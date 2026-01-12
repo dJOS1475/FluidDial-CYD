@@ -2,8 +2,5 @@
 
 <img src="https://raw.githubusercontent.com/dJOS1475/FluidDial-CYD/refs/heads/main/new_ui/Pendant.jpeg" alt="CYD Dial Pendant With Buttons and Jog Dial" height="500">
 
-<img src="[[http://wiki.fluidnc.com/cydpendant.jpg](https://raw.githubusercontent.com/dJOS1475/FluidDial-CYD/refs/heads/main/new_ui/Pendant.jpeg)](https://raw.githubusercontent.com/dJOS1475/FluidDial-CYD/new_ui/Pendant.jpeg)" alt="CYD Dial Pendant With Buttons and Jog Dial" height="500">
+Wiki pages for more information: [CYD Dial Pendant (http://wiki.fluidnc.com/en/hardware/official/CYD_Dial_Pendant).
 
-Wiki pages for more information: [M5 FluidDial Pendant (left image)](http://wiki.fluidnc.com/en/hardware/official/M5Dial_Pendant) and [CYD Dial Pendant (right image)](http://wiki.fluidnc.com/en/hardware/official/CYD_Dial_Pendant).
-
-Both have similar functionality and similar cost, using different hardware.
