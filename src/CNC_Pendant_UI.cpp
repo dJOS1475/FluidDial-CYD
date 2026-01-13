@@ -65,6 +65,10 @@ struct MachineState {
   String connectionStatus = "Connected";
   int freeHeap = 187;
   String workCoordSystem = "G54";
+  String ipAddress = "192.168.1.100";
+  String wifiSSID = "MyNetwork";
+  String displayRotation = "Normal";
+  int rotation = 2; // 2 = normal, 0 = upside down
 } pendantMachine;
 
 struct JogState {
@@ -248,6 +252,7 @@ void drawStatusScreen() {
   display.setTextSize(1);
   display.setCursor(10, 100);
   display.print("CURRENT FILE");
+  display.setTextColor(COLOR_CYAN);
   display.setTextSize(1);
   display.setCursor(10, 115);
   display.print(pendantMachine.currentFile);
@@ -314,8 +319,9 @@ void drawStatusScreen() {
   display.setCursor(235 - 5 - rpmWidth, 260);
   display.print("RPM");
 
-  // Main Menu button - with 5px gap from panels above
-  drawButton(5, 280, 230, 40, "Main Menu", COLOR_BLUE, COLOR_WHITE, 2);
+  // Main Menu and FluidNC buttons - with 5px gap from panels above
+  drawButton(5, 280, 112, 40, "Main Menu", COLOR_BLUE, COLOR_WHITE, 2);
+  drawButton(123, 280, 112, 40, "FluidNC", COLOR_BLUE, COLOR_WHITE, 2);
 }
 
 void drawJogHomingScreen() {
@@ -652,111 +658,150 @@ void drawMacrosScreen() {
   }
 
   // Main Menu button
-  drawButton(5, 297, 230, 40, "Main Menu", COLOR_BLUE, COLOR_WHITE, 2);
+  drawButton(5, 280, 230, 40, "Main Menu", COLOR_BLUE, COLOR_WHITE, 2);
 }
 
 void drawSDCardScreen() {
   display.fillScreen(COLOR_BACKGROUND);
   drawTitle("SD CARD");
 
-  // File list - 4 files visible
-  for (int i = 0; i < 4 && i < pendantSdCard.fileCount; i++) {
+  // File list - increased to 5 files visible with more space
+  for (int i = 0; i < 5 && i < pendantSdCard.fileCount; i++) {
     int displayIndex = i + pendantSdCard.scrollOffset;
     if (displayIndex >= pendantSdCard.fileCount) break;
 
-    uint16_t bgColor = (displayIndex == pendantSdCard.selectedFile) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
-    display.fillRoundRect(5, 40 + i * 48, 230, 43, 8, bgColor);
+    // No default selection - only highlight if user has selected
+    uint16_t bgColor = COLOR_BUTTON_GRAY;
+    display.fillRoundRect(5, 40 + i * 44, 230, 40, 8, bgColor);
     display.setTextColor(COLOR_WHITE);
-    display.setTextSize(2);
-    display.setCursor(10, 54 + i * 48);
+    display.setTextSize(1);
+    display.setCursor(10, 52 + i * 44);
     display.print(pendantSdCard.files[displayIndex]);
   }
 
-  // Navigation buttons
-  drawButton(5, 235, 112, 38, "Back", COLOR_BUTTON_GRAY, COLOR_WHITE, 2);
-  drawButton(123, 235, 112, 38, "Next", COLOR_BUTTON_GRAY, COLOR_WHITE, 2);
-
-  // Action buttons
-  drawButton(5, 278, 112, 38, "Open", COLOR_GREEN, COLOR_WHITE, 2);
-  drawButton(123, 278, 112, 38, "Delete", COLOR_RED, COLOR_WHITE, 2);
+  // Navigation buttons stacked above Main Menu
+  drawButton(5, 240, 112, 38, "Back", COLOR_BUTTON_GRAY, COLOR_WHITE, 2);
+  drawButton(123, 240, 112, 38, "Next", COLOR_BUTTON_GRAY, COLOR_WHITE, 2);
 
   // Main Menu button
-  drawButton(5, 297, 230, 40, "Main Menu", COLOR_BLUE, COLOR_WHITE, 2);
+  drawButton(5, 282, 230, 38, "Main Menu", COLOR_BLUE, COLOR_WHITE, 2);
 }
 
 void drawFluidNCScreen() {
   display.fillScreen(COLOR_BACKGROUND);
   drawTitle("FLUIDNC");
 
-  // FluidDial Version
-  display.fillRoundRect(5, 40, 230, 50, 5, COLOR_DARKER_BG);
+  // Version and Network Info Panel - split into two columns, increased height
+  display.fillRoundRect(5, 40, 230, 60, 5, COLOR_DARKER_BG);
+
+  // Left column - Version info
   display.setTextColor(COLOR_GRAY_TEXT);
   display.setTextSize(1);
   display.setCursor(10, 45);
-  display.print("FLUIDDIAL VERSION");
+  display.print("FLUIDDIAL");
   display.setTextColor(COLOR_GREEN);
-  display.setTextSize(2);
-  display.setCursor(10, 62);
+  display.setTextSize(1);
+  display.setCursor(10, 57);
   display.print(pendantMachine.fluidDialVersion);
 
-  // FluidNC Version
-  display.fillRoundRect(5, 98, 230, 50, 5, COLOR_DARKER_BG);
+  // Space row
+
   display.setTextColor(COLOR_GRAY_TEXT);
   display.setTextSize(1);
-  display.setCursor(10, 103);
-  display.print("FLUIDNC VERSION");
+  display.setCursor(10, 75);
+  display.print("FLUIDNC");
   display.setTextColor(COLOR_GREEN);
-  display.setTextSize(2);
-  display.setCursor(10, 120);
+  display.setTextSize(1);
+  display.setCursor(10, 87);
   display.print(pendantMachine.fluidNCVersion);
 
-  // Connection Info
-  display.fillRoundRect(5, 156, 230, 80, 5, COLOR_DARKER_BG);
+  // Right column - Network info
   display.setTextColor(COLOR_GRAY_TEXT);
   display.setTextSize(1);
-  display.setCursor(10, 161);
+  display.setCursor(120, 45);
+  display.print("IP ADDRESS");
+  display.setTextColor(COLOR_CYAN);
+  display.setTextSize(1);
+  display.setCursor(120, 57);
+  display.print(pendantMachine.ipAddress);
+
+  // Space row
+
+  display.setTextColor(COLOR_GRAY_TEXT);
+  display.setTextSize(1);
+  display.setCursor(120, 75);
+  display.print("WIFI SSID");
+  display.setTextColor(COLOR_CYAN);
+  display.setTextSize(1);
+  display.setCursor(120, 87);
+  display.print(pendantMachine.wifiSSID);
+
+  // Connection Info
+  display.fillRoundRect(5, 108, 230, 70, 5, COLOR_DARKER_BG);
+  display.setTextColor(COLOR_GRAY_TEXT);
+  display.setTextSize(1);
+  display.setCursor(10, 113);
   display.print("CONNECTION");
 
-  display.setCursor(10, 178);
+  display.setCursor(10, 130);
   display.print("Baud:");
   display.setTextColor(COLOR_ORANGE);
   display.setTextSize(2);
-  display.setCursor(100, 175);
+  display.setCursor(100, 127);
   display.print(pendantMachine.baudRate);
 
   display.setTextColor(COLOR_GRAY_TEXT);
   display.setTextSize(1);
-  display.setCursor(10, 198);
+  display.setCursor(10, 148);
   display.print("Port:");
   display.setTextColor(COLOR_CYAN);
   display.setTextSize(1);
-  display.setCursor(10, 210);
+  display.setCursor(10, 160);
   display.print(pendantMachine.port);
 
+  // CYD ESP32 Resources - increased height to 70px for 3 rows
+  display.fillRoundRect(5, 186, 230, 70, 5, COLOR_DARKER_BG);
   display.setTextColor(COLOR_GRAY_TEXT);
   display.setTextSize(1);
-  display.setCursor(10, 223);
-  display.print("Status:");
-  display.setTextColor(COLOR_GREEN);
-  display.setTextSize(1);
-  display.setCursor(100, 223);
-  display.print(pendantMachine.connectionStatus);
-
-  // CYD ESP32 Resources
-  display.fillRoundRect(5, 244, 230, 45, 5, COLOR_DARKER_BG);
-  display.setTextColor(COLOR_GRAY_TEXT);
-  display.setTextSize(1);
-  display.setCursor(10, 249);
+  display.setCursor(10, 191);
   display.print("FREE HEAP");
 
   display.setTextColor(COLOR_ORANGE);
   display.setTextSize(2);
-  display.setCursor(10, 266);
+  display.setCursor(10, 208);
   display.print(pendantMachine.freeHeap);
   display.print(" KB");
 
+  display.setTextColor(COLOR_GRAY_TEXT);
+  display.setTextSize(1);
+  display.setCursor(120, 191);
+  display.print("STATUS");
+  display.setTextColor(COLOR_GREEN);
+  display.setTextSize(1);
+  display.setCursor(120, 208);
+  display.print(pendantMachine.connectionStatus);
+
+  display.setTextColor(COLOR_GRAY_TEXT);
+  display.setTextSize(1);
+  display.setCursor(10, 227);
+  display.print("ROTATION");
+  display.setTextColor(COLOR_CYAN);
+  display.setTextSize(1);
+  display.setCursor(10, 239);
+  display.print(pendantMachine.displayRotation);
+
+  // Jog Dial touch area - invisible clickable area for rotation toggle
+  display.setTextColor(COLOR_GRAY_TEXT);
+  display.setTextSize(1);
+  display.setCursor(120, 227);
+  display.print("Jog Dial");
+  display.setTextColor(COLOR_CYAN);
+  display.setTextSize(1);
+  display.setCursor(120, 239);
+  display.print("Rotate");
+
   // Main Menu button
-  drawButton(5, 297, 230, 40, "Main Menu", COLOR_BLUE, COLOR_WHITE, 2);
+  drawButton(5, 264, 230, 40, "Main Menu", COLOR_BLUE, COLOR_WHITE, 2);
 }
 
 // ===== Main Drawing Router =====
@@ -970,42 +1015,43 @@ void handleFeedsSpeedsTouch(int x, int y) {
 }
 
 void handleSDCardTouch(int x, int y) {
-  // File selection
-  for (int i = 0; i < 4; i++) {
-    if (isTouchInBounds(x, y, 5, 40 + i * 48, 230, 43)) {
-      pendantSdCard.selectedFile = i + pendantSdCard.scrollOffset;
-      drawCurrentPendantScreen();
+  // File selection - selecting a file opens it and goes to Status screen
+  for (int i = 0; i < 5; i++) {
+    if (isTouchInBounds(x, y, 5, 40 + i * 44, 230, 40)) {
+      int displayIndex = i + pendantSdCard.scrollOffset;
+      if (displayIndex < pendantSdCard.fileCount) {
+        // Open file and switch to Status screen
+        pendantMachine.currentFile = pendantSdCard.files[displayIndex];
+        dbg_printf("Opening: %s\n", pendantMachine.currentFile.c_str());
+        currentPendantScreen = PSCREEN_STATUS;
+      }
       return;
     }
   }
 
-  // Navigation
-  if (isTouchInBounds(x, y, 5, 235, 112, 38)) {
-    // Back
+  // Navigation - Back button with animation
+  if (isTouchInBounds(x, y, 5, 240, 112, 38)) {
     if (pendantSdCard.scrollOffset > 0) {
+      // Animate button press
+      drawButton(5, 240, 112, 38, "Back", COLOR_WHITE, COLOR_BUTTON_GRAY, 2);
+      delay_ms(150);
       pendantSdCard.scrollOffset--;
       drawCurrentPendantScreen();
     }
-  } else if (isTouchInBounds(x, y, 123, 235, 112, 38)) {
-    // Next
-    if (pendantSdCard.scrollOffset + 4 < pendantSdCard.fileCount) {
+  }
+  // Navigation - Next button with animation
+  else if (isTouchInBounds(x, y, 123, 240, 112, 38)) {
+    if (pendantSdCard.scrollOffset + 5 < pendantSdCard.fileCount) {
+      // Animate button press
+      drawButton(123, 240, 112, 38, "Next", COLOR_WHITE, COLOR_BUTTON_GRAY, 2);
+      delay_ms(150);
       pendantSdCard.scrollOffset++;
       drawCurrentPendantScreen();
     }
   }
 
-  // Actions
-  if (isTouchInBounds(x, y, 5, 278, 112, 38)) {
-    // Open file
-    pendantMachine.currentFile = pendantSdCard.files[pendantSdCard.selectedFile];
-    dbg_printf("Opening: %s\n", pendantMachine.currentFile.c_str());
-  } else if (isTouchInBounds(x, y, 123, 278, 112, 38)) {
-    // Delete file
-    dbg_printf("Deleting: %s\n", pendantSdCard.files[pendantSdCard.selectedFile].c_str());
-  }
-
   // Main Menu
-  if (isTouchInBounds(x, y, 5, 297, 230, 40)) {
+  if (isTouchInBounds(x, y, 5, 282, 230, 38)) {
     currentPendantScreen = PSCREEN_MAIN_MENU;
   }
 }
@@ -1069,13 +1115,18 @@ void handleMacrosTouch(int x, int y) {
     int bx = 5 + (i % 2) * 118;
     int by = 40 + (i / 2) * 48;
     if (isTouchInBounds(x, y, bx, by, 112, 43)) {
+      // Animate button press
+      String label = "Macro " + String(i);
+      drawButton(bx, by, 112, 43, label, COLOR_WHITE, COLOR_BUTTON_GRAY, 2);
+      delay_ms(150);
+      drawButton(bx, by, 112, 43, label, COLOR_BUTTON_GRAY, COLOR_WHITE, 2);
       dbg_printf("Executing Macro %d\n", i);
       return;
     }
   }
 
   // Main Menu
-  if (isTouchInBounds(x, y, 5, 297, 230, 40)) {
+  if (isTouchInBounds(x, y, 5, 280, 230, 40)) {
     currentPendantScreen = PSCREEN_MAIN_MENU;
   }
 }
@@ -1104,14 +1155,18 @@ void handlePendantTouch(int x, int y) {
       handleMacrosTouch(x, y);
       break;
     case PSCREEN_STATUS:
-      // Main Menu button at bottom - Y=280, height 40
-      if (isTouchInBounds(x, y, 5, 280, 230, 40)) {
+      // Main Menu button at bottom left - Y=280, height 40
+      if (isTouchInBounds(x, y, 5, 280, 112, 40)) {
         currentPendantScreen = PSCREEN_MAIN_MENU;
+      }
+      // FluidNC button at bottom right - Y=280, height 40
+      else if (isTouchInBounds(x, y, 123, 280, 112, 40)) {
+        currentPendantScreen = PSCREEN_FLUIDNC;
       }
       break;
     case PSCREEN_FLUIDNC:
-      // Main Menu button at bottom
-      if (isTouchInBounds(x, y, 5, 297, 230, 40)) {
+      // Main Menu button at bottom - at Y=264
+      if (isTouchInBounds(x, y, 5, 264, 230, 40)) {
         currentPendantScreen = PSCREEN_MAIN_MENU;
       }
       break;
@@ -1169,6 +1224,12 @@ void setup_pendant() {
   // The hardware initialization is already done by the existing FluidDial code
   // Display rotation is already set to 180 degrees in ardmain.cpp
 
+  // Initialize encoder pins if using encoder
+  if (USE_ENCODER) {
+    pinMode(ENCODER_CLK, INPUT_PULLUP);
+    pinMode(ENCODER_DT, INPUT_PULLUP);
+  }
+
   // Draw our initial screen
   drawCurrentPendantScreen();
   dbg_printf("CNC Pendant UI Initialized\n");
@@ -1178,6 +1239,38 @@ void loop_pendant() {
   // Handle physical buttons
   if (USE_PHYSICAL_BUTTONS) {
     handlePendantPhysicalButtons();
+  }
+
+  // Handle encoder rotation for screen rotation (only on FluidNC screen)
+  if (USE_ENCODER && currentPendantScreen == PSCREEN_FLUIDNC) {
+    static int lastEncoderCLK = HIGH;
+    static unsigned long lastRotationTime = 0;
+
+    int currentCLK = digitalRead(ENCODER_CLK);
+
+    // Detect rotation - check if CLK changed from HIGH to LOW
+    if (currentCLK != lastEncoderCLK && currentCLK == LOW) {
+      // Debounce - only handle if not rotated recently
+      if (millis() - lastRotationTime > 300) {
+        int currentDT = digitalRead(ENCODER_DT);
+
+        // Determine rotation direction and toggle display rotation
+        // When CLK goes LOW, if DT is HIGH = clockwise, if DT is LOW = counter-clockwise
+        // Either direction toggles the rotation
+        if (pendantMachine.rotation == 2) {
+          pendantMachine.rotation = 0;
+          pendantMachine.displayRotation = "Upside Down";
+        } else {
+          pendantMachine.rotation = 2;
+          pendantMachine.displayRotation = "Normal";
+        }
+        display.setRotation(pendantMachine.rotation);
+        drawCurrentPendantScreen();
+        lastRotationTime = millis();
+        dbg_printf("Display rotation toggled to: %s\n", pendantMachine.displayRotation.c_str());
+      }
+    }
+    lastEncoderCLK = currentCLK;
   }
 
   // Handle touch input
