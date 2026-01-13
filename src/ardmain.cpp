@@ -17,14 +17,16 @@ extern AboutScene aboutScene;
 void setup() {
     init_system();
 
-    // Set display rotation to 180 degrees before showing anything
-    display.setRotation(2);
+    // Set display brightness
     display.setBrightness(255);
+
+    // Set initial rotation for logo (will be overridden by pendant preferences)
+    display.setRotation(2);
 
     show_logo();
     delay_ms(2000);  // view the logo and wait for the debug port to connect
 
-    // Initialize the new pendant UI
+    // Initialize the new pendant UI (loads rotation preference)
     setup_pendant();
 
     dbg_printf("FluidNC Pendant with new UI %s\n", git_info);

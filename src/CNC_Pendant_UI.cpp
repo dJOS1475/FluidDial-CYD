@@ -11,10 +11,14 @@
  */
 
 #include "cnc_pendant_config.h"
+#include <Preferences.h>
 
 // Include from existing FluidDial project
 #include "System.h"
 #include "Scene.h"
+
+// Preferences object for persistent storage
+Preferences preferences;
 
 // External references from Hardware2432.cpp
 extern LGFX_Device& display;
@@ -30,6 +34,7 @@ enum PendantScreen {
   PSCREEN_STATUS,
   PSCREEN_JOG_HOMING,
   PSCREEN_PROBING_WORK,
+  PSCREEN_PROBING,
   PSCREEN_FEEDS_SPEEDS,
   PSCREEN_SPINDLE_CONTROL,
   PSCREEN_MACROS,
@@ -98,6 +103,15 @@ struct ProbingState {
   String selectedCoordSystem = "G54"; // G54, G55, G56, G57
   int selectedCoordIndex = 0;
 } pendantProbing;
+
+struct ProbeState {
+  int selectedProbeType = -1; // -1=none, 0=Z Surface, 1=Tool Height
+  float feedRate = 100.0;
+  float maxTravel = 25.0;
+  float toolDia = 6.0;
+  String status = "Ready";
+  float lastZ = -15.234;
+} pendantProbe;
 
 int displayRotation = 2; // 0, 1, 2, 3 for 0°, 90°, 180°, 270° - default is 180°
 
@@ -227,7 +241,7 @@ void drawMainMenu() {
   drawButton(123, btnY + btnGap*2, 112, btnH, "SD Card", COLOR_BLUE, COLOR_WHITE, 2);
 
   // Row 4
-  drawButton(5, btnY + btnGap*3, 112, btnH, "FluidNC", COLOR_BLUE, COLOR_WHITE, 2);
+  drawButton(5, btnY + btnGap*3, 112, btnH, "Probe", COLOR_BLUE, COLOR_WHITE, 2);
   drawButton(123, btnY + btnGap*3, 112, btnH, "Status", COLOR_BLUE, COLOR_WHITE, 2);
 }
 
@@ -489,6 +503,72 @@ void drawProbingWorkScreen() {
   // Bottom navigation
   drawButton(5, 277, 112, 40, "Main Menu", COLOR_BLUE, COLOR_WHITE, 2);
   drawButton(123, 277, 112, 40, "Jog", COLOR_BLUE, COLOR_WHITE, 2);
+}
+
+void drawProbingScreen() {
+  display.fillScreen(COLOR_BACKGROUND);
+  drawTitle("PROBE");
+
+  // Current Position
+  display.setTextColor(COLOR_GRAY_TEXT);
+  display.setTextSize(1);
+  display.setCursor(5, 43);
+  display.print("CURRENT POSITION");
+
+  display.setTextColor(COLOR_ORANGE);
+  display.setTextSize(2);
+  display.setCursor(5, 57);
+  display.print("X ");
+  display.print(pendantMachine.posX, 1);
+  display.setCursor(90, 57);
+  display.print("Y ");
+  display.print(pendantMachine.posY, 1);
+  display.setCursor(5, 77);
+  display.print("Z ");
+  display.print(pendantMachine.posZ, 1);
+  display.setCursor(90, 77);
+  display.print("A ");
+  display.print(pendantMachine.posA, 1);
+
+  // Probe Type
+  display.setTextColor(COLOR_GRAY_TEXT);
+  display.setTextSize(1);
+  display.setCursor(5, 104);
+  display.print("PROBE TYPE");
+
+  String probeTypes[] = {"Z Surface", "Tool Height"};
+  uint16_t probeColors[] = {COLOR_DARK_GREEN, COLOR_ORANGE};
+
+  // 2 buttons stacked vertically - colored buttons
+  for (int i = 0; i < 2; i++) {
+    int y = 116 + i * 43;
+    drawButton(5, y, 230, 38, probeTypes[i], probeColors[i], COLOR_WHITE, 2);
+  }
+
+  // Probe Settings
+  display.setTextColor(COLOR_GRAY_TEXT);
+  display.setTextSize(1);
+  display.setCursor(5, 214);
+  display.print("PROBE SETTINGS");
+
+  display.setCursor(5, 228);
+  display.print("Feed Rate:");
+  display.setTextColor(COLOR_ORANGE);
+  display.setTextSize(1);
+  display.setCursor(170, 228);
+  display.print(pendantProbe.feedRate, 0);
+  display.print(" mm/min");
+
+  display.setTextColor(COLOR_GRAY_TEXT);
+  display.setCursor(5, 243);
+  display.print("Max Travel:");
+  display.setTextColor(COLOR_ORANGE);
+  display.setCursor(170, 243);
+  display.print(pendantProbe.maxTravel, 1);
+  display.print(" mm");
+
+  // Main Menu button
+  drawButton(5, 280, 230, 40, "Main Menu", COLOR_BLUE, COLOR_WHITE, 2);
 }
 
 void drawFeedsSpeedsScreen() {
@@ -819,6 +899,9 @@ void drawCurrentPendantScreen() {
     case PSCREEN_PROBING_WORK:
       drawProbingWorkScreen();
       break;
+    case PSCREEN_PROBING:
+      drawProbingScreen();
+      break;
     case PSCREEN_FEEDS_SPEEDS:
       drawFeedsSpeedsScreen();
       break;
@@ -860,7 +943,7 @@ void handleMainMenuTouch(int x, int y) {
   } else if (isTouchInBounds(x, y, 123, btnY + btnGap*2, 112, btnH)) {
     currentPendantScreen = PSCREEN_SD_CARD;
   } else if (isTouchInBounds(x, y, 5, btnY + btnGap*3, 112, btnH)) {
-    currentPendantScreen = PSCREEN_FLUIDNC;
+    currentPendantScreen = PSCREEN_PROBING;
   } else if (isTouchInBounds(x, y, 123, btnY + btnGap*3, 112, btnH)) {
     currentPendantScreen = PSCREEN_STATUS;
   }
@@ -1131,6 +1214,30 @@ void handleMacrosTouch(int x, int y) {
   }
 }
 
+void handleProbingTouch(int x, int y) {
+  // Probe Type selection - 2 buttons stacked vertically with animation
+  String probeTypes[] = {"Z Surface", "Tool Height"};
+  uint16_t probeColors[] = {COLOR_DARK_GREEN, COLOR_ORANGE};
+
+  for (int i = 0; i < 2; i++) {
+    int by = 116 + i * 43;
+    if (isTouchInBounds(x, y, 5, by, 230, 38)) {
+      // Animate button press - invert colors
+      drawButton(5, by, 230, 38, probeTypes[i], COLOR_WHITE, probeColors[i], 2);
+      delay_ms(150);
+      drawButton(5, by, 230, 38, probeTypes[i], probeColors[i], COLOR_WHITE, 2);
+      pendantProbe.selectedProbeType = i;
+      dbg_printf("Probe type selected: %s\n", probeTypes[i].c_str());
+      return;
+    }
+  }
+
+  // Main Menu button
+  if (isTouchInBounds(x, y, 5, 280, 230, 40)) {
+    currentPendantScreen = PSCREEN_MAIN_MENU;
+  }
+}
+
 void handlePendantTouch(int x, int y) {
   switch (currentPendantScreen) {
     case PSCREEN_MAIN_MENU:
@@ -1150,6 +1257,9 @@ void handlePendantTouch(int x, int y) {
       break;
     case PSCREEN_PROBING_WORK:
       handleProbingWorkTouch(x, y);
+      break;
+    case PSCREEN_PROBING:
+      handleProbingTouch(x, y);
       break;
     case PSCREEN_MACROS:
       handleMacrosTouch(x, y);
@@ -1222,7 +1332,22 @@ void handlePendantPhysicalButtons() {
 // ===== Public Interface Functions =====
 void setup_pendant() {
   // The hardware initialization is already done by the existing FluidDial code
-  // Display rotation is already set to 180 degrees in ardmain.cpp
+
+  // Load saved rotation preference from NVS
+  preferences.begin("pendant", false); // Read/Write mode
+  int savedRotation = preferences.getInt("rotation", 2); // Default to 2 (normal)
+  preferences.end();
+
+  // Apply saved rotation
+  pendantMachine.rotation = savedRotation;
+  if (pendantMachine.rotation == 2) {
+    pendantMachine.displayRotation = "Normal";
+  } else {
+    pendantMachine.displayRotation = "Upside Down";
+  }
+  display.setRotation(pendantMachine.rotation);
+
+  dbg_printf("Loaded display rotation: %s (%d)\n", pendantMachine.displayRotation.c_str(), pendantMachine.rotation);
 
   // Initialize encoder pins if using encoder
   if (USE_ENCODER) {
@@ -1242,35 +1367,53 @@ void loop_pendant() {
   }
 
   // Handle encoder rotation for screen rotation (only on FluidNC screen)
-  if (USE_ENCODER && currentPendantScreen == PSCREEN_FLUIDNC) {
+  if (USE_ENCODER) {
     static int lastEncoderCLK = HIGH;
     static unsigned long lastRotationTime = 0;
+    static PendantScreen lastScreen = PSCREEN_MAIN_MENU;
 
-    int currentCLK = digitalRead(ENCODER_CLK);
-
-    // Detect rotation - check if CLK changed from HIGH to LOW
-    if (currentCLK != lastEncoderCLK && currentCLK == LOW) {
-      // Debounce - only handle if not rotated recently
-      if (millis() - lastRotationTime > 300) {
-        int currentDT = digitalRead(ENCODER_DT);
-
-        // Determine rotation direction and toggle display rotation
-        // When CLK goes LOW, if DT is HIGH = clockwise, if DT is LOW = counter-clockwise
-        // Either direction toggles the rotation
-        if (pendantMachine.rotation == 2) {
-          pendantMachine.rotation = 0;
-          pendantMachine.displayRotation = "Upside Down";
-        } else {
-          pendantMachine.rotation = 2;
-          pendantMachine.displayRotation = "Normal";
-        }
-        display.setRotation(pendantMachine.rotation);
-        drawCurrentPendantScreen();
-        lastRotationTime = millis();
-        dbg_printf("Display rotation toggled to: %s\n", pendantMachine.displayRotation.c_str());
-      }
+    // Reset encoder state when entering FluidNC screen
+    if (currentPendantScreen == PSCREEN_FLUIDNC && lastScreen != PSCREEN_FLUIDNC) {
+      lastEncoderCLK = digitalRead(ENCODER_CLK);
+      lastScreen = PSCREEN_FLUIDNC;
+    } else if (currentPendantScreen != PSCREEN_FLUIDNC) {
+      lastScreen = currentPendantScreen;
     }
-    lastEncoderCLK = currentCLK;
+
+    // Only handle rotation when on FluidNC screen
+    if (currentPendantScreen == PSCREEN_FLUIDNC) {
+      int currentCLK = digitalRead(ENCODER_CLK);
+
+      // Detect rotation - check if CLK changed from HIGH to LOW
+      if (currentCLK != lastEncoderCLK && currentCLK == LOW) {
+        // Debounce - only handle if not rotated recently
+        if (millis() - lastRotationTime > 300) {
+          int currentDT = digitalRead(ENCODER_DT);
+
+          // Determine rotation direction and toggle display rotation
+          // When CLK goes LOW, if DT is HIGH = clockwise, if DT is LOW = counter-clockwise
+          // Either direction toggles the rotation
+          if (pendantMachine.rotation == 2) {
+            pendantMachine.rotation = 0;
+            pendantMachine.displayRotation = "Upside Down";
+          } else {
+            pendantMachine.rotation = 2;
+            pendantMachine.displayRotation = "Normal";
+          }
+          display.setRotation(pendantMachine.rotation);
+
+          // Save rotation preference to NVS
+          preferences.begin("pendant", false);
+          preferences.putInt("rotation", pendantMachine.rotation);
+          preferences.end();
+
+          drawCurrentPendantScreen();
+          lastRotationTime = millis();
+          dbg_printf("Display rotation toggled to: %s (saved to NVS)\n", pendantMachine.displayRotation.c_str());
+        }
+      }
+      lastEncoderCLK = currentCLK;
+    }
   }
 
   // Handle touch input
