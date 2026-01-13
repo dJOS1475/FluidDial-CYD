@@ -960,10 +960,14 @@ void handleJogHomingTouch(int x, int y) {
   }
 
   // Home buttons
+  String axisNames[] = {"X", "Y", "Z", "A"};
   for (int i = 0; i < 4; i++) {
     if (isTouchInBounds(x, y, 5 + i * 56, 173, 52, 38)) {
+      // Animate button press - invert colors
+      drawButton(5 + i * 56, 173, 52, 38, axisNames[i], COLOR_WHITE, COLOR_DARK_GREEN, 3);
+      delay_ms(150);
+      drawButton(5 + i * 56, 173, 52, 38, axisNames[i], COLOR_DARK_GREEN, COLOR_WHITE, 3);
       // Send home command for axis i
-      String axisNames[] = {"X", "Y", "Z", "A"};
       dbg_printf("$H%s\n", axisNames[i].c_str());
       return;
     }
