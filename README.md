@@ -8,5 +8,5 @@ and a jog dial, and is designed to work with the FluidNC Firmware.
 
 Wiki pages for more information: CYD Dial Pendant (http://wiki.fluidnc.com/en/hardware/official/CYD_Dial_Pendant).
 
-See the **Compiling Firmware** Section on how to test this: (http://wiki.fluidnc.com/en/hardware/official/CYD_Dial_Pendant)
+See the **Compiling Firmware** Section on how to test this version: (http://wiki.fluidnc.com/en/hardware/official/CYD_Dial_Pendant)
 
