@@ -5,9 +5,10 @@ and a jog dial, and is designed to work with the FluidNC Firmware.
 *** **This Firmware is a Work In-progress** ***
 
 **Design Goals:**
+
 Physical jog dial will only move the cnc machine when in the Jog & Homing screen. 
 
-The 3 physical buttons that will always be:
+The 3 physical buttons will always be:
 * Red: e-stop
 * Yellow: Pause Job
 * Green: Cycle Start
