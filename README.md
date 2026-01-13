@@ -1,7 +1,19 @@
-# FluidDial: A CNC Pendant for FluidNC Firmware.
+# FluidDial-CYD: 
+The CYD_Buttons Version has been optimised for FluidDial CNC Pendants with 3 physical buttons 
+and a jog dial, and is designed to work with the FluidNC Firmware.
 
-<img src="http://wiki.fluidnc.com/hardware/fd1.png" alt="M5 Fluid Dial" height="500"><img src="http://wiki.fluidnc.com/cydpendant.jpg" alt="CYD Dial Pendant" height="500">
+*** **This Firmware is a Work In-progress** ***
 
-Wiki pages for more information: [M5 FluidDial Pendant (left image)](http://wiki.fluidnc.com/en/hardware/official/M5Dial_Pendant) and [CYD Dial Pendant (right image)](http://wiki.fluidnc.com/en/hardware/official/CYD_Dial_Pendant).
+**Design Goals:**
 
-Both have similar functionality and similar cost, using different hardware.
+All Menu navigation and as many features as possible will be managed via the touch screen. The Physical jog dial will only move the CNC machine when in the Jog & Homing screen (safety feature). The 3 physical buttons will always be:
+* Red: e-stop
+* Yellow: Pause Job
+* Green: Cycle Start
+
+<img src="https://raw.githubusercontent.com/dJOS1475/FluidDial-CYD/refs/heads/main/new_ui/Pendant.jpeg" alt="CYD Dial Pendant With Buttons and Jog Dial" height="500">
+
+Wiki pages for more information: CYD Dial Pendant (http://wiki.fluidnc.com/en/hardware/official/CYD_Dial_Pendant).
+
+See the **Compiling Firmware** Section on how to test this version: (http://wiki.fluidnc.com/en/hardware/official/CYD_Dial_Pendant)
+
