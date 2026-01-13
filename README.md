@@ -7,6 +7,8 @@ and a jog dial, and is designed to work with the FluidNC Firmware.
 **Updates:**
 * FluidNC Screen now accessible via the Status page
 * Probe Screen created and button added to Main Menu
+* Screen can be rotated 180 degress via the Jog Dial from the FluidNC
+* Screen Rotation is saved and will be recalled on restart
 
 **Design Goals:**
 
