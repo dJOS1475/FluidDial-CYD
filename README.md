@@ -4,6 +4,10 @@ and a jog dial, and is designed to work with the FluidNC Firmware.
 
 *** **This Firmware is a Work In-progress** ***
 
+**Updates:**
+* FluidNC Screen now accessible via the Status page
+* Probe Screen created and button added to Main Menu
+
 **Design Goals:**
 
 All Menu navigation and as many features as possible will be managed via the touch screen. The Physical jog dial will only move the CNC machine when in the Jog & Homing screen (safety feature). The Jog Dial will also be able to scroll through selected features depending on the screen (WIP). eg on the FluidNC screen, the jog Dial will rotate the display. 
