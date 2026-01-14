@@ -5,6 +5,13 @@ and a jog dial, and is designed to work with the FluidNC Firmware.
 *** **This Firmware is a Work In-progress** ***
 
 **Updates:**
+
+**2025-01-15**
+* Changed to sprite based rendering to remove as much screen flicker as possible
+* Made the Yellow button context sensitive
+* remove axis coordinates from the Main Menu screen
+
+**2025-01-13**
 * FluidNC Screen now accessible via the Status page
 * Probe Screen created and button added to Main Menu
 * Screen can be rotated 180 degress via the Jog Dial from the FluidNC
