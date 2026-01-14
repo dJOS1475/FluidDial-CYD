@@ -45,16 +45,6 @@ enum PendantScreen {
 PendantScreen currentPendantScreen = PSCREEN_MAIN_MENU;
 PendantScreen previousPendantScreen = PSCREEN_MAIN_MENU;
 
-// ===== Sprite Buffers for Optimization =====
-// These sprites hold frequently updated UI elements to avoid full screen redraws
-LGFX_Sprite spriteAxisDisplay(&display);    // For Jog screen axis position display
-LGFX_Sprite spriteValueDisplay(&display);   // For small value updates (RPM, feed rate, etc.)
-LGFX_Sprite spriteStatusBar(&display);      // For status indicators
-
-// Track which screen sprites are allocated for
-PendantScreen spritesAllocatedFor = PSCREEN_MAIN_MENU;
-bool spritesInitialized = false;
-
 // ===== State Variables =====
 struct MachineState {
   String status = "IDLE";
@@ -183,633 +173,55 @@ void drawInfoBox(int x, int y, int w, int h, String label, String value, uint16_
   display.print(value);
 }
 
-// ===== Sprite Management Functions =====
-
-// Initialize sprites for a specific screen
-void initSpritesForScreen(PendantScreen screen) {
-  // Free existing sprites if they exist
-  if (spritesInitialized) {
-    spriteAxisDisplay.deleteSprite();
-    spriteValueDisplay.deleteSprite();
-    spriteStatusBar.deleteSprite();
-    spritesInitialized = false;
-  }
-
-  // Allocate sprites based on screen needs
-  switch (screen) {
-    case PSCREEN_JOG_HOMING:
-      // Large sprite for axis position display (230x55)
-      spriteAxisDisplay.createSprite(230, 55);
-      spriteAxisDisplay.setColorDepth(16);
-
-      // Small sprite for increment indicator updates
-      spriteValueDisplay.createSprite(230, 40);
-      spriteValueDisplay.setColorDepth(16);
-      spritesInitialized = true;
-      break;
-
-    case PSCREEN_PROBING_WORK:
-      // Sprite for machine position display (230x45)
-      spriteAxisDisplay.createSprite(230, 45);
-      spriteAxisDisplay.setColorDepth(16);
-
-      // Sprite for work position display (230x45)
-      spriteValueDisplay.createSprite(230, 45);
-      spriteValueDisplay.setColorDepth(16);
-      spritesInitialized = true;
-      break;
-
-    case PSCREEN_MAIN_MENU:
-      // Sprite for centered status display only
-      spriteStatusBar.createSprite(230, 65);
-      spriteStatusBar.setColorDepth(16);
-      spritesInitialized = true;
-      break;
-
-    case PSCREEN_STATUS:
-      // Sprite for machine status (230x50)
-      spriteStatusBar.createSprite(230, 50);
-      spriteStatusBar.setColorDepth(16);
-
-      // Sprite for axis positions (230x65)
-      spriteAxisDisplay.createSprite(230, 65);
-      spriteAxisDisplay.setColorDepth(16);
-
-      // Sprite for feed/spindle info - full width to cover both boxes (230x65)
-      spriteValueDisplay.createSprite(230, 65);
-      spriteValueDisplay.setColorDepth(16);
-      spritesInitialized = true;
-      break;
-
-    case PSCREEN_SPINDLE_CONTROL:
-      // Sprite for RPM display
-      spriteValueDisplay.createSprite(230, 60);
-      spriteValueDisplay.setColorDepth(16);
-      spritesInitialized = true;
-      break;
-
-    case PSCREEN_FEEDS_SPEEDS:
-      // Sprite for current feed/spindle values at top
-      spriteStatusBar.createSprite(230, 35);
-      spriteStatusBar.setColorDepth(16);
-
-      // Sprite for feed override readout (middle area)
-      spriteAxisDisplay.createSprite(72, 37);
-      spriteAxisDisplay.setColorDepth(16);
-
-      // Sprite for spindle override readout (bottom area)
-      spriteValueDisplay.createSprite(72, 37);
-      spriteValueDisplay.setColorDepth(16);
-      spritesInitialized = true;
-      break;
-
-    case PSCREEN_PROBING:
-      // Sprite for current position display
-      spriteAxisDisplay.createSprite(230, 50);
-      spriteAxisDisplay.setColorDepth(16);
-
-      // Sprite for probe settings display
-      spriteValueDisplay.createSprite(230, 40);
-      spriteValueDisplay.setColorDepth(16);
-      spritesInitialized = true;
-      break;
-
-    default:
-      // Other screens don't need sprites yet
-      break;
-  }
-
-  spritesAllocatedFor = screen;
-}
-
-// Update axis position display on Jog screen using sprite
-void updateJogAxisDisplay() {
-  if (!spritesInitialized || currentPendantScreen != PSCREEN_JOG_HOMING) return;
-
-  // Draw to sprite instead of screen
-  spriteAxisDisplay.fillSprite(COLOR_DARKER_BG);
-
-  // Current axis indicator on left side
-  String axisNames[] = {"X", "Y", "Z", "A"};
-  spriteAxisDisplay.setTextColor(COLOR_GREEN);
-  spriteAxisDisplay.setTextSize(3);
-  spriteAxisDisplay.setCursor(5, 7);
-  spriteAxisDisplay.print(axisNames[pendantJog.selectedAxis]);
-
-  // Current position for selected axis
-  float positions[] = {pendantMachine.posX, pendantMachine.posY, pendantMachine.posZ, pendantMachine.posA};
-  spriteAxisDisplay.setTextSize(3);
-  spriteAxisDisplay.setCursor(50, 7);
-
-  // Get position text to calculate width
-  char posBuffer[16];
-  dtostrf(positions[pendantJog.selectedAxis], 1, 2, posBuffer);
-  spriteAxisDisplay.print(posBuffer);
-
-  // Calculate width of position text
-  int16_t posTextWidth = spriteAxisDisplay.textWidth(posBuffer);
-
-  // Measurement unit below selected axis position, right-aligned to position
-  spriteAxisDisplay.setTextColor(COLOR_GRAY_TEXT);
-  spriteAxisDisplay.setTextSize(2);
-  int16_t unitTextWidth = spriteAxisDisplay.textWidth("mm");
-  spriteAxisDisplay.setCursor(50 + posTextWidth - unitTextWidth, 33);
-  spriteAxisDisplay.print("mm");
-
-  // All axis positions in 2x2 grid on right side
-  spriteAxisDisplay.setTextColor(COLOR_GRAY_TEXT);
-  spriteAxisDisplay.setTextSize(1);
-  // X (top left)
-  spriteAxisDisplay.setCursor(150, 3);
-  spriteAxisDisplay.print("X:");
-  spriteAxisDisplay.print(pendantMachine.posX, 1);
-  // Y (top right)
-  spriteAxisDisplay.setCursor(150, 15);
-  spriteAxisDisplay.print("Y:");
-  spriteAxisDisplay.print(pendantMachine.posY, 1);
-  // Z (bottom left)
-  spriteAxisDisplay.setCursor(150, 27);
-  spriteAxisDisplay.print("Z:");
-  spriteAxisDisplay.print(pendantMachine.posZ, 1);
-  // A (bottom right)
-  spriteAxisDisplay.setCursor(150, 39);
-  spriteAxisDisplay.print("A:");
-  spriteAxisDisplay.print(pendantMachine.posA, 1);
-
-  // Push sprite to display at position (5, 40)
-  spriteAxisDisplay.pushSprite(5, 40);
-}
-
-// Update machine position display on Work Area screen using sprite
-void updateWorkMachinePos() {
-  if (!spritesInitialized || currentPendantScreen != PSCREEN_PROBING_WORK) return;
-
-  // Draw to sprite instead of screen
-  spriteAxisDisplay.fillSprite(COLOR_BACKGROUND);
-
-  spriteAxisDisplay.setTextColor(COLOR_ORANGE);
-  spriteAxisDisplay.setTextSize(2);
-  spriteAxisDisplay.setCursor(0, 5);
-  spriteAxisDisplay.print("X:");
-  spriteAxisDisplay.print(pendantMachine.posX, 1);
-  spriteAxisDisplay.setCursor(120, 5);
-  spriteAxisDisplay.print("Y:");
-  spriteAxisDisplay.print(pendantMachine.posY, 1);
-  spriteAxisDisplay.setCursor(0, 25);
-  spriteAxisDisplay.print("Z:");
-  spriteAxisDisplay.print(pendantMachine.posZ, 1);
-  spriteAxisDisplay.setCursor(120, 25);
-  spriteAxisDisplay.print("A:");
-  spriteAxisDisplay.print(pendantMachine.posA, 1);
-
-  // Push sprite to display at position (5, 108)
-  spriteAxisDisplay.pushSprite(5, 108);
-}
-
-// Update work position display on Work Area screen using sprite
-void updateWorkAreaPos() {
-  if (!spritesInitialized || currentPendantScreen != PSCREEN_PROBING_WORK) return;
-
-  // Draw to sprite instead of screen
-  spriteValueDisplay.fillSprite(COLOR_BACKGROUND);
-
-  spriteValueDisplay.setTextColor(COLOR_CYAN);
-  spriteValueDisplay.setTextSize(2);
-  spriteValueDisplay.setCursor(0, 5);
-  spriteValueDisplay.print("X:");
-  spriteValueDisplay.print(pendantMachine.workX, 1);
-  spriteValueDisplay.setCursor(120, 5);
-  spriteValueDisplay.print("Y:");
-  spriteValueDisplay.print(pendantMachine.workY, 1);
-  spriteValueDisplay.setCursor(0, 25);
-  spriteValueDisplay.print("Z:");
-  spriteValueDisplay.print(pendantMachine.workZ, 1);
-  spriteValueDisplay.setCursor(120, 25);
-  spriteValueDisplay.print("A:");
-  spriteValueDisplay.print(pendantMachine.workA, 1);
-
-  // Push sprite to display at position (5, 166)
-  spriteValueDisplay.pushSprite(5, 166);
-}
-
-// Redraw only axis selection buttons (no full screen redraw)
-void redrawJogAxisButtons() {
-  if (currentPendantScreen != PSCREEN_JOG_HOMING) return;
-
-  String axisNames[] = {"X", "Y", "Z", "A"};
-  for (int i = 0; i < 4; i++) {
-    uint16_t bgColor = (i == pendantJog.selectedAxis) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
-    drawButton(5 + i * 56, 115, 52, 38, axisNames[i], bgColor, COLOR_WHITE, 3);
-  }
-
-  // Also update the axis display sprite to show the newly selected axis
-  updateJogAxisDisplay();
-}
-
-// Redraw only increment selection buttons (no full screen redraw)
-void redrawJogIncrementButtons() {
-  if (currentPendantScreen != PSCREEN_JOG_HOMING) return;
-
-  String increments[] = {"0.1", "1", "10", "100"};
-  for (int i = 0; i < 4; i++) {
-    uint16_t bgColor = (i == pendantJog.selectedIncrement) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
-    drawButton(5 + i * 56, 231, 52, 38, increments[i], bgColor, COLOR_WHITE, 2);
-  }
-}
-
-// Redraw only coordinate system selection buttons (no full screen redraw)
-void redrawWorkCoordButtons() {
-  if (currentPendantScreen != PSCREEN_PROBING_WORK) return;
-
-  String coordSystems[] = {"G54", "G55", "G56", "G57"};
-  for (int i = 0; i < 4; i++) {
-    uint16_t bgColor = (i == pendantProbing.selectedCoordIndex) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
-    drawButton(5 + i * 56, 55, 52, 38, coordSystems[i], bgColor, COLOR_WHITE, 2);
-  }
-}
-
-// Update main menu status display using sprite (centered)
-void updateMainMenuDisplay() {
-  if (!spritesInitialized || currentPendantScreen != PSCREEN_MAIN_MENU) return;
-
-  // Draw to sprite instead of screen
-  spriteStatusBar.fillSprite(COLOR_DARKER_BG);
-
-  // STATUS label centered
-  spriteStatusBar.setTextColor(COLOR_GRAY_TEXT);
-  spriteStatusBar.setTextSize(1);
-  int16_t labelWidth = spriteStatusBar.textWidth("STATUS");
-  spriteStatusBar.setCursor(115 - labelWidth/2, 8);
-  spriteStatusBar.print("STATUS");
-
-  // Status value centered below label
-  spriteStatusBar.setTextColor(COLOR_CYAN);
-  spriteStatusBar.setTextSize(4);
-  int16_t statusWidth = spriteStatusBar.textWidth(pendantMachine.status.c_str());
-  spriteStatusBar.setCursor(115 - statusWidth/2, 26);
-  spriteStatusBar.print(pendantMachine.status);
-
-  // Push sprite to display at position (5, 40)
-  spriteStatusBar.pushSprite(5, 40);
-}
-
-// Update current feed/spindle values at top of Feeds & Speeds screen using sprite
-void updateFeedsSpeedsTopDisplay() {
-  if (!spritesInitialized || currentPendantScreen != PSCREEN_FEEDS_SPEEDS) return;
-
-  // Draw to sprite instead of screen (sprite covers full 230x35 area with both boxes)
-  spriteStatusBar.fillSprite(COLOR_BACKGROUND);
-
-  // Left box - Feed rate (0, 0, 112, 35) in sprite coordinates
-  spriteStatusBar.fillRoundRect(0, 0, 112, 35, 5, COLOR_DARKER_BG);
-  spriteStatusBar.setTextColor(COLOR_GRAY_TEXT);
-  spriteStatusBar.setTextSize(1);
-  spriteStatusBar.setCursor(5, 3);
-  spriteStatusBar.print("FEED");
-  spriteStatusBar.setTextColor(COLOR_ORANGE);
-  spriteStatusBar.setTextSize(2);
-  spriteStatusBar.setCursor(5, 13);
-  spriteStatusBar.print(pendantMachine.feedRate);
-  // Unit inline
-  spriteStatusBar.setTextColor(COLOR_GRAY_TEXT);
-  spriteStatusBar.setTextSize(1);
-  spriteStatusBar.setCursor(5 + spriteStatusBar.textWidth(String(pendantMachine.feedRate).c_str()) * 2 + 4, 17);
-  spriteStatusBar.print("mm/min");
-
-  // Right box - Spindle RPM (118, 0, 112, 35) in sprite coordinates (gap of 6px)
-  spriteStatusBar.fillRoundRect(118, 0, 112, 35, 5, COLOR_DARKER_BG);
-  spriteStatusBar.setTextColor(COLOR_GRAY_TEXT);
-  spriteStatusBar.setTextSize(1);
-  spriteStatusBar.setCursor(123, 3);
-  spriteStatusBar.print("SPINDLE");
-  spriteStatusBar.setTextColor(COLOR_GREEN);
-  spriteStatusBar.setTextSize(2);
-  spriteStatusBar.setCursor(123, 13);
-  spriteStatusBar.print(pendantMachine.spindleRPM);
-  // Unit inline
-  spriteStatusBar.setTextColor(COLOR_GRAY_TEXT);
-  spriteStatusBar.setTextSize(1);
-  spriteStatusBar.setCursor(123 + spriteStatusBar.textWidth(String(pendantMachine.spindleRPM).c_str()) * 2 + 4, 17);
-  spriteStatusBar.print("RPM");
-
-  // Push sprite to display at position (5, 40)
-  spriteStatusBar.pushSprite(5, 40);
-}
-
-// Update feed override readout using sprite
-void updateFeedOverrideDisplay() {
-  if (!spritesInitialized || currentPendantScreen != PSCREEN_FEEDS_SPEEDS) return;
-
-  // Draw to sprite instead of screen
-  spriteAxisDisplay.fillSprite(COLOR_DARKER_BG);
-
-  spriteAxisDisplay.setTextColor(COLOR_ORANGE);
-  spriteAxisDisplay.setTextSize(2);
-  int16_t textW = spriteAxisDisplay.textWidth((String(pendantMachine.feedOverride) + "%").c_str());
-  spriteAxisDisplay.setCursor(36 - textW/2, 11);
-  spriteAxisDisplay.print(pendantMachine.feedOverride);
-  spriteAxisDisplay.print("%");
-
-  // Push sprite to display at position (83, 137)
-  spriteAxisDisplay.pushSprite(83, 137);
-}
-
-// Update spindle override readout using sprite
-void updateSpindleOverrideDisplay() {
-  if (!spritesInitialized || currentPendantScreen != PSCREEN_FEEDS_SPEEDS) return;
-
-  // Draw to sprite instead of screen
-  spriteValueDisplay.fillSprite(COLOR_DARKER_BG);
-
-  spriteValueDisplay.setTextColor(COLOR_GREEN);
-  spriteValueDisplay.setTextSize(2);
-  int16_t textW = spriteValueDisplay.textWidth((String(pendantMachine.spindleOverride) + "%").c_str());
-  spriteValueDisplay.setCursor(36 - textW/2, 11);
-  spriteValueDisplay.print(pendantMachine.spindleOverride);
-  spriteValueDisplay.print("%");
-
-  // Push sprite to display at position (83, 236)
-  spriteValueDisplay.pushSprite(83, 236);
-}
-
-// Redraw only feed override buttons (no full screen redraw)
-void redrawFeedOverrideButtons() {
-  if (currentPendantScreen != PSCREEN_FEEDS_SPEEDS) return;
-
-  String percentages[] = {"50%", "75%", "100%", "125%", "150%"};
-
-  // Row 1 - 3 buttons
-  for (int i = 0; i < 3; i++) {
-    uint16_t bgColor = (i == pendantFeeds.selectedFeedOverride) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
-    int x = 5 + i * 78;
-    drawButton(x, 95, 72, 37, percentages[i], bgColor, COLOR_WHITE, 2);
-  }
-
-  // Row 2 - 2 buttons
-  uint16_t bgColor3 = (3 == pendantFeeds.selectedFeedOverride) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
-  drawButton(5, 137, 72, 37, percentages[3], bgColor3, COLOR_WHITE, 2);
-
-  uint16_t bgColor4 = (4 == pendantFeeds.selectedFeedOverride) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
-  drawButton(161, 137, 72, 37, percentages[4], bgColor4, COLOR_WHITE, 2);
-
-  // Also update the feed override readout
-  updateFeedOverrideDisplay();
-}
-
-// Redraw only spindle override buttons (no full screen redraw)
-void redrawSpindleOverrideButtons() {
-  if (currentPendantScreen != PSCREEN_FEEDS_SPEEDS) return;
-
-  String percentages[] = {"50%", "75%", "100%", "125%", "150%"};
-
-  // Row 1 - 3 buttons
-  for (int i = 0; i < 3; i++) {
-    uint16_t bgColor = (i == pendantFeeds.selectedSpindleOverride) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
-    int x = 5 + i * 78;
-    drawButton(x, 194, 72, 37, percentages[i], bgColor, COLOR_WHITE, 2);
-  }
-
-  // Row 2 - 2 buttons
-  uint16_t bgColor3s = (3 == pendantFeeds.selectedSpindleOverride) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
-  drawButton(5, 236, 72, 37, percentages[3], bgColor3s, COLOR_WHITE, 2);
-
-  uint16_t bgColor4s = (4 == pendantFeeds.selectedSpindleOverride) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
-  drawButton(161, 236, 72, 37, percentages[4], bgColor4s, COLOR_WHITE, 2);
-
-  // Also update the spindle override readout
-  updateSpindleOverrideDisplay();
-}
-
-// Update RPM display on Spindle Control screen using sprite
-void updateSpindleRPMDisplay() {
-  if (!spritesInitialized || currentPendantScreen != PSCREEN_SPINDLE_CONTROL) return;
-
-  // Draw to sprite instead of screen
-  spriteValueDisplay.fillSprite(COLOR_DARKER_BG);
-
-  spriteValueDisplay.setTextColor(COLOR_GRAY_TEXT);
-  spriteValueDisplay.setTextSize(1);
-  spriteValueDisplay.setCursor(5, 5);
-  spriteValueDisplay.print("RPM");
-
-  spriteValueDisplay.setTextColor(COLOR_ORANGE);
-  spriteValueDisplay.setTextSize(4);
-  spriteValueDisplay.setCursor(5, 20);
-  spriteValueDisplay.print(pendantMachine.spindleRPM);
-
-  spriteValueDisplay.setTextColor(COLOR_CYAN);
-  spriteValueDisplay.setTextSize(2);
-  spriteValueDisplay.setCursor(155, 30);
-  spriteValueDisplay.print(pendantMachine.spindleDir);
-
-  // Push sprite to display at position (5, 40)
-  spriteValueDisplay.pushSprite(5, 40);
-}
-
-// Redraw only direction buttons (no full screen redraw)
-void redrawSpindleDirectionButtons() {
-  if (currentPendantScreen != PSCREEN_SPINDLE_CONTROL) return;
-
-  drawButton(5, 118, 112, 38, "Fwd", pendantSpindle.directionFwd ? COLOR_DARK_GREEN : COLOR_BUTTON_GRAY, COLOR_WHITE, 2);
-  drawButton(123, 118, 112, 38, "Rev", !pendantSpindle.directionFwd ? COLOR_DARK_GREEN : COLOR_BUTTON_GRAY, COLOR_WHITE, 2);
-
-  // Also update the RPM display to reflect direction change
-  updateSpindleRPMDisplay();
-}
-
-// Redraw only RPM preset buttons (no full screen redraw)
-void redrawSpindlePresetButtons() {
-  if (currentPendantScreen != PSCREEN_SPINDLE_CONTROL) return;
-
-  int presets[] = {6000, 12000, 24000};
-  String presetLabels[] = {"6000", "12000", "24000"};
-
-  for (int i = 0; i < 3; i++) {
-    uint16_t bgColor = (i == pendantSpindle.selectedPreset) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
-    int x = 5 + i * 75;
-    int y = 178;
-    drawButton(x, y, 70, 37, presetLabels[i], bgColor, COLOR_WHITE, 2);
-  }
-
-  // Also update the RPM display to show new value
-  updateSpindleRPMDisplay();
-}
-
-// Update current position display on Probe screen using sprite
-void updateProbePositionDisplay() {
-  if (!spritesInitialized || currentPendantScreen != PSCREEN_PROBING) return;
-
-  // Draw to sprite instead of screen
-  spriteAxisDisplay.fillSprite(COLOR_BACKGROUND);
-
-  spriteAxisDisplay.setTextColor(COLOR_ORANGE);
-  spriteAxisDisplay.setTextSize(2);
-  spriteAxisDisplay.setCursor(0, 7);
-  spriteAxisDisplay.print("X ");
-  spriteAxisDisplay.print(pendantMachine.posX, 1);
-  spriteAxisDisplay.setCursor(85, 7);
-  spriteAxisDisplay.print("Y ");
-  spriteAxisDisplay.print(pendantMachine.posY, 1);
-  spriteAxisDisplay.setCursor(0, 27);
-  spriteAxisDisplay.print("Z ");
-  spriteAxisDisplay.print(pendantMachine.posZ, 1);
-  spriteAxisDisplay.setCursor(85, 27);
-  spriteAxisDisplay.print("A ");
-  spriteAxisDisplay.print(pendantMachine.posA, 1);
-
-  // Push sprite to display at position (5, 57)
-  spriteAxisDisplay.pushSprite(5, 57);
-}
-
-// Update probe settings display using sprite
-void updateProbeSettingsDisplay() {
-  if (!spritesInitialized || currentPendantScreen != PSCREEN_PROBING) return;
-
-  // Draw to sprite instead of screen
-  spriteValueDisplay.fillSprite(COLOR_BACKGROUND);
-
-  spriteValueDisplay.setTextColor(COLOR_GRAY_TEXT);
-  spriteValueDisplay.setTextSize(1);
-  spriteValueDisplay.setCursor(0, 4);
-  spriteValueDisplay.print("Feed Rate:");
-  spriteValueDisplay.setTextColor(COLOR_ORANGE);
-  spriteValueDisplay.setCursor(165, 4);
-  spriteValueDisplay.print(pendantProbe.feedRate, 0);
-  spriteValueDisplay.print(" mm/min");
-
-  spriteValueDisplay.setTextColor(COLOR_GRAY_TEXT);
-  spriteValueDisplay.setCursor(0, 19);
-  spriteValueDisplay.print("Max Travel:");
-  spriteValueDisplay.setTextColor(COLOR_ORANGE);
-  spriteValueDisplay.setCursor(165, 19);
-  spriteValueDisplay.print(pendantProbe.maxTravel, 1);
-  spriteValueDisplay.print(" mm");
-
-  // Push sprite to display at position (5, 228)
-  spriteValueDisplay.pushSprite(5, 228);
-}
-
-// Update machine status display on Status screen using sprite (centered)
-void updateStatusMachineStatus() {
-  if (!spritesInitialized || currentPendantScreen != PSCREEN_STATUS) return;
-
-  // Draw to sprite instead of screen
-  spriteStatusBar.fillSprite(COLOR_DARKER_BG);
-
-  // MACHINE STATUS label centered
-  spriteStatusBar.setTextColor(COLOR_GRAY_TEXT);
-  spriteStatusBar.setTextSize(1);
-  int16_t labelWidth = spriteStatusBar.textWidth("MACHINE STATUS");
-  spriteStatusBar.setCursor(115 - labelWidth/2, 5);
-  spriteStatusBar.print("MACHINE STATUS");
-
-  // Status value centered below label
-  spriteStatusBar.setTextColor(COLOR_CYAN);
-  spriteStatusBar.setTextSize(3);
-  int16_t statusWidth = spriteStatusBar.textWidth(pendantMachine.status.c_str());
-  spriteStatusBar.setCursor(115 - statusWidth/2, 22);
-  spriteStatusBar.print(pendantMachine.status);
-
-  // Push sprite to display at position (5, 40)
-  spriteStatusBar.pushSprite(5, 40);
-}
-
-// Update axis positions display on Status screen using sprite
-void updateStatusAxisPositions() {
-  if (!spritesInitialized || currentPendantScreen != PSCREEN_STATUS) return;
-
-  // Draw to sprite instead of screen
-  spriteAxisDisplay.fillSprite(COLOR_DARKER_BG);
-
-  spriteAxisDisplay.setTextColor(COLOR_GRAY_TEXT);
-  spriteAxisDisplay.setTextSize(1);
-  spriteAxisDisplay.setCursor(5, 5);
-  spriteAxisDisplay.print("AXIS POSITIONS");
-
-  spriteAxisDisplay.setTextColor(COLOR_ORANGE);
-  spriteAxisDisplay.setTextSize(2);
-  spriteAxisDisplay.setCursor(5, 20);
-  spriteAxisDisplay.print("X:");
-  spriteAxisDisplay.print(pendantMachine.posX, 1);
-  spriteAxisDisplay.setCursor(125, 20);
-  spriteAxisDisplay.print("Y:");
-  spriteAxisDisplay.print(pendantMachine.posY, 1);
-  spriteAxisDisplay.setCursor(5, 43);
-  spriteAxisDisplay.print("Z:");
-  spriteAxisDisplay.print(pendantMachine.posZ, 1);
-  spriteAxisDisplay.setCursor(125, 43);
-  spriteAxisDisplay.print("A:");
-  spriteAxisDisplay.print(pendantMachine.posA, 1);
-
-  // Push sprite to display at position (5, 140)
-  spriteAxisDisplay.pushSprite(5, 140);
-}
-
-// Update feed/spindle info on Status screen using sprite (covers both boxes)
-void updateStatusFeedSpindle() {
-  if (!spritesInitialized || currentPendantScreen != PSCREEN_STATUS) return;
-
-  // Draw to sprite instead of screen (sprite covers full 230x65 area with both boxes)
-  spriteValueDisplay.fillSprite(COLOR_BACKGROUND);
-
-  // Feed Rate box (0, 0, 112, 65) in sprite coordinates
-  spriteValueDisplay.fillRoundRect(0, 0, 112, 65, 5, COLOR_DARKER_BG);
-  spriteValueDisplay.setTextColor(COLOR_GRAY_TEXT);
-  spriteValueDisplay.setTextSize(1);
-  spriteValueDisplay.setCursor(5, 3);
-  spriteValueDisplay.print("FEED");
-  spriteValueDisplay.setTextColor(COLOR_ORANGE);
-  spriteValueDisplay.setTextSize(2);
-  spriteValueDisplay.setCursor(5, 25);
-  spriteValueDisplay.print(pendantMachine.feedRate);
-  spriteValueDisplay.setTextColor(COLOR_GRAY_TEXT);
-  spriteValueDisplay.setTextSize(1);
-  int16_t mmMinWidth = spriteValueDisplay.textWidth("mm/min");
-  spriteValueDisplay.setCursor(112 - 5 - mmMinWidth, 50);
-  spriteValueDisplay.print("mm/min");
-
-  // Spindle box (118, 0, 112, 65) in sprite coordinates (gap of 6px between boxes)
-  spriteValueDisplay.fillRoundRect(118, 0, 112, 65, 5, COLOR_DARKER_BG);
-  spriteValueDisplay.setTextColor(COLOR_GRAY_TEXT);
-  spriteValueDisplay.setTextSize(1);
-  spriteValueDisplay.setCursor(123, 3);
-  spriteValueDisplay.print("SPINDLE");
-  spriteValueDisplay.setTextColor(COLOR_ORANGE);
-  spriteValueDisplay.setTextSize(1);
-  int16_t dirWidth = spriteValueDisplay.textWidth(pendantMachine.spindleDir.c_str());
-  spriteValueDisplay.setCursor(230 - 5 - dirWidth, 3);
-  spriteValueDisplay.print(pendantMachine.spindleDir);
-
-  spriteValueDisplay.setTextColor(COLOR_GREEN);
-  spriteValueDisplay.setTextSize(2);
-  spriteValueDisplay.setCursor(123, 25);
-  spriteValueDisplay.print(pendantMachine.spindleRPM);
-  spriteValueDisplay.setTextColor(COLOR_GRAY_TEXT);
-  spriteValueDisplay.setTextSize(1);
-  int16_t rpmWidth = spriteValueDisplay.textWidth("RPM");
-  spriteValueDisplay.setCursor(230 - 5 - rpmWidth, 50);
-  spriteValueDisplay.print("RPM");
-
-  // Push sprite to display at position (5, 210)
-  spriteValueDisplay.pushSprite(5, 210);
-}
-
 // ===== Screen Drawing Functions =====
 
 void drawMainMenu() {
   display.fillScreen(COLOR_BACKGROUND);
   drawTitle("MAIN MENU");
 
-  // Initialize sprites for this screen if not already done
-  if (!spritesInitialized || spritesAllocatedFor != PSCREEN_MAIN_MENU) {
-    initSpritesForScreen(PSCREEN_MAIN_MENU);
-  }
-
-  // Draw static background for status/axis display area (sprite will be drawn on top)
+  // Combined status and axis info box (reduced height from 75 to 65)
   display.fillRoundRect(5, 40, 230, 65, 5, COLOR_DARKER_BG);
 
-  // Update status and axis display using sprite
-  updateMainMenuDisplay();
+  // STATUS label and value on the left
+  display.setTextColor(COLOR_GRAY_TEXT);
+  display.setTextSize(1);
+  display.setCursor(10, 45);
+  display.print("STATUS");
+
+  display.setTextColor(COLOR_CYAN);
+  display.setTextSize(3);
+  display.setCursor(10, 62);
+  display.print(pendantMachine.status);
+
+  // AXIS label in the center
+  display.setTextColor(COLOR_GRAY_TEXT);
+  display.setTextSize(1);
+  display.setCursor(95, 45);
+  display.print("AXIS");
+
+  // Axis coordinates in a 2x2 grid on the right side
+  display.setTextColor(COLOR_ORANGE);
+  display.setTextSize(2);
+
+  // X coordinate (top left of axis grid)
+  display.setCursor(95, 56);
+  display.print("X");
+  display.print(pendantMachine.posX, 2);
+
+  // Y coordinate (top right of axis grid)
+  display.setCursor(165, 56);
+  display.print(" Y");
+  display.print(pendantMachine.posY, 2);
+
+  // Z coordinate (bottom left of axis grid)
+  display.setCursor(95, 78);
+  display.print("Z");
+  display.print(pendantMachine.posZ, 2);
+
+  // A coordinate (bottom right of axis grid)
+  display.setCursor(165, 78);
+  display.print(" A");
+  display.print(pendantMachine.posA, 2);
 
   // Menu buttons - arranged in a 2x4 grid with smaller, wrapped text (adjusted positions)
   int btnY = 115;
@@ -837,14 +249,16 @@ void drawStatusScreen() {
   display.fillScreen(COLOR_BACKGROUND);
   drawTitle("STATUS");
 
-  // Initialize sprites for this screen if not already done
-  if (!spritesInitialized || spritesAllocatedFor != PSCREEN_STATUS) {
-    initSpritesForScreen(PSCREEN_STATUS);
-  }
-
-  // Machine Status - draw static background, then use sprite
+  // Machine Status
   display.fillRoundRect(5, 40, 230, 50, 5, COLOR_DARKER_BG);
-  updateStatusMachineStatus();
+  display.setTextColor(COLOR_GRAY_TEXT);
+  display.setTextSize(1);
+  display.setCursor(10, 45);
+  display.print("MACHINE STATUS");
+  display.setTextColor(COLOR_CYAN);
+  display.setTextSize(3);
+  display.setCursor(10, 62);
+  display.print(pendantMachine.status);
 
   // Current File - moved up from 100 to 95
   display.fillRoundRect(5, 95, 230, 40, 5, COLOR_DARKER_BG);
@@ -857,12 +271,67 @@ void drawStatusScreen() {
   display.setCursor(10, 115);
   display.print(pendantMachine.currentFile);
 
-  // Axis Positions - draw static background, then use sprite
+  // Axis Positions - moved up from 150 to 140, reduced height from 70 to 65
   display.fillRoundRect(5, 140, 230, 65, 5, COLOR_DARKER_BG);
-  updateStatusAxisPositions();
+  display.setTextColor(COLOR_GRAY_TEXT);
+  display.setTextSize(1);
+  display.setCursor(10, 145);
+  display.print("AXIS POSITIONS");
 
-  // Feed Rate and Spindle - use update function
-  updateStatusFeedSpindle();
+  display.setTextColor(COLOR_ORANGE);
+  display.setTextSize(2);
+  display.setCursor(10, 160);
+  display.print("X:");
+  display.print(pendantMachine.posX, 1);
+  display.setCursor(130, 160);
+  display.print("Y:");
+  display.print(pendantMachine.posY, 1);
+  display.setCursor(10, 183);
+  display.print("Z:");
+  display.print(pendantMachine.posZ, 1);
+  display.setCursor(130, 183);
+  display.print("A:");
+  display.print(pendantMachine.posA, 1);
+
+  // Feed Rate and Spindle - reduced height from 70 to 65 for consistent gaps
+  display.fillRoundRect(5, 210, 112, 65, 5, COLOR_DARKER_BG);
+  display.setTextColor(COLOR_GRAY_TEXT);
+  display.setTextSize(1);
+  display.setCursor(10, 213);
+  display.print("FEED");
+  display.setTextColor(COLOR_ORANGE);
+  display.setTextSize(2);
+  display.setCursor(10, 235);
+  display.print(pendantMachine.feedRate);
+  // Unit below and right-justified
+  display.setTextColor(COLOR_GRAY_TEXT);
+  display.setTextSize(1);
+  int16_t mmMinWidth = display.textWidth("mm/min");
+  display.setCursor(117 - 5 - mmMinWidth, 260);
+  display.print("mm/min");
+
+  display.fillRoundRect(123, 210, 112, 65, 5, COLOR_DARKER_BG);
+  display.setTextColor(COLOR_GRAY_TEXT);
+  display.setTextSize(1);
+  display.setCursor(128, 213);
+  display.print("SPINDLE");
+  // Direction inline with label, right-justified
+  display.setTextColor(COLOR_ORANGE);
+  display.setTextSize(1);
+  int16_t dirWidth = display.textWidth(pendantMachine.spindleDir.c_str());
+  display.setCursor(235 - 5 - dirWidth, 213);
+  display.print(pendantMachine.spindleDir);
+
+  display.setTextColor(COLOR_GREEN);
+  display.setTextSize(2);
+  display.setCursor(128, 235);
+  display.print(pendantMachine.spindleRPM);
+  // RPM below and right-justified
+  display.setTextColor(COLOR_GRAY_TEXT);
+  display.setTextSize(1);
+  int16_t rpmWidth = display.textWidth("RPM");
+  display.setCursor(235 - 5 - rpmWidth, 260);
+  display.print("RPM");
 
   // Main Menu and FluidNC buttons - with 5px gap from panels above
   drawButton(5, 280, 112, 40, "Main Menu", COLOR_BLUE, COLOR_WHITE, 2);
@@ -873,19 +342,55 @@ void drawJogHomingScreen() {
   display.fillScreen(COLOR_BACKGROUND);
   drawTitle("JOG & HOMING");
 
-  // Initialize sprites for this screen if not already done
-  if (!spritesInitialized || spritesAllocatedFor != PSCREEN_JOG_HOMING) {
-    initSpritesForScreen(PSCREEN_JOG_HOMING);
-  }
-
-  // Draw static background for axis display area (sprite will be drawn on top)
+  // Display area showing selected axis and position (reduced height)
   display.fillRoundRect(5, 40, 230, 55, 5, COLOR_DARKER_BG);
 
-  // Draw axis display using sprite (this includes all position info)
-  updateJogAxisDisplay();
-
-  // Axis labels needed for buttons
+  // Current axis indicator on left side
   String axisNames[] = {"X", "Y", "Z", "A"};
+  display.setTextColor(COLOR_GREEN);
+  display.setTextSize(3);
+  display.setCursor(10, 52);
+  display.print(axisNames[pendantJog.selectedAxis]);
+
+  // Current position for selected axis
+  float positions[] = {pendantMachine.posX, pendantMachine.posY, pendantMachine.posZ, pendantMachine.posA};
+  display.setTextSize(3);
+  display.setCursor(55, 52);
+
+  // Get position text to calculate width
+  char posBuffer[16];
+  dtostrf(positions[pendantJog.selectedAxis], 1, 2, posBuffer);
+  display.print(posBuffer);
+
+  // Calculate width of position text
+  int16_t posTextWidth = display.textWidth(posBuffer);
+
+  // Measurement unit below selected axis position, right-aligned to position
+  display.setTextColor(COLOR_GRAY_TEXT);
+  display.setTextSize(2);
+  int16_t unitTextWidth = display.textWidth("mm");
+  display.setCursor(55 + posTextWidth - unitTextWidth, 78);
+  display.print("mm");
+
+  // All axis positions in 2x2 grid on right side
+  display.setTextColor(COLOR_GRAY_TEXT);
+  display.setTextSize(1);
+  // X (top left)
+  display.setCursor(155, 48);
+  display.print("X:");
+  display.print(pendantMachine.posX, 1);
+  // Y (top right)
+  display.setCursor(155, 60);
+  display.print("Y:");
+  display.print(pendantMachine.posY, 1);
+  // Z (bottom left)
+  display.setCursor(155, 72);
+  display.print("Z:");
+  display.print(pendantMachine.posZ, 1);
+  // A (bottom right)
+  display.setCursor(155, 84);
+  display.print("A:");
+  display.print(pendantMachine.posA, 1);
 
   // Axis selection buttons
   display.setTextColor(COLOR_GRAY_TEXT);
@@ -929,11 +434,6 @@ void drawProbingWorkScreen() {
   display.fillScreen(COLOR_BACKGROUND);
   drawTitle("WORK AREA");
 
-  // Initialize sprites for this screen if not already done
-  if (!spritesInitialized || spritesAllocatedFor != PSCREEN_PROBING_WORK) {
-    initSpritesForScreen(PSCREEN_PROBING_WORK);
-  }
-
   // Work coordinate system selection
   display.setTextColor(COLOR_GRAY_TEXT);
   display.setTextSize(1);
@@ -946,23 +446,47 @@ void drawProbingWorkScreen() {
     drawButton(5 + i * 56, 55, 52, 38, coordSystems[i], bgColor, COLOR_WHITE, 2);
   }
 
-  // Machine Position label
+  // Machine Position
   display.setTextColor(COLOR_GRAY_TEXT);
   display.setTextSize(1);
   display.setCursor(5, 100);
   display.print("MACHINE POS");
 
-  // Update machine position using sprite (230x45 at position 5, 108)
-  updateWorkMachinePos();
+  display.setTextColor(COLOR_ORANGE);
+  display.setTextSize(2);
+  display.setCursor(5, 113);
+  display.print("X:");
+  display.print(pendantMachine.posX, 1);
+  display.setCursor(125, 113);
+  display.print("Y:");
+  display.print(pendantMachine.posY, 1);
+  display.setCursor(5, 133);
+  display.print("Z:");
+  display.print(pendantMachine.posZ, 1);
+  display.setCursor(125, 133);
+  display.print("A:");
+  display.print(pendantMachine.posA, 1);
 
-  // Work Position label
+  // Work Area Position
   display.setTextColor(COLOR_GRAY_TEXT);
   display.setTextSize(1);
   display.setCursor(5, 158);
   display.print("WORK POS");
 
-  // Update work position using sprite (230x45 at position 5, 166)
-  updateWorkAreaPos();
+  display.setTextColor(COLOR_CYAN);
+  display.setTextSize(2);
+  display.setCursor(5, 171);
+  display.print("X:");
+  display.print(pendantMachine.workX, 1);
+  display.setCursor(125, 171);
+  display.print("Y:");
+  display.print(pendantMachine.workY, 1);
+  display.setCursor(5, 191);
+  display.print("Z:");
+  display.print(pendantMachine.workZ, 1);
+  display.setCursor(125, 191);
+  display.print("A:");
+  display.print(pendantMachine.workA, 1);
 
   // Set Work Zero buttons
   display.setTextColor(COLOR_GRAY_TEXT);
@@ -985,19 +509,26 @@ void drawProbingScreen() {
   display.fillScreen(COLOR_BACKGROUND);
   drawTitle("PROBE");
 
-  // Initialize sprites for this screen if not already done
-  if (!spritesInitialized || spritesAllocatedFor != PSCREEN_PROBING) {
-    initSpritesForScreen(PSCREEN_PROBING);
-  }
-
-  // Current Position label
+  // Current Position
   display.setTextColor(COLOR_GRAY_TEXT);
   display.setTextSize(1);
   display.setCursor(5, 43);
   display.print("CURRENT POSITION");
 
-  // Update current position using sprite
-  updateProbePositionDisplay();
+  display.setTextColor(COLOR_ORANGE);
+  display.setTextSize(2);
+  display.setCursor(5, 57);
+  display.print("X ");
+  display.print(pendantMachine.posX, 1);
+  display.setCursor(90, 57);
+  display.print("Y ");
+  display.print(pendantMachine.posY, 1);
+  display.setCursor(5, 77);
+  display.print("Z ");
+  display.print(pendantMachine.posZ, 1);
+  display.setCursor(90, 77);
+  display.print("A ");
+  display.print(pendantMachine.posA, 1);
 
   // Probe Type
   display.setTextColor(COLOR_GRAY_TEXT);
@@ -1014,14 +545,27 @@ void drawProbingScreen() {
     drawButton(5, y, 230, 38, probeTypes[i], probeColors[i], COLOR_WHITE, 2);
   }
 
-  // Probe Settings label
+  // Probe Settings
   display.setTextColor(COLOR_GRAY_TEXT);
   display.setTextSize(1);
   display.setCursor(5, 214);
   display.print("PROBE SETTINGS");
 
-  // Update probe settings using sprite
-  updateProbeSettingsDisplay();
+  display.setCursor(5, 228);
+  display.print("Feed Rate:");
+  display.setTextColor(COLOR_ORANGE);
+  display.setTextSize(1);
+  display.setCursor(170, 228);
+  display.print(pendantProbe.feedRate, 0);
+  display.print(" mm/min");
+
+  display.setTextColor(COLOR_GRAY_TEXT);
+  display.setCursor(5, 243);
+  display.print("Max Travel:");
+  display.setTextColor(COLOR_ORANGE);
+  display.setCursor(170, 243);
+  display.print(pendantProbe.maxTravel, 1);
+  display.print(" mm");
 
   // Main Menu button
   drawButton(5, 280, 230, 40, "Main Menu", COLOR_BLUE, COLOR_WHITE, 2);
@@ -1031,13 +575,36 @@ void drawFeedsSpeedsScreen() {
   display.fillScreen(COLOR_BACKGROUND);
   drawTitle("FEEDS & SPEEDS");
 
-  // Initialize sprites for this screen if not already done
-  if (!spritesInitialized || spritesAllocatedFor != PSCREEN_FEEDS_SPEEDS) {
-    initSpritesForScreen(PSCREEN_FEEDS_SPEEDS);
-  }
+  // Current values display - reduced height from 45 to 35
+  display.fillRoundRect(5, 40, 112, 35, 5, COLOR_DARKER_BG);
+  display.setTextColor(COLOR_GRAY_TEXT);
+  display.setTextSize(1);
+  display.setCursor(10, 43);
+  display.print("FEED");
+  display.setTextColor(COLOR_ORANGE);
+  display.setTextSize(2);
+  display.setCursor(10, 53);
+  display.print(pendantMachine.feedRate);
+  // Unit inline
+  display.setTextColor(COLOR_GRAY_TEXT);
+  display.setTextSize(1);
+  display.setCursor(10 + display.textWidth(String(pendantMachine.feedRate).c_str()) * 2 + 4, 57);
+  display.print("mm/min");
 
-  // Update current feed/spindle values at top
-  updateFeedsSpeedsTopDisplay();
+  display.fillRoundRect(123, 40, 112, 35, 5, COLOR_DARKER_BG);
+  display.setTextColor(COLOR_GRAY_TEXT);
+  display.setTextSize(1);
+  display.setCursor(128, 43);
+  display.print("SPINDLE");
+  display.setTextColor(COLOR_GREEN);
+  display.setTextSize(2);
+  display.setCursor(128, 53);
+  display.print(pendantMachine.spindleRPM);
+  // Unit inline
+  display.setTextColor(COLOR_GRAY_TEXT);
+  display.setTextSize(1);
+  display.setCursor(128 + display.textWidth(String(pendantMachine.spindleRPM).c_str()) * 2 + 4, 57);
+  display.print("RPM");
 
   // Feed Override section - moved up from 93 to 83
   display.setTextColor(COLOR_GRAY_TEXT);
@@ -1059,9 +626,14 @@ void drawFeedsSpeedsScreen() {
   uint16_t bgColor3 = (3 == pendantFeeds.selectedFeedOverride) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
   drawButton(5, 137, 72, 37, percentages[3], bgColor3, COLOR_WHITE, 2);
 
-  // Readout inline - aligned to middle column (using sprite)
+  // Readout inline - aligned to middle column
   display.fillRoundRect(83, 137, 72, 37, 5, COLOR_DARKER_BG);
-  updateFeedOverrideDisplay();
+  display.setTextColor(COLOR_ORANGE);
+  display.setTextSize(2);
+  int16_t textW = display.textWidth((String(pendantMachine.feedOverride) + "%").c_str());
+  display.setCursor(119 - textW/2, 148);
+  display.print(pendantMachine.feedOverride);
+  display.print("%");
 
   uint16_t bgColor4 = (4 == pendantFeeds.selectedFeedOverride) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
   drawButton(161, 137, 72, 37, percentages[4], bgColor4, COLOR_WHITE, 2);
@@ -1083,9 +655,14 @@ void drawFeedsSpeedsScreen() {
   uint16_t bgColor3s = (3 == pendantFeeds.selectedSpindleOverride) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
   drawButton(5, 236, 72, 37, percentages[3], bgColor3s, COLOR_WHITE, 2);
 
-  // Readout inline - aligned to middle column (using sprite)
+  // Readout inline - aligned to middle column
   display.fillRoundRect(83, 236, 72, 37, 5, COLOR_DARKER_BG);
-  updateSpindleOverrideDisplay();
+  display.setTextColor(COLOR_GREEN);
+  display.setTextSize(2);
+  textW = display.textWidth((String(pendantMachine.spindleOverride) + "%").c_str());
+  display.setCursor(119 - textW/2, 247);
+  display.print(pendantMachine.spindleOverride);
+  display.print("%");
 
   uint16_t bgColor4s = (4 == pendantFeeds.selectedSpindleOverride) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
   drawButton(161, 236, 72, 37, percentages[4], bgColor4s, COLOR_WHITE, 2);
@@ -1098,16 +675,22 @@ void drawSpindleControlScreen() {
   display.fillScreen(COLOR_BACKGROUND);
   drawTitle("SPINDLE CONTROL");
 
-  // Initialize sprites for this screen if not already done
-  if (!spritesInitialized || spritesAllocatedFor != PSCREEN_SPINDLE_CONTROL) {
-    initSpritesForScreen(PSCREEN_SPINDLE_CONTROL);
-  }
-
-  // Draw static background for RPM display area (sprite will be drawn on top)
+  // RPM Display
   display.fillRoundRect(5, 40, 230, 60, 5, COLOR_DARKER_BG);
+  display.setTextColor(COLOR_GRAY_TEXT);
+  display.setTextSize(1);
+  display.setCursor(10, 45);
+  display.print("RPM");
 
-  // Update RPM display using sprite
-  updateSpindleRPMDisplay();
+  display.setTextColor(COLOR_ORANGE);
+  display.setTextSize(4);
+  display.setCursor(10, 60);
+  display.print(pendantMachine.spindleRPM);
+
+  display.setTextColor(COLOR_CYAN);
+  display.setTextSize(2);
+  display.setCursor(160, 70);
+  display.print(pendantMachine.spindleDir);
 
   // Direction Toggle
   display.setTextColor(COLOR_GRAY_TEXT);
@@ -1371,8 +954,7 @@ void handleJogHomingTouch(int x, int y) {
   for (int i = 0; i < 4; i++) {
     if (isTouchInBounds(x, y, 5 + i * 56, 115, 52, 38)) {
       pendantJog.selectedAxis = i;
-      // Partial redraw - only update axis buttons and display
-      redrawJogAxisButtons();
+      drawCurrentPendantScreen();
       return;
     }
   }
@@ -1397,8 +979,7 @@ void handleJogHomingTouch(int x, int y) {
       pendantJog.selectedIncrement = i;
       float increments[] = {0.1, 1.0, 10.0, 100.0};
       pendantJog.increment = increments[i];
-      // Partial redraw - only update increment buttons
-      redrawJogIncrementButtons();
+      drawCurrentPendantScreen();
       return;
     }
   }
@@ -1416,13 +997,11 @@ void handleSpindleControlTouch(int x, int y) {
   if (isTouchInBounds(x, y, 5, 118, 112, 38)) {
     pendantSpindle.directionFwd = true;
     pendantMachine.spindleDir = "Fwd";
-    // Partial redraw - only update direction buttons and RPM display
-    redrawSpindleDirectionButtons();
+    drawCurrentPendantScreen();
   } else if (isTouchInBounds(x, y, 123, 118, 112, 38)) {
     pendantSpindle.directionFwd = false;
     pendantMachine.spindleDir = "Rev";
-    // Partial redraw - only update direction buttons and RPM display
-    redrawSpindleDirectionButtons();
+    drawCurrentPendantScreen();
   }
 
   // RPM Presets
@@ -1433,8 +1012,7 @@ void handleSpindleControlTouch(int x, int y) {
     if (isTouchInBounds(x, y, bx, by, 70, 37)) {
       pendantSpindle.selectedPreset = i;
       pendantMachine.spindleRPM = presets[i];
-      // Partial redraw - only update preset buttons and RPM display
-      redrawSpindlePresetButtons();
+      drawCurrentPendantScreen();
       return;
     }
   }
@@ -1471,8 +1049,7 @@ void handleFeedsSpeedsTouch(int x, int y) {
       pendantFeeds.selectedFeedOverride = i;
       int percentages[] = {50, 75, 100, 125, 150};
       pendantMachine.feedOverride = percentages[i];
-      // Partial redraw - only update feed override buttons and readout
-      redrawFeedOverrideButtons();
+      drawCurrentPendantScreen();
       return;
     }
   }
@@ -1480,16 +1057,14 @@ void handleFeedsSpeedsTouch(int x, int y) {
   if (isTouchInBounds(x, y, 5, 137, 72, 37)) {
     pendantFeeds.selectedFeedOverride = 3;
     pendantMachine.feedOverride = 125;
-    // Partial redraw - only update feed override buttons and readout
-    redrawFeedOverrideButtons();
+    drawCurrentPendantScreen();
     return;
   }
   // Row 2 - right button (150%) - moved up from 147 to 137
   if (isTouchInBounds(x, y, 161, 137, 72, 37)) {
     pendantFeeds.selectedFeedOverride = 4;
     pendantMachine.feedOverride = 150;
-    // Partial redraw - only update feed override buttons and readout
-    redrawFeedOverrideButtons();
+    drawCurrentPendantScreen();
     return;
   }
 
@@ -1501,8 +1076,7 @@ void handleFeedsSpeedsTouch(int x, int y) {
       pendantFeeds.selectedSpindleOverride = i;
       int percentages[] = {50, 75, 100, 125, 150};
       pendantMachine.spindleOverride = percentages[i];
-      // Partial redraw - only update spindle override buttons and readout
-      redrawSpindleOverrideButtons();
+      drawCurrentPendantScreen();
       return;
     }
   }
@@ -1510,16 +1084,14 @@ void handleFeedsSpeedsTouch(int x, int y) {
   if (isTouchInBounds(x, y, 5, 236, 72, 37)) {
     pendantFeeds.selectedSpindleOverride = 3;
     pendantMachine.spindleOverride = 125;
-    // Partial redraw - only update spindle override buttons and readout
-    redrawSpindleOverrideButtons();
+    drawCurrentPendantScreen();
     return;
   }
   // Row 2 - right button (150%) - moved up from 246 to 236
   if (isTouchInBounds(x, y, 161, 236, 72, 37)) {
     pendantFeeds.selectedSpindleOverride = 4;
     pendantMachine.spindleOverride = 150;
-    // Partial redraw - only update spindle override buttons and readout
-    redrawSpindleOverrideButtons();
+    drawCurrentPendantScreen();
     return;
   }
 
@@ -1578,8 +1150,7 @@ void handleProbingWorkTouch(int x, int y) {
       pendantProbing.selectedCoordIndex = i;
       String coords[] = {"G54", "G55", "G56", "G57"};
       pendantProbing.selectedCoordSystem = coords[i];
-      // Partial redraw - only update coordinate system buttons
-      redrawWorkCoordButtons();
+      drawCurrentPendantScreen();
       return;
     }
   }
@@ -1745,16 +1316,9 @@ void handlePendantPhysicalButtons() {
             dbg_printf("!\n");
             pendantMachine.status = "ALARM";
             break;
-          case 1: // Yellow - Context-sensitive button
-            // If in ALARM state, clear alarm with $X command
-            if (pendantMachine.status == "ALARM") {
-              dbg_printf("$X\n");
-              pendantMachine.status = "IDLE";
-            } else {
-              // Otherwise, send Pause/Feed Hold
-              dbg_printf("!\n");
-              pendantMachine.status = "HOLD";
-            }
+          case 1: // Yellow - Pause
+            dbg_printf("!\n");
+            pendantMachine.status = "HOLD";
             break;
           case 2: // Green - Cycle Start
             dbg_printf("~\n");
@@ -1806,40 +1370,6 @@ void loop_pendant() {
     handlePendantPhysicalButtons();
   }
 
-  // Handle jog dial encoder for jogging (only active on Jog & Homing screen)
-  if (USE_ENCODER && currentPendantScreen == PSCREEN_JOG_HOMING) {
-    static int lastJogEncoderCLK = HIGH;
-    static unsigned long lastJogTime = 0;
-
-    int currentCLK = digitalRead(ENCODER_CLK);
-
-    // Detect rotation - check if CLK changed from HIGH to LOW
-    if (currentCLK != lastJogEncoderCLK && currentCLK == LOW) {
-      // Debounce - only handle if not rotated recently
-      if (millis() - lastJogTime > 50) { // 50ms debounce for jog dial
-        int currentDT = digitalRead(ENCODER_DT);
-
-        // Determine rotation direction
-        bool clockwise = (currentDT == HIGH);
-
-        // Get axis names for G-code command
-        String axisNames[] = {"X", "Y", "Z", "A"};
-        String axis = axisNames[pendantJog.selectedAxis];
-
-        // Calculate jog distance
-        float distance = clockwise ? pendantJog.increment : -pendantJog.increment;
-
-        // Send jog command using $J= (jog mode command for FluidNC/GRBL)
-        dbg_printf("$J=G91 %s%.3f F1000\n", axis.c_str(), distance);
-
-        lastJogTime = millis();
-        dbg_printf("Jog %s: %s%.3fmm\n", axis.c_str(), clockwise ? "+" : "", distance);
-      }
-    }
-
-    lastJogEncoderCLK = currentCLK;
-  }
-
   // Handle encoder rotation for screen rotation (only on FluidNC screen)
   if (USE_ENCODER) {
     static int lastEncoderCLK = HIGH;
@@ -1888,53 +1418,6 @@ void loop_pendant() {
       }
       lastEncoderCLK = currentCLK;
     }
-  }
-
-  // Periodic sprite updates for position displays (reduces full screen redraws)
-  static unsigned long lastSpriteUpdate = 0;
-  if (millis() - lastSpriteUpdate > 100) { // Update every 100ms
-    if (spritesInitialized) {
-      switch (currentPendantScreen) {
-        case PSCREEN_MAIN_MENU:
-          // Update status and axis display using sprite (no full redraw needed)
-          updateMainMenuDisplay();
-          break;
-        case PSCREEN_JOG_HOMING:
-          // Update axis position display using sprite (no full redraw needed)
-          updateJogAxisDisplay();
-          break;
-        case PSCREEN_PROBING_WORK:
-          // Update both machine and work position displays using sprites
-          updateWorkMachinePos();
-          updateWorkAreaPos();
-          break;
-        case PSCREEN_FEEDS_SPEEDS:
-          // Update feed/spindle values and override readouts using sprites
-          updateFeedsSpeedsTopDisplay();
-          updateFeedOverrideDisplay();
-          updateSpindleOverrideDisplay();
-          break;
-        case PSCREEN_SPINDLE_CONTROL:
-          // Update RPM and direction display using sprite
-          updateSpindleRPMDisplay();
-          break;
-        case PSCREEN_PROBING:
-          // Update current position and probe settings using sprites
-          updateProbePositionDisplay();
-          updateProbeSettingsDisplay();
-          break;
-        case PSCREEN_STATUS:
-          // Update machine status, axis positions, and feed/spindle info
-          updateStatusMachineStatus();
-          updateStatusAxisPositions();
-          updateStatusFeedSpindle();
-          break;
-        // Add more sprite updates for other screens as needed
-        default:
-          break;
-      }
-    }
-    lastSpriteUpdate = millis();
   }
 
   // Handle touch input
