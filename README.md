@@ -16,7 +16,9 @@ All Menu navigation and as many features as possible will be managed via the tou
 
 The 3 physical buttons will always be:
 * Red: e-stop
-* Yellow: Pause Job
+* Yellow: context sensitive
+  * In ALARM → Clear Alarm
+  * Otherwise → Pause/Hold
 * Green: Cycle Start
 
 <img src="https://raw.githubusercontent.com/dJOS1475/FluidDial-CYD/refs/heads/main/new_ui/Pendant2.jpeg" alt="CYD Dial Pendant With Buttons and Jog Dial" height="500">
