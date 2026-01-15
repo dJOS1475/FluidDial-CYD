@@ -5,7 +5,10 @@
 #include "FileParser.h"
 #include "Scene.h"
 #include "AboutScene.h"
+
+#ifdef USE_NEW_UI
 #include "CNC_Pendant_UI.h"
+#endif
 
 extern void base_display();
 extern void show_logo();
@@ -17,24 +20,38 @@ extern AboutScene aboutScene;
 void setup() {
     init_system();
 
-    // Set display brightness
-    display.setBrightness(255);
-
-    // Set initial rotation for logo (will be overridden by pendant preferences)
-    display.setRotation(2);
+    display.setBrightness(aboutScene.getBrightness());
 
     show_logo();
     delay_ms(2000);  // view the logo and wait for the debug port to connect
+
+#ifdef USE_NEW_UI
+    // Set initial rotation for logo (will be overridden by pendant preferences)
+    display.setRotation(2);
 
     // Initialize the new pendant UI (loads rotation preference)
     setup_pendant();
 
     dbg_printf("FluidNC Pendant with new UI %s\n", git_info);
+#else
+    base_display();
+
+    dbg_printf("FluidNC Pendant %s\n", git_info);
+
+    // init_file_list();
+
+    extern Scene* initMenus();
+    activate_scene(initMenus());
+#endif
 
     fnc_realtime(StatusReport);  // Kick FluidNC into action
 }
 
 void loop() {
     fnc_poll();         // Handle messages from FluidNC
+#ifdef USE_NEW_UI
     loop_pendant();     // Handle pendant UI (touch, buttons, display)
+#else
+    dispatch_events();  // Handle dial, touch, buttons
+#endif
 }

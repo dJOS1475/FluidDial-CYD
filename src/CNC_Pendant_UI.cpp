@@ -50,6 +50,7 @@ PendantScreen previousPendantScreen = PSCREEN_MAIN_MENU;
 LGFX_Sprite spriteAxisDisplay(&display);    // For Jog screen axis position display
 LGFX_Sprite spriteValueDisplay(&display);   // For small value updates (RPM, feed rate, etc.)
 LGFX_Sprite spriteStatusBar(&display);      // For status indicators
+LGFX_Sprite spriteFileDisplay(&display);    // For current file display on Status screen
 
 // Track which screen sprites are allocated for
 PendantScreen spritesAllocatedFor = PSCREEN_MAIN_MENU;
@@ -192,7 +193,15 @@ void initSpritesForScreen(PendantScreen screen) {
     spriteAxisDisplay.deleteSprite();
     spriteValueDisplay.deleteSprite();
     spriteStatusBar.deleteSprite();
+    spriteFileDisplay.deleteSprite();
     spritesInitialized = false;
+  }
+
+  // Check available heap before allocating sprites
+  uint32_t freeHeap = ESP.getFreeHeap();
+  if (freeHeap < 50000) { // Less than 50KB free
+    dbg_printf("Warning: Low heap memory (%d bytes), skipping sprite allocation\n", freeHeap);
+    return;
   }
 
   // Allocate sprites based on screen needs
@@ -227,17 +236,43 @@ void initSpritesForScreen(PendantScreen screen) {
       break;
 
     case PSCREEN_STATUS:
-      // Sprite for machine status (230x50)
+      // Allocate sprites for all dynamic Status screen elements to prevent flickering
+      // spriteStatusBar: Machine status (230x50 at position 5, 40)
       spriteStatusBar.createSprite(230, 50);
-      spriteStatusBar.setColorDepth(16);
+      if (spriteStatusBar.getBuffer()) {
+        spriteStatusBar.setColorDepth(16);
+      } else {
+        dbg_printf("Warning: Failed to allocate spriteStatusBar for Status screen\n");
+        spriteStatusBar.deleteSprite();
+      }
 
-      // Sprite for axis positions (230x65)
+      // spriteAxisDisplay: Axis positions (230x65 at position 5, 140)
       spriteAxisDisplay.createSprite(230, 65);
-      spriteAxisDisplay.setColorDepth(16);
+      if (spriteAxisDisplay.getBuffer()) {
+        spriteAxisDisplay.setColorDepth(16);
+      } else {
+        dbg_printf("Warning: Failed to allocate spriteAxisDisplay for Status screen\n");
+        spriteAxisDisplay.deleteSprite();
+      }
 
-      // Sprite for feed/spindle info - full width to cover both boxes (230x65)
+      // spriteValueDisplay: Feed/Spindle info (230x65 at position 5, 210)
       spriteValueDisplay.createSprite(230, 65);
-      spriteValueDisplay.setColorDepth(16);
+      if (spriteValueDisplay.getBuffer()) {
+        spriteValueDisplay.setColorDepth(16);
+      } else {
+        dbg_printf("Warning: Failed to allocate spriteValueDisplay for Status screen\n");
+        spriteValueDisplay.deleteSprite();
+      }
+
+      // spriteFileDisplay: Current file display (230x40 at position 5, 95)
+      spriteFileDisplay.createSprite(230, 40);
+      if (spriteFileDisplay.getBuffer()) {
+        spriteFileDisplay.setColorDepth(16);
+      } else {
+        dbg_printf("Warning: Failed to allocate spriteFileDisplay for Status screen\n");
+        spriteFileDisplay.deleteSprite();
+      }
+
       spritesInitialized = true;
       break;
 
@@ -280,6 +315,10 @@ void initSpritesForScreen(PendantScreen screen) {
   }
 
   spritesAllocatedFor = screen;
+
+  if (spritesInitialized) {
+    dbg_printf("Sprites allocated successfully. Free heap after: %d bytes\n", ESP.getFreeHeap());
+  }
 }
 
 // Update axis position display on Jog screen using sprite
@@ -689,6 +728,27 @@ void updateProbeSettingsDisplay() {
   spriteValueDisplay.pushSprite(5, 228);
 }
 
+// Update current file display on Status screen using sprite
+void updateStatusCurrentFile() {
+  if (!spritesInitialized || currentPendantScreen != PSCREEN_STATUS) return;
+
+  // Draw to sprite instead of screen to prevent flickering
+  spriteFileDisplay.fillRoundRect(0, 0, 230, 40, 5, COLOR_DARKER_BG);
+
+  spriteFileDisplay.setTextColor(COLOR_GRAY_TEXT);
+  spriteFileDisplay.setTextSize(1);
+  spriteFileDisplay.setCursor(5, 5);
+  spriteFileDisplay.print("CURRENT FILE");
+
+  spriteFileDisplay.setTextColor(COLOR_CYAN);
+  spriteFileDisplay.setTextSize(1);
+  spriteFileDisplay.setCursor(5, 20);
+  spriteFileDisplay.print(pendantMachine.currentFile);
+
+  // Push sprite to display at position (5, 95)
+  spriteFileDisplay.pushSprite(5, 95);
+}
+
 // Update machine status display on Status screen using sprite (centered)
 void updateStatusMachineStatus() {
   if (!spritesInitialized || currentPendantScreen != PSCREEN_STATUS) return;
@@ -718,8 +778,8 @@ void updateStatusMachineStatus() {
 void updateStatusAxisPositions() {
   if (!spritesInitialized || currentPendantScreen != PSCREEN_STATUS) return;
 
-  // Draw to sprite instead of screen
-  spriteAxisDisplay.fillSprite(COLOR_DARKER_BG);
+  // Draw to sprite instead of screen to prevent flickering
+  spriteAxisDisplay.fillRoundRect(0, 0, 230, 65, 5, COLOR_DARKER_BG);
 
   spriteAxisDisplay.setTextColor(COLOR_GRAY_TEXT);
   spriteAxisDisplay.setTextSize(1);
@@ -745,14 +805,15 @@ void updateStatusAxisPositions() {
   spriteAxisDisplay.pushSprite(5, 140);
 }
 
-// Update feed/spindle info on Status screen using sprite (covers both boxes)
+// Update feed/spindle info on Status screen using sprite
 void updateStatusFeedSpindle() {
   if (!spritesInitialized || currentPendantScreen != PSCREEN_STATUS) return;
 
-  // Draw to sprite instead of screen (sprite covers full 230x65 area with both boxes)
+  // Draw to sprite instead of screen to prevent flickering
+  // Clear sprite with background color
   spriteValueDisplay.fillSprite(COLOR_BACKGROUND);
 
-  // Feed Rate box (0, 0, 112, 65) in sprite coordinates
+  // Feed Rate box (left half of sprite: 0-112)
   spriteValueDisplay.fillRoundRect(0, 0, 112, 65, 5, COLOR_DARKER_BG);
   spriteValueDisplay.setTextColor(COLOR_GRAY_TEXT);
   spriteValueDisplay.setTextSize(1);
@@ -768,7 +829,7 @@ void updateStatusFeedSpindle() {
   spriteValueDisplay.setCursor(112 - 5 - mmMinWidth, 50);
   spriteValueDisplay.print("mm/min");
 
-  // Spindle box (118, 0, 112, 65) in sprite coordinates (gap of 6px between boxes)
+  // Spindle box (right half of sprite: 118-230)
   spriteValueDisplay.fillRoundRect(118, 0, 112, 65, 5, COLOR_DARKER_BG);
   spriteValueDisplay.setTextColor(COLOR_GRAY_TEXT);
   spriteValueDisplay.setTextSize(1);
@@ -842,23 +903,13 @@ void drawStatusScreen() {
     initSpritesForScreen(PSCREEN_STATUS);
   }
 
-  // Machine Status - draw static background, then use sprite
-  display.fillRoundRect(5, 40, 230, 50, 5, COLOR_DARKER_BG);
+  // Machine Status - use sprite
   updateStatusMachineStatus();
 
-  // Current File - moved up from 100 to 95
-  display.fillRoundRect(5, 95, 230, 40, 5, COLOR_DARKER_BG);
-  display.setTextColor(COLOR_GRAY_TEXT);
-  display.setTextSize(1);
-  display.setCursor(10, 100);
-  display.print("CURRENT FILE");
-  display.setTextColor(COLOR_CYAN);
-  display.setTextSize(1);
-  display.setCursor(10, 115);
-  display.print(pendantMachine.currentFile);
+  // Current File - use sprite
+  updateStatusCurrentFile();
 
-  // Axis Positions - draw static background, then use sprite
-  display.fillRoundRect(5, 140, 230, 65, 5, COLOR_DARKER_BG);
+  // Axis Positions - use sprite
   updateStatusAxisPositions();
 
   // Feed Rate and Spindle - use update function
@@ -1725,6 +1776,8 @@ void handlePendantTouch(int x, int y) {
 void handlePendantPhysicalButtons() {
   static unsigned long lastDebounceTime[3] = {0, 0, 0};
   static bool lastButtonState[3] = {HIGH, HIGH, HIGH};
+  static bool buttonState[3] = {HIGH, HIGH, HIGH};        // Debounced state
+  static bool buttonHandled[3] = {false, false, false};   // Track if press was handled
   const unsigned long debounceDelay = 50;
 
   int buttons[] = {red_button_pin, dial_button_pin, green_button_pin};
@@ -1734,12 +1787,18 @@ void handlePendantPhysicalButtons() {
 
     bool reading = digitalRead(buttons[i]);
 
+    // Reset debounce timer if state changed
     if (reading != lastButtonState[i]) {
       lastDebounceTime[i] = millis();
     }
+    lastButtonState[i] = reading;
 
+    // Update debounced state after delay
     if ((millis() - lastDebounceTime[i]) > debounceDelay) {
-      if (reading == LOW) {
+      // Only act on state change to LOW (button pressed) and not already handled
+      if (reading == LOW && buttonState[i] == HIGH && !buttonHandled[i]) {
+        buttonHandled[i] = true;  // Mark as handled
+
         switch (i) {
           case 0: // Red - E-Stop
             dbg_printf("!\n");
@@ -1763,9 +1822,14 @@ void handlePendantPhysicalButtons() {
         }
         drawCurrentPendantScreen();
       }
-    }
 
-    lastButtonState[i] = reading;
+      // Reset handled flag when button is released
+      if (reading == HIGH) {
+        buttonHandled[i] = false;
+      }
+
+      buttonState[i] = reading;
+    }
   }
 }
 
@@ -1924,8 +1988,9 @@ void loop_pendant() {
           updateProbeSettingsDisplay();
           break;
         case PSCREEN_STATUS:
-          // Update machine status, axis positions, and feed/spindle info
+          // Update machine status, current file, axis positions, and feed/spindle info
           updateStatusMachineStatus();
+          updateStatusCurrentFile();
           updateStatusAxisPositions();
           updateStatusFeedSpindle();
           break;
