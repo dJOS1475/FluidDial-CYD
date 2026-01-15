@@ -2,7 +2,7 @@
 The CYD_Buttons Version has been optimised for FluidDial CNC Pendants with 3 physical buttons 
 and a jog dial, and is designed to work with the FluidNC Firmware.
 
-*** **This Firmware is a Work In-progress** ***
+*** **This Firmware is a Work In-progress** - it's currently is a UI Only ***
 
 **Updates:**
 
