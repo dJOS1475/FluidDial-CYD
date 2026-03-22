@@ -85,31 +85,30 @@ void updateJogAxisDisplay() {
     String axisNames[] = { "X", "Y", "Z", "A" };
     float  positions[] = { px, py, pz, pa };
 
+    // Large selected axis + position on one line
+    char posBuf[12];
+    dtostrf(positions[pendantJog.selectedAxis], 1, 2, posBuf);
+    char mainLine[32];
+    snprintf(mainLine, sizeof(mainLine), "%s %s mm", axisNames[pendantJog.selectedAxis].c_str(), posBuf);
     spriteAxisDisplay.setTextColor(COLOR_GREEN);
     spriteAxisDisplay.setTextSize(3);
-    spriteAxisDisplay.setCursor(5, 7);
-    spriteAxisDisplay.print(axisNames[pendantJog.selectedAxis]);
+    spriteAxisDisplay.setCursor(5, 5);
+    spriteAxisDisplay.print(mainLine);
 
-    char posBuffer[16];
-    dtostrf(positions[pendantJog.selectedAxis], 1, 2, posBuffer);
-    spriteAxisDisplay.setTextSize(3);
-    spriteAxisDisplay.setCursor(50, 7);
-    spriteAxisDisplay.print(posBuffer);
-
-    int16_t posTextWidth = spriteAxisDisplay.textWidth(posBuffer);
-    spriteAxisDisplay.setTextColor(COLOR_GRAY_TEXT);
-    spriteAxisDisplay.setTextSize(2);
-    int16_t unitW = spriteAxisDisplay.textWidth("mm");
-    spriteAxisDisplay.setCursor(50 + posTextWidth - unitW, 33);
-    spriteAxisDisplay.print("mm");
-
-    // All axes mini-readout
+    // Non-selected axes in a small row underneath
     spriteAxisDisplay.setTextColor(COLOR_GRAY_TEXT);
     spriteAxisDisplay.setTextSize(1);
-    spriteAxisDisplay.setCursor(150, 3);  spriteAxisDisplay.print("X:"); spriteAxisDisplay.print(px, 1);
-    spriteAxisDisplay.setCursor(150, 15); spriteAxisDisplay.print("Y:"); spriteAxisDisplay.print(py, 1);
-    spriteAxisDisplay.setCursor(150, 27); spriteAxisDisplay.print("Z:"); spriteAxisDisplay.print(pz, 1);
-    spriteAxisDisplay.setCursor(150, 39); spriteAxisDisplay.print("A:"); spriteAxisDisplay.print(pa, 1);
+    int col = 5;
+    for (int i = 0; i < 4; i++) {
+        if (i == pendantJog.selectedAxis) continue;
+        char valBuf[10];
+        dtostrf(positions[i], 1, 2, valBuf);
+        char buf[16];
+        snprintf(buf, sizeof(buf), "%s:%s", axisNames[i].c_str(), valBuf);
+        spriteAxisDisplay.setCursor(col, 38);
+        spriteAxisDisplay.print(buf);
+        col += 75;
+    }
 
     spriteAxisDisplay.pushSprite(5, 40);
 }
