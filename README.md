@@ -2,9 +2,14 @@
 The CYD_Buttons Version has been optimised for FluidDial CNC Pendants with 3 physical buttons 
 and a jog dial, and is designed to work with the FluidNC Firmware.
 
-*** **This Firmware is a Work In-progress** - it's currently is a UI Only ***
+*** **This Firmware is a Work In-progress** - FluidNC Control is now partly functional ***
 
 **Updates:**
+
+**2026-03-22**
+* Rebuilt with Hardware control now running on CPU Core 0 and the the UI on CPU Core 1
+* Fixed UART boot loop, now talks to FluidNC controllers properly
+* There are still a lot of things needing fixing, but core functionality is working.
 
 **2025-01-15**
 * Properly debounced the physical buttons
