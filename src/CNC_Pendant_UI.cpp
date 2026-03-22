@@ -263,6 +263,9 @@ static void updateCurrentScreenSprites() {
             updateStatusAxisPositions();
             updateStatusFeedSpindle();
             break;
+        case PSCREEN_FLUIDNC:
+            updateFluidNCDisplay();
+            break;
         default:
             break;
     }
@@ -457,9 +460,8 @@ void loop_pendant() {
             case HwEvent::BUTTON_GREEN:
                 break;
             case HwEvent::STATE_UPDATE:
-                // FluidNC screen has no sprites — redraw directly when data changes
                 if (currentPendantScreen == PSCREEN_FLUIDNC) {
-                    drawCurrentPendantScreen();
+                    updateFluidNCDisplay();
                 }
                 break;
         }
