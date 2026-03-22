@@ -338,7 +338,10 @@ void pendant_hw_task(void* /*pvParameters*/) {
     bool          btnHandled[3]  = { false, false, false };
     int           btnPins[3]     = { red_button_pin, dial_button_pin, green_button_pin };
 
-    unsigned long lastPingMs = 0;
+    // Send first $? immediately — fnc_is_connected() uses a 'starting' flag so
+    // the very first call fires the ping right away instead of waiting for the timer.
+    fnc_is_connected();
+    unsigned long lastPingMs = millis();
 
     for (;;) {
         // Poll FluidNC UART — calls PendantScene callbacks when data arrives
@@ -347,7 +350,7 @@ void pendant_hw_task(void* /*pvParameters*/) {
         // Drive the ping mechanism (sends $? to FluidNC every ~4s to keep connection alive).
         // Must stay on Core 0 with UART — fnc_is_connected() writes to UART which blocks Core 1.
         unsigned long nowMs = millis();
-        if (nowMs - lastPingMs >= 1000) {
+        if (nowMs - lastPingMs >= 200) {
             fnc_is_connected();
             lastPingMs = nowMs;
         }
