@@ -318,6 +318,14 @@ public:
 
 static PendantScene pendantScene;
 
+// Called by GrblParser when a [VER:] report arrives from FluidNC
+extern "C" void show_versions(const char* /*grbl_version*/, const char* fluidnc_version) {
+    if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+        pendantMachine.fluidNCVersion = fluidnc_version;
+        xSemaphoreGive(stateMutex);
+    }
+}
+
 // ===== Core 0 Hardware Task =====
 void pendant_hw_task(void* /*pvParameters*/) {
     dbg_println("PendantHW task started on Core 0");
@@ -329,9 +337,19 @@ void pendant_hw_task(void* /*pvParameters*/) {
     bool          btnHandled[3]  = { false, false, false };
     int           btnPins[3]     = { red_button_pin, dial_button_pin, green_button_pin };
 
+    unsigned long lastPingMs = 0;
+
     for (;;) {
         // Poll FluidNC UART — calls PendantScene callbacks when data arrives
         fnc_poll();
+
+        // Drive the ping mechanism (sends $? to FluidNC every ~4s to keep connection alive).
+        // Must stay on Core 0 with UART — fnc_is_connected() writes to UART which blocks Core 1.
+        unsigned long nowMs = millis();
+        if (nowMs - lastPingMs >= 1000) {
+            fnc_is_connected();
+            lastPingMs = nowMs;
+        }
 
         // Encoder delta via PCNT (hardware, no polling/debounce needed)
         int16_t encCount = get_encoder();
@@ -384,8 +402,12 @@ void pendant_hw_task(void* /*pvParameters*/) {
     }
 }
 
+extern const char* git_info;  // version.cpp
+
 // ===== Public Interface =====
 void setup_pendant() {
+    pendantMachine.fluidDialVersion = git_info;
+
     // Load saved display rotation
     preferences.begin("pendant", false);
     int savedRotation = preferences.getInt("rotation", 2);

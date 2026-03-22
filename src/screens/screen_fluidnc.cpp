@@ -1,8 +1,11 @@
 #include "pendant_shared.h"
 #include "screen_fluidnc.h"
 #include <Preferences.h>
+#include <string>
 
-extern Preferences preferences;
+extern Preferences  preferences;
+extern std::string  wifi_ssid;   // FileParser.cpp — from FluidNC $Sta report
+extern std::string  wifi_ip;     // FileParser.cpp — from FluidNC $Sta report
 
 void enterFluidNC() {
     // No sprites for FluidNC screen
@@ -37,12 +40,12 @@ void drawFluidNCScreen() {
     display.setTextColor(COLOR_GRAY_TEXT); display.setTextSize(1);
     display.setCursor(120, 45); display.print("IP ADDRESS");
     display.setTextColor(COLOR_CYAN); display.setTextSize(1);
-    display.setCursor(120, 57); display.print(pendantMachine.ipAddress);
+    display.setCursor(120, 57); display.print(wifi_ip.empty() ? "---" : wifi_ip.c_str());
 
     display.setTextColor(COLOR_GRAY_TEXT); display.setTextSize(1);
     display.setCursor(120, 75); display.print("WIFI SSID");
     display.setTextColor(COLOR_CYAN); display.setTextSize(1);
-    display.setCursor(120, 87); display.print(pendantMachine.wifiSSID);
+    display.setCursor(120, 87); display.print(wifi_ssid.empty() ? "---" : wifi_ssid.c_str());
 
     // Connection Info
     display.fillRoundRect(5, 108, 230, 70, 5, COLOR_DARKER_BG);
