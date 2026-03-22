@@ -277,6 +277,7 @@ public:
         pendantConnected  = true;
         lastFluidNCDataMs = millis();
         if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+            pendantMachine.numAxes       = n_axes;
             pendantMachine.posX          = myAxes[0] / 10000.0f;
             pendantMachine.posY          = (n_axes > 1) ? myAxes[1] / 10000.0f : 0.0f;
             pendantMachine.posZ          = (n_axes > 2) ? myAxes[2] / 10000.0f : 0.0f;
@@ -406,7 +407,17 @@ extern const char* git_info;  // version.cpp
 
 // ===== Public Interface =====
 void setup_pendant() {
-    pendantMachine.fluidDialVersion = git_info;
+    // Strip build suffix — keep only "v<digits>.<digits>" (e.g. "v0.1main-abc-dirty" → "v0.1")
+    {
+        const char* src = git_info;
+        char buf[16];
+        int  j = 0;
+        if (*src == 'v') buf[j++] = *src++;
+        while (*src && (isdigit((unsigned char)*src) || *src == '.') && j < 15)
+            buf[j++] = *src++;
+        buf[j] = '\0';
+        pendantMachine.fluidDialVersion = buf;
+    }
 
     // Load saved display rotation
     preferences.begin("pendant", false);
@@ -441,8 +452,12 @@ void loop_pendant() {
             case HwEvent::BUTTON_RED:
             case HwEvent::BUTTON_YELLOW:
             case HwEvent::BUTTON_GREEN:
+                break;
             case HwEvent::STATE_UPDATE:
-                // Sprite update handled below; full redraw only if screen needs it
+                // FluidNC screen has no sprites — redraw directly when data changes
+                if (currentPendantScreen == PSCREEN_FLUIDNC) {
+                    drawCurrentPendantScreen();
+                }
                 break;
         }
     }

@@ -51,11 +51,15 @@ void drawProbingWorkScreen() {
     display.setCursor(5, 218);
     display.print("SET WORK ZERO");
 
-    drawButton(5,   230, 46, 38, "X",   COLOR_DARK_GREEN, COLOR_WHITE, 3);
-    drawButton(52,  230, 46, 38, "Y",   COLOR_DARK_GREEN, COLOR_WHITE, 3);
-    drawButton(99,  230, 46, 38, "Z",   COLOR_DARK_GREEN, COLOR_WHITE, 3);
-    drawButton(146, 230, 46, 38, "A",   COLOR_DARK_GREEN, COLOR_WHITE, 3);
-    drawButton(193, 230, 46, 38, "ALL", COLOR_DARK_GREEN, COLOR_WHITE, 2);
+    {
+        const char* axisLabels[] = { "X", "Y", "Z", "A" };
+        int numAx     = pendantMachine.numAxes;
+        int totalBtns = numAx + 1;
+        int btnW      = 230 / totalBtns;
+        for (int i = 0; i < numAx; i++)
+            drawButton(5 + i * btnW, 230, btnW - 2, 38, axisLabels[i], COLOR_DARK_GREEN, COLOR_WHITE, 3);
+        drawButton(5 + numAx * btnW, 230, btnW - 2, 38, "ALL", COLOR_DARK_GREEN, COLOR_WHITE, 2);
+    }
 
     drawButton(5,   277, 112, 40, "Main Menu", COLOR_BLUE, COLOR_WHITE, 2);
     drawButton(123, 277, 112, 40, "Jog",       COLOR_BLUE, COLOR_WHITE, 2);
@@ -75,13 +79,15 @@ void updateWorkMachinePos() {
         pz = pendantMachine.posZ; pa = pendantMachine.posA;
     }
 
+    const char* axisNames[] = { "X", "Y", "Z", "A" };
+    float       positions[] = { px, py, pz, pa };
     spriteAxisDisplay.fillSprite(COLOR_BACKGROUND);
     spriteAxisDisplay.setTextColor(COLOR_ORANGE);
     spriteAxisDisplay.setTextSize(2);
-    spriteAxisDisplay.setCursor(0,   5); spriteAxisDisplay.print("X:"); spriteAxisDisplay.print(px, 1);
-    spriteAxisDisplay.setCursor(120, 5); spriteAxisDisplay.print("Y:"); spriteAxisDisplay.print(py, 1);
-    spriteAxisDisplay.setCursor(0,   25); spriteAxisDisplay.print("Z:"); spriteAxisDisplay.print(pz, 1);
-    spriteAxisDisplay.setCursor(120, 25); spriteAxisDisplay.print("A:"); spriteAxisDisplay.print(pa, 1);
+    for (int i = 0; i < pendantMachine.numAxes; i++) {
+        spriteAxisDisplay.setCursor((i % 2) ? 120 : 0, 5 + (i / 2) * 20);
+        spriteAxisDisplay.print(axisNames[i]); spriteAxisDisplay.print(":"); spriteAxisDisplay.print(positions[i], 1);
+    }
     spriteAxisDisplay.pushSprite(5, 108);
 }
 
@@ -99,13 +105,15 @@ void updateWorkAreaPos() {
         wz = pendantMachine.workZ; wa = pendantMachine.workA;
     }
 
+    const char* wAxisNames[] = { "X", "Y", "Z", "A" };
+    float       workPos[]    = { wx, wy, wz, wa };
     spriteValueDisplay.fillSprite(COLOR_BACKGROUND);
     spriteValueDisplay.setTextColor(COLOR_CYAN);
     spriteValueDisplay.setTextSize(2);
-    spriteValueDisplay.setCursor(0,   5); spriteValueDisplay.print("X:"); spriteValueDisplay.print(wx, 1);
-    spriteValueDisplay.setCursor(120, 5); spriteValueDisplay.print("Y:"); spriteValueDisplay.print(wy, 1);
-    spriteValueDisplay.setCursor(0,   25); spriteValueDisplay.print("Z:"); spriteValueDisplay.print(wz, 1);
-    spriteValueDisplay.setCursor(120, 25); spriteValueDisplay.print("A:"); spriteValueDisplay.print(wa, 1);
+    for (int i = 0; i < pendantMachine.numAxes; i++) {
+        spriteValueDisplay.setCursor((i % 2) ? 120 : 0, 5 + (i / 2) * 20);
+        spriteValueDisplay.print(wAxisNames[i]); spriteValueDisplay.print(":"); spriteValueDisplay.print(workPos[i], 1);
+    }
     spriteValueDisplay.pushSprite(5, 166);
 }
 
@@ -130,22 +138,33 @@ void handleProbingWorkTouch(int x, int y) {
         }
     }
 
-    // Set Work Zero buttons
-    struct { int bx; const char* axis; const char* cmd; } zeros[] = {
-        { 5,   "X",   "G10 L20 P1 X0"         },
-        { 52,  "Y",   "G10 L20 P1 Y0"         },
-        { 99,  "Z",   "G10 L20 P1 Z0"         },
-        { 146, "A",   "G10 L20 P1 A0"         },
-        { 193, "ALL", "G10 L20 P1 X0 Y0 Z0 A0" },
-    };
-    int btnW[] = { 46, 46, 46, 46, 46 };
-    int textSz[] = { 3, 3, 3, 3, 2 };
-    for (int i = 0; i < 5; i++) {
-        if (isTouchInBounds(x, y, zeros[i].bx, 230, 46, 38)) {
-            drawButton(zeros[i].bx, 230, 46, 38, zeros[i].axis, COLOR_WHITE, COLOR_DARK_GREEN, textSz[i]);
+    // Set Work Zero buttons — layout matches drawProbingWorkScreen()
+    {
+        const char* axisLabels[] = { "X", "Y", "Z", "A" };
+        const char* axisCmds[]   = { "G10 L20 P1 X0", "G10 L20 P1 Y0", "G10 L20 P1 Z0", "G10 L20 P1 A0" };
+        int numAx     = pendantMachine.numAxes;
+        int totalBtns = numAx + 1;
+        int btnW      = 230 / totalBtns;
+        for (int i = 0; i < numAx; i++) {
+            if (isTouchInBounds(x, y, 5 + i * btnW, 230, btnW - 2, 38)) {
+                drawButton(5 + i * btnW, 230, btnW - 2, 38, axisLabels[i], COLOR_WHITE, COLOR_DARK_GREEN, 3);
+                delay_ms(150);
+                drawButton(5 + i * btnW, 230, btnW - 2, 38, axisLabels[i], COLOR_DARK_GREEN, COLOR_WHITE, 3);
+                if (pendantConnected) send_line(axisCmds[i]);
+                return;
+            }
+        }
+        int allX = 5 + numAx * btnW;
+        if (isTouchInBounds(x, y, allX, 230, btnW - 2, 38)) {
+            drawButton(allX, 230, btnW - 2, 38, "ALL", COLOR_WHITE, COLOR_DARK_GREEN, 2);
             delay_ms(150);
-            drawButton(zeros[i].bx, 230, 46, 38, zeros[i].axis, COLOR_DARK_GREEN, COLOR_WHITE, textSz[i]);
-            if (pendantConnected) send_line(zeros[i].cmd);
+            drawButton(allX, 230, btnW - 2, 38, "ALL", COLOR_DARK_GREEN, COLOR_WHITE, 2);
+            if (pendantConnected) {
+                char cmd[48] = "G10 L20 P1";
+                const char* letters[] = { " X0", " Y0", " Z0", " A0" };
+                for (int i = 0; i < numAx; i++) strncat(cmd, letters[i], sizeof(cmd) - strlen(cmd) - 1);
+                send_line(cmd);
+            }
             return;
         }
     }

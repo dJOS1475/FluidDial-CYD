@@ -134,12 +134,16 @@ void updateStatusAxisPositions() {
     spriteAxisDisplay.setCursor(5, 5);
     spriteAxisDisplay.print("AXIS POSITIONS");
 
+    const char* axisNames[] = { "X", "Y", "Z", "A" };
+    float       positions[] = { px, py, pz, pa };
     spriteAxisDisplay.setTextColor(COLOR_ORANGE);
     spriteAxisDisplay.setTextSize(2);
-    spriteAxisDisplay.setCursor(5,   20); spriteAxisDisplay.print("X:"); spriteAxisDisplay.print(px, 1);
-    spriteAxisDisplay.setCursor(125, 20); spriteAxisDisplay.print("Y:"); spriteAxisDisplay.print(py, 1);
-    spriteAxisDisplay.setCursor(5,   43); spriteAxisDisplay.print("Z:"); spriteAxisDisplay.print(pz, 1);
-    spriteAxisDisplay.setCursor(125, 43); spriteAxisDisplay.print("A:"); spriteAxisDisplay.print(pa, 1);
+    for (int i = 0; i < pendantMachine.numAxes; i++) {
+        spriteAxisDisplay.setCursor((i % 2) ? 125 : 5, 20 + (i / 2) * 23);
+        spriteAxisDisplay.print(axisNames[i]);
+        spriteAxisDisplay.print(":");
+        spriteAxisDisplay.print(positions[i], 1);
+    }
 
     spriteAxisDisplay.pushSprite(5, 140);
 }

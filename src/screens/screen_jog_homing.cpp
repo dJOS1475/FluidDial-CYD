@@ -32,14 +32,17 @@ void drawJogHomingScreen() {
 
     String axisNames[] = { "X", "Y", "Z", "A" };
 
+    int numAx = pendantMachine.numAxes;
+    int btnW  = 230 / numAx;
+
     display.setTextColor(COLOR_GRAY_TEXT);
     display.setTextSize(1);
     display.setCursor(5, 103);
     display.print("JOG AXIS");
 
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < numAx; i++) {
         uint16_t bg = (i == pendantJog.selectedAxis) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
-        drawButton(5 + i * 56, 115, 52, 38, axisNames[i], bg, COLOR_WHITE, 3);
+        drawButton(5 + i * btnW, 115, btnW - 4, 38, axisNames[i], bg, COLOR_WHITE, 3);
     }
 
     display.setTextColor(COLOR_GRAY_TEXT);
@@ -47,8 +50,8 @@ void drawJogHomingScreen() {
     display.setCursor(5, 161);
     display.print("HOME");
 
-    for (int i = 0; i < 4; i++) {
-        drawButton(5 + i * 56, 173, 52, 38, axisNames[i], COLOR_DARK_GREEN, COLOR_WHITE, 3);
+    for (int i = 0; i < numAx; i++) {
+        drawButton(5 + i * btnW, 173, btnW - 4, 38, axisNames[i], COLOR_DARK_GREEN, COLOR_WHITE, 3);
     }
 
     display.setTextColor(COLOR_GRAY_TEXT);
@@ -98,8 +101,10 @@ void updateJogAxisDisplay() {
     // Non-selected axes in a small row underneath
     spriteAxisDisplay.setTextColor(COLOR_GRAY_TEXT);
     spriteAxisDisplay.setTextSize(1);
-    int col = 5;
-    for (int i = 0; i < 4; i++) {
+    int numAx      = pendantMachine.numAxes;
+    int colSpacing = (numAx > 1) ? 230 / (numAx - 1) : 230;
+    int col        = 5;
+    for (int i = 0; i < numAx; i++) {
         if (i == pendantJog.selectedAxis) continue;
         char valBuf[10];
         dtostrf(positions[i], 1, 2, valBuf);
@@ -107,7 +112,7 @@ void updateJogAxisDisplay() {
         snprintf(buf, sizeof(buf), "%s:%s", axisNames[i].c_str(), valBuf);
         spriteAxisDisplay.setCursor(col, 38);
         spriteAxisDisplay.print(buf);
-        col += 75;
+        col += colSpacing;
     }
 
     spriteAxisDisplay.pushSprite(5, 40);
@@ -116,9 +121,11 @@ void updateJogAxisDisplay() {
 void redrawJogAxisButtons() {
     if (currentPendantScreen != PSCREEN_JOG_HOMING) return;
     String axisNames[] = { "X", "Y", "Z", "A" };
-    for (int i = 0; i < 4; i++) {
+    int numAx = pendantMachine.numAxes;
+    int btnW  = 230 / numAx;
+    for (int i = 0; i < numAx; i++) {
         uint16_t bg = (i == pendantJog.selectedAxis) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
-        drawButton(5 + i * 56, 115, 52, 38, axisNames[i], bg, COLOR_WHITE, 3);
+        drawButton(5 + i * btnW, 115, btnW - 4, 38, axisNames[i], bg, COLOR_WHITE, 3);
     }
     updateJogAxisDisplay();
 }
@@ -133,9 +140,13 @@ void redrawJogIncrementButtons() {
 }
 
 void handleJogHomingTouch(int x, int y) {
+    int numAx = pendantMachine.numAxes;
+    int btnW  = 230 / numAx;
+    if (pendantJog.selectedAxis >= numAx) pendantJog.selectedAxis = 0;
+
     // Axis selection
-    for (int i = 0; i < 4; i++) {
-        if (isTouchInBounds(x, y, 5 + i * 56, 115, 52, 38)) {
+    for (int i = 0; i < numAx; i++) {
+        if (isTouchInBounds(x, y, 5 + i * btnW, 115, btnW - 4, 38)) {
             pendantJog.selectedAxis = i;
             redrawJogAxisButtons();
             return;
@@ -144,11 +155,11 @@ void handleJogHomingTouch(int x, int y) {
 
     // Home buttons
     String axisNames[] = { "X", "Y", "Z", "A" };
-    for (int i = 0; i < 4; i++) {
-        if (isTouchInBounds(x, y, 5 + i * 56, 173, 52, 38)) {
-            drawButton(5 + i * 56, 173, 52, 38, axisNames[i], COLOR_WHITE, COLOR_DARK_GREEN, 3);
+    for (int i = 0; i < numAx; i++) {
+        if (isTouchInBounds(x, y, 5 + i * btnW, 173, btnW - 4, 38)) {
+            drawButton(5 + i * btnW, 173, btnW - 4, 38, axisNames[i], COLOR_WHITE, COLOR_DARK_GREEN, 3);
             delay_ms(150);
-            drawButton(5 + i * 56, 173, 52, 38, axisNames[i], COLOR_DARK_GREEN, COLOR_WHITE, 3);
+            drawButton(5 + i * btnW, 173, btnW - 4, 38, axisNames[i], COLOR_DARK_GREEN, COLOR_WHITE, 3);
             if (!pendantConnected) return;
             char cmd[16];
             snprintf(cmd, sizeof(cmd), "$H%s", axisNames[i].c_str());

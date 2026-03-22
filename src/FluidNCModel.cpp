@@ -212,6 +212,7 @@ extern "C" void show_state(const char* state_string) {
             send_line("$G");                     // Refresh GCode modes
             send_line("$G");                     // Refresh GCode modes
             send_line("$RI=200");
+            send_line("$I");                     // Request firmware version → triggers show_versions()
             init_file_list();
             detect_homing_info();
         }
