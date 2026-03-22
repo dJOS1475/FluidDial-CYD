@@ -6,10 +6,17 @@ and a jog dial, and is designed to work with the FluidNC Firmware.
 
 **Updates:**
 
-**2026-03-22**
-* Rebuilt with Hardware control now running on CPU Core 0 and the the UI on CPU Core 1
+2026-03-22
+
+* Rebuilt with Hardware control now running on CPU Core 0 and the UI on CPU Core 1
 * Fixed UART boot loop, now talks to FluidNC controllers properly
+* Broke one large screen file into separate files per screen to reduce memory use
+* Fixed position display showing wrong decimal place
+* Fixed boot screen rotation
+* Fixed button assignments (Red=E-stop, Yellow=pause/alarm clear, Green=cycle start)
+* Fixed upload speed to reliably flash the device
 * There are still a lot of things needing fixing, but core functionality is working.
+
 
 **2025-01-15**
 * Properly debounced the physical buttons
