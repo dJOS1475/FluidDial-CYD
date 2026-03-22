@@ -6,11 +6,15 @@
 #ifndef CNC_PENDANT_UI_H
 #define CNC_PENDANT_UI_H
 
-// Public interface functions
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+
+// Public interface called from ardmain.cpp
 void setup_pendant();
 void loop_pendant();
-
-// Optional: Function to manually redraw the current screen
 void drawCurrentPendantScreen();
 
-#endif // CNC_PENDANT_UI_H
+// Core 0 hardware task — created by ardmain.cpp after setup_pendant()
+void pendant_hw_task(void* pvParameters);
+
+#endif  // CNC_PENDANT_UI_H

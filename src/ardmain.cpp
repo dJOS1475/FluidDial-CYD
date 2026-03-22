@@ -8,6 +8,10 @@
 
 #ifdef USE_NEW_UI
 #include "CNC_Pendant_UI.h"
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
+#include <freertos/queue.h>
+#include "screens/pendant_shared.h"
 #endif
 
 extern void base_display();
@@ -22,23 +26,38 @@ void setup() {
 
     display.setBrightness(aboutScene.getBrightness());
 
+#ifdef USE_NEW_UI
+    display.setRotation(2);  // Boot screen rotation (overridden by saved preference after)
+#endif
     show_logo();
     delay_ms(2000);  // view the logo and wait for the debug port to connect
 
 #ifdef USE_NEW_UI
-    // Set initial rotation for logo (will be overridden by pendant preferences)
-    display.setRotation(2);
 
-    // Initialize the new pendant UI (loads rotation preference)
+    // Create FreeRTOS sync objects before setup_pendant() so PendantScene
+    // callbacks can post events as soon as fnc_poll() starts running.
+    stateMutex   = xSemaphoreCreateMutex();
+    hwEventQueue = xQueueCreate(32, sizeof(HwEvent));
+
+    // Initialize the new pendant UI on Core 1 (current context)
     setup_pendant();
+
+    // Start hardware task on Core 0: UART, encoder, buttons
+    xTaskCreatePinnedToCore(
+        pendant_hw_task,   // task function
+        "PendantHW",       // name
+        4096,              // stack size (bytes)
+        nullptr,           // parameter
+        2,                 // priority (higher than loop's priority of 1)
+        nullptr,           // handle (not needed)
+        0                  // core 0
+    );
 
     dbg_printf("FluidNC Pendant with new UI %s\n", git_info);
 #else
     base_display();
 
     dbg_printf("FluidNC Pendant %s\n", git_info);
-
-    // init_file_list();
 
     extern Scene* initMenus();
     activate_scene(initMenus());
@@ -48,10 +67,12 @@ void setup() {
 }
 
 void loop() {
-    fnc_poll();         // Handle messages from FluidNC
+    // Core 1: UI only — touch, display, event queue processing
+    // Hardware (UART, encoder, buttons) runs on Core 0 in pendant_hw_task()
 #ifdef USE_NEW_UI
-    loop_pendant();     // Handle pendant UI (touch, buttons, display)
+    loop_pendant();
 #else
+    fnc_poll();         // Handle messages from FluidNC
     dispatch_events();  // Handle dial, touch, buttons
 #endif
 }
