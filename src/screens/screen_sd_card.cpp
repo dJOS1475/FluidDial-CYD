@@ -43,9 +43,11 @@ void handleSDCardTouch(int x, int y) {
                 pendantSdCard.selectedFile      = displayIndex;
                 pendantMachine.currentFile      = pendantSdCard.files[displayIndex];
                 // Send SD run command
-                String cmd = "/SD/" + pendantMachine.currentFile;
-                send_line(cmd.c_str());
-                currentPendantScreen = PSCREEN_STATUS;
+                if (pendantConnected) {
+                    String cmd = "/SD/" + pendantMachine.currentFile;
+                    send_line(cmd.c_str());
+                    currentPendantScreen = PSCREEN_STATUS;
+                }
             }
             return;
         }

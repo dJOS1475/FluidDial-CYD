@@ -47,6 +47,10 @@ Preferences preferences;
 SemaphoreHandle_t stateMutex   = nullptr;
 QueueHandle_t     hwEventQueue = nullptr;
 
+// ===== Connection State =====
+volatile bool    pendantConnected  = false;
+static uint32_t  lastFluidNCDataMs = 0;
+
 // ===== Screen State =====
 PendantScreen currentPendantScreen  = PSCREEN_MAIN_MENU;
 PendantScreen previousPendantScreen = PSCREEN_MAIN_MENU;
@@ -205,6 +209,7 @@ static void handlePendantTouch(int x, int y) {
 // ===== Encoder Delta Handler (Core 1) =====
 static void handleEncoderDelta(int32_t delta) {
     if (currentPendantScreen == PSCREEN_JOG_HOMING) {
+        if (!pendantConnected) return;
         String axisNames[] = { "X", "Y", "Z", "A" };
         float  distance    = (float)delta * pendantJog.increment;
         char   cmd[64];
@@ -269,6 +274,8 @@ public:
     PendantScene() : Scene("Pendant") {}
 
     void onDROChange() override {
+        pendantConnected  = true;
+        lastFluidNCDataMs = millis();
         if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
             pendantMachine.posX          = myAxes[0] / 10000.0f;
             pendantMachine.posY          = (n_axes > 1) ? myAxes[1] / 10000.0f : 0.0f;
@@ -288,6 +295,8 @@ public:
     }
 
     void onStateChange(state_t /*newState*/) override {
+        pendantConnected  = true;
+        lastFluidNCDataMs = millis();
         if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
             pendantMachine.status           = my_state_string;
             pendantMachine.connectionStatus = fnc_is_connected() ? "Connected" : "N/C";
@@ -352,9 +361,9 @@ void pendant_hw_task(void* /*pvParameters*/) {
                     btnHandled[i] = true;
                     switch (i) {
                         case 0: fnc_realtime(Reset);      break;  // Red    → E-Stop (Ctrl-X)
-                        case 1:                                     // Yellow → context
-                            if (state == Alarm) send_line("$X");   //   Alarm  → Clear Alarm
-                            else                fnc_realtime(FeedHold); //   Other → Pause/Hold
+                        case 1:                                                      // Yellow → context
+                            if (state == Alarm && fnc_is_connected()) send_line("$X"); //   Alarm  → Clear Alarm
+                            else if (state != Alarm)                  fnc_realtime(FeedHold); //   Other → Pause/Hold
                             break;
                         case 2: fnc_realtime(CycleStart); break;  // Green  → Cycle Start (~)
                     }
@@ -414,6 +423,11 @@ void loop_pendant() {
                 // Sprite update handled below; full redraw only if screen needs it
                 break;
         }
+    }
+
+    // Connection timeout — clear flag if no FluidNC data for 3 seconds
+    if (pendantConnected && (millis() - lastFluidNCDataMs) > 3000) {
+        pendantConnected = false;
     }
 
     // Periodic sprite refresh (100ms)

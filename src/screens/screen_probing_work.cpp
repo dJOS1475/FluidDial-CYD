@@ -125,8 +125,7 @@ void handleProbingWorkTouch(int x, int y) {
             pendantProbing.selectedCoordIndex  = i;
             pendantProbing.selectedCoordSystem = coords[i];
             redrawWorkCoordButtons();
-            // Send coord system select command
-            send_line(coords[i].c_str());
+            if (pendantConnected) send_line(coords[i].c_str());
             return;
         }
     }
@@ -146,7 +145,7 @@ void handleProbingWorkTouch(int x, int y) {
             drawButton(zeros[i].bx, 230, 46, 38, zeros[i].axis, COLOR_WHITE, COLOR_DARK_GREEN, textSz[i]);
             delay_ms(150);
             drawButton(zeros[i].bx, 230, 46, 38, zeros[i].axis, COLOR_DARK_GREEN, COLOR_WHITE, textSz[i]);
-            send_line(zeros[i].cmd);
+            if (pendantConnected) send_line(zeros[i].cmd);
             return;
         }
     }

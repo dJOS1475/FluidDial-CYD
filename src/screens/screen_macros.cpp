@@ -37,7 +37,7 @@ void handleMacrosTouch(int x, int y) {
             drawButton(bx, by, 112, 43, label, COLOR_WHITE, COLOR_BUTTON_GRAY, 2);
             delay_ms(150);
             drawButton(bx, by, 112, 43, label, COLOR_BUTTON_GRAY, COLOR_WHITE, 2);
-            // Send macro command - macros 1-10
+            if (!pendantConnected) return;
             char cmd[16];
             snprintf(cmd, sizeof(cmd), "$macro/%d", i);
             send_line(cmd);

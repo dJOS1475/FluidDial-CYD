@@ -149,6 +149,7 @@ void handleJogHomingTouch(int x, int y) {
             drawButton(5 + i * 56, 173, 52, 38, axisNames[i], COLOR_WHITE, COLOR_DARK_GREEN, 3);
             delay_ms(150);
             drawButton(5 + i * 56, 173, 52, 38, axisNames[i], COLOR_DARK_GREEN, COLOR_WHITE, 3);
+            if (!pendantConnected) return;
             char cmd[16];
             snprintf(cmd, sizeof(cmd), "$H%s", axisNames[i].c_str());
             send_line(cmd);

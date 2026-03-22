@@ -124,15 +124,17 @@ void handleSpindleControlTouch(int x, int y) {
         drawButton(5, 230, 112, 40, "Start", COLOR_WHITE, COLOR_DARK_GREEN, 2);
         delay_ms(150);
         drawButton(5, 230, 112, 40, "Start", COLOR_DARK_GREEN, COLOR_WHITE, 2);
-        char cmd[32];
-        snprintf(cmd, sizeof(cmd), "M3 S%d", pendantMachine.spindleRPM);
-        send_line(cmd);
+        if (pendantConnected) {
+            char cmd[32];
+            snprintf(cmd, sizeof(cmd), "M3 S%d", pendantMachine.spindleRPM);
+            send_line(cmd);
+        }
         pendantMachine.spindleRunning = true;
     } else if (isTouchInBounds(x, y, 123, 230, 112, 40)) {
         drawButton(123, 230, 112, 40, "Stop", COLOR_WHITE, COLOR_RED, 2);
         delay_ms(150);
         drawButton(123, 230, 112, 40, "Stop", COLOR_RED, COLOR_WHITE, 2);
-        send_line("M5");
+        if (pendantConnected) send_line("M5");
         pendantMachine.spindleRunning = false;
     }
 

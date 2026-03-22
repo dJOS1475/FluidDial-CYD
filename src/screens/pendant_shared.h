@@ -129,6 +129,11 @@ extern bool        spritesInitialized;
 extern SemaphoreHandle_t stateMutex;
 extern QueueHandle_t     hwEventQueue;
 
+// ===== Connection State (set by Core 0 callbacks, read by Core 1) =====
+// Use this instead of fnc_is_connected() on Core 1 — fnc_is_connected() sends
+// UART bytes which block when no controller is attached.
+extern volatile bool pendantConnected;
+
 // ===== Helper Functions (defined in CNC_Pendant_UI.cpp) =====
 bool   isTouchInBounds(int tx, int ty, int x, int y, int w, int h);
 void   drawRoundRect(int x, int y, int w, int h, int r, uint16_t color);
