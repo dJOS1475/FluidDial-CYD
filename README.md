@@ -8,6 +8,7 @@ and a jog dial, and is designed to work with the FluidNC Firmware.
 
 **2026-03-22**
 v0.1
+
 * Rebuilt with Hardware control now running on CPU Core 0 and the UI on CPU Core 1
 * Fixed UART boot loop, now talks to FluidNC controllers properly
 * Broke one large screen file into separate files per screen to reduce memory use
@@ -17,6 +18,7 @@ v0.1
 * Fixed upload speed to reliably flash the device
 * Fixed UI freezing when turning the encoder with no controller connected
 * There are still a lot of things needing fixing, but core functionality is working.
+
 v0.2
 * Fixed the FluidNC Status screen - it now reports controller info correctly
 
