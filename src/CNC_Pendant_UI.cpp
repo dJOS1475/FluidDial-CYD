@@ -19,6 +19,7 @@
 #include "System.h"
 #include "Scene.h"
 #include "FluidNCModel.h"
+#include "FileParser.h"
 #include "Encoder.h"
 #include "GrblParserC.h"
 
@@ -304,6 +305,8 @@ public:
         if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
             pendantMachine.status           = my_state_string;
             pendantMachine.connectionStatus = fnc_is_connected() ? "Connected" : "N/C";
+            if (wifi_ip.length())   pendantMachine.ipAddress = String(wifi_ip.c_str());
+            if (wifi_ssid.length()) pendantMachine.wifiSSID  = String(wifi_ssid.c_str());
             xSemaphoreGive(stateMutex);
         }
         if (hwEventQueue) {
