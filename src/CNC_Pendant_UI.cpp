@@ -211,12 +211,9 @@ static void handlePendantTouch(int x, int y) {
 static void handleEncoderDelta(int32_t delta) {
     if (currentPendantScreen == PSCREEN_JOG_HOMING) {
         if (!pendantConnected) return;
-        // PCNT is configured in 4x quadrature mode: 4 counts per physical detent.
-        // Divide by 4 to convert raw counts to actual encoder clicks.
-        int32_t steps = delta / 4;
-        if (steps == 0) return;  // sub-detent noise, ignore
+        // delta is already in whole detents (converted in pendant_hw_task)
         String axisNames[] = { "X", "Y", "Z", "A" };
-        float  distance    = (float)steps * pendantJog.increment;
+        float  distance    = (float)delta * pendantJog.increment;
         char   cmd[64];
         snprintf(cmd, sizeof(cmd), "$J=G91 %s%.3f F1000",
                  axisNames[pendantJog.selectedAxis].c_str(), distance);
@@ -369,14 +366,25 @@ void pendant_hw_task(void* /*pvParameters*/) {
             lastPingMs = nowMs;
         }
 
-        // Encoder delta via PCNT (hardware, no polling/debounce needed)
-        int16_t encCount = get_encoder();
-        int16_t delta    = encCount - lastEncCount;
-        if (delta != 0) {
-            lastEncCount = encCount;
-            if (hwEventQueue) {
-                HwEvent ev = { HwEvent::ENCODER_DELTA, (int32_t)delta };
-                xQueueSend(hwEventQueue, &ev, 0);
+        // Encoder delta via PCNT. The encoder is wired in 4x quadrature mode so
+        // one physical detent (click) = 4 raw counts. Accumulate counts until a
+        // full detent is reached before sending an event, so slow turns that spread
+        // counts across multiple 5ms samples still produce the correct step count.
+        {
+            static int32_t encAccumulator = 0;
+            int16_t encCount = get_encoder();
+            int16_t rawDelta = encCount - lastEncCount;
+            if (rawDelta != 0) {
+                lastEncCount = encCount;
+                encAccumulator += rawDelta;
+                int32_t steps = encAccumulator / 4;
+                if (steps != 0) {
+                    encAccumulator -= steps * 4;  // keep sub-detent remainder
+                    if (hwEventQueue) {
+                        HwEvent ev = { HwEvent::ENCODER_DELTA, steps };
+                        xQueueSend(hwEventQueue, &ev, 0);
+                    }
+                }
             }
         }
 
