@@ -211,8 +211,12 @@ static void handlePendantTouch(int x, int y) {
 static void handleEncoderDelta(int32_t delta) {
     if (currentPendantScreen == PSCREEN_JOG_HOMING) {
         if (!pendantConnected) return;
+        // PCNT is configured in 4x quadrature mode: 4 counts per physical detent.
+        // Divide by 4 to convert raw counts to actual encoder clicks.
+        int32_t steps = delta / 4;
+        if (steps == 0) return;  // sub-detent noise, ignore
         String axisNames[] = { "X", "Y", "Z", "A" };
-        float  distance    = (float)delta * pendantJog.increment;
+        float  distance    = (float)steps * pendantJog.increment;
         char   cmd[64];
         snprintf(cmd, sizeof(cmd), "$J=G91 %s%.3f F1000",
                  axisNames[pendantJog.selectedAxis].c_str(), distance);
