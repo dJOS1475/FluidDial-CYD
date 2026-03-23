@@ -5,6 +5,19 @@ The CYD_Buttons version has been cloned into CYD_New_UI - the UI has been rebuil
 
 **Updates:**
 
+**2026-03-23**
+
+v0.3
+* Feed and spindle override preset buttons now send real commands to the controller
+* Work zero buttons now correctly target the selected coordinate system (G54–G57)
+* Faster connection to controller on startup
+* Only axes available on the connected machine are shown throughout the UI
+* FluidNC screen now shows live firmware version, IP address and WiFi SSID from the controller
+* Spindle Start button now correctly sends M3 (forward) or M4 (reverse) based on direction selection
+* Probe screen buttons now run macro files from the controller (probe_work_z.nc / probe_tool_height.nc)
+* Probe screen shows "Running..." confirmation or "Not connected" if no controller is present
+
+
 **2026-03-22**
 
 v0.1
@@ -22,15 +35,6 @@ v0.1
 v0.2
 * Fixed the FluidNC Status screen - it now reports controller info correctly
 
-v0.3
-* Feed and spindle override preset buttons now send real commands to the controller
-* Work zero buttons now correctly target the selected coordinate system (G54–G57)
-* Faster connection to controller on startup
-* Only axes available on the connected machine are shown throughout the UI
-* FluidNC screen now shows live firmware version, IP address and WiFi SSID from the controller
-* Spindle Start button now correctly sends M3 (forward) or M4 (reverse) based on direction selection
-* Probe screen buttons now run macro files from the controller (probe_work_z.nc / probe_tool_height.nc)
-* Probe screen shows "Running..." confirmation or "Not connected" if no controller is present
 
 
 **2025-01-15**
