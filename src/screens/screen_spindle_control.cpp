@@ -126,7 +126,8 @@ void handleSpindleControlTouch(int x, int y) {
         drawButton(5, 230, 112, 40, "Start", COLOR_DARK_GREEN, COLOR_WHITE, 2);
         if (pendantConnected) {
             char cmd[32];
-            snprintf(cmd, sizeof(cmd), "M3 S%d", pendantMachine.spindleRPM);
+            // M3 = clockwise (Fwd), M4 = counterclockwise (Rev)
+            snprintf(cmd, sizeof(cmd), "%s S%d", pendantSpindle.directionFwd ? "M3" : "M4", pendantMachine.spindleRPM);
             send_line(cmd);
         }
         pendantMachine.spindleRunning = true;

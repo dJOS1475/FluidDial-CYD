@@ -28,6 +28,9 @@ v0.3
 * Faster connection to controller on startup
 * Only axes available on the connected machine are shown throughout the UI
 * FluidNC screen now shows live firmware version, IP address and WiFi SSID from the controller
+* Spindle Start button now correctly sends M3 (forward) or M4 (reverse) based on direction selection
+* Probe screen buttons now run macro files from the controller (probe_work_z.nc / probe_tool_height.nc)
+* Probe screen shows "Running..." confirmation or "Not connected" if no controller is present
 
 
 **2025-01-15**

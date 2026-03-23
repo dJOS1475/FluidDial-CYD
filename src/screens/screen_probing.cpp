@@ -102,17 +102,39 @@ void updateProbeSettingsDisplay() {
     spriteValueDisplay.pushSprite(5, 228);
 }
 
+// Draw a status message in the area below probe settings
+static void showProbeStatus(const char* msg, uint16_t color) {
+    display.fillRect(5, 270, 230, 14, COLOR_BACKGROUND);
+    display.setTextColor(color);
+    display.setTextSize(1);
+    display.setCursor(5, 270);
+    display.print(msg);
+}
+
 void handleProbingTouch(int x, int y) {
-    String probeTypes[] = { "Z Surface", "Tool Height" };
-    uint16_t probeColors[] = { COLOR_DARK_GREEN, COLOR_ORANGE };
+    // Macro filenames stored on the FluidNC SD card / local filesystem
+    const char* macroFiles[]  = { "probe_work_z.nc", "probe_tool_height.nc" };
+    String      probeTypes[]  = { "Z Surface", "Tool Height" };
+    uint16_t    probeColors[] = { COLOR_DARK_GREEN, COLOR_ORANGE };
 
     for (int i = 0; i < 2; i++) {
         int by = 116 + i * 43;
         if (isTouchInBounds(x, y, 5, by, 230, 38)) {
+            // Visual press feedback
             drawButton(5, by, 230, 38, probeTypes[i], COLOR_WHITE, probeColors[i], 2);
             delay_ms(150);
             drawButton(5, by, 230, 38, probeTypes[i], probeColors[i], COLOR_WHITE, 2);
             pendantProbe.selectedProbeType = i;
+
+            if (!pendantConnected) {
+                showProbeStatus("Not connected", COLOR_RED);
+                return;
+            }
+            // Run the macro file from the controller's local filesystem
+            char cmd[48];
+            snprintf(cmd, sizeof(cmd), "$Localfs/Run=%s", macroFiles[i]);
+            send_line(cmd);
+            showProbeStatus("Running...", COLOR_CYAN);
             return;
         }
     }
