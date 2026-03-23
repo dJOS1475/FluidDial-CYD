@@ -49,8 +49,8 @@ SemaphoreHandle_t stateMutex   = nullptr;
 QueueHandle_t     hwEventQueue = nullptr;
 
 // ===== Connection State =====
-volatile bool    pendantConnected  = false;
-static uint32_t  lastFluidNCDataMs = 0;
+// Driven exclusively by fnc_is_connected() on Core 0 (backed by update_rx_time() per UART byte).
+volatile bool pendantConnected = false;
 
 // ===== Screen State =====
 PendantScreen currentPendantScreen  = PSCREEN_MAIN_MENU;
@@ -278,8 +278,6 @@ public:
     PendantScene() : Scene("Pendant") {}
 
     void onDROChange() override {
-        pendantConnected  = true;
-        lastFluidNCDataMs = millis();
         if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
             pendantMachine.numAxes       = n_axes;
             pendantMachine.posX          = myAxes[0] / 10000.0f;
@@ -300,11 +298,9 @@ public:
     }
 
     void onStateChange(state_t /*newState*/) override {
-        pendantConnected  = true;
-        lastFluidNCDataMs = millis();
         if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
             pendantMachine.status           = my_state_string;
-            pendantMachine.connectionStatus = fnc_is_connected() ? "Connected" : "N/C";
+            pendantMachine.connectionStatus = "Connected";  // we're in a callback, so we ARE connected
             if (wifi_ip.length())   pendantMachine.ipAddress = String(wifi_ip.c_str());
             if (wifi_ssid.length()) pendantMachine.wifiSSID  = String(wifi_ssid.c_str());
             xSemaphoreGive(stateMutex);
@@ -353,11 +349,19 @@ void pendant_hw_task(void* /*pvParameters*/) {
         // Poll FluidNC UART — calls PendantScene callbacks when data arrives
         fnc_poll();
 
-        // Drive the ping mechanism (sends $? to FluidNC every ~4s to keep connection alive).
-        // Must stay on Core 0 with UART — fnc_is_connected() writes to UART which blocks Core 1.
+        // Drive ping + connection state from Core 0.
+        // fnc_is_connected() is backed by update_rx_time() (called per UART byte) so it
+        // reliably reflects whether FluidNC is actually responding.
         unsigned long nowMs = millis();
         if (nowMs - lastPingMs >= 200) {
-            fnc_is_connected();
+            bool connected = fnc_is_connected();
+            if (connected != pendantConnected) {
+                pendantConnected = connected;
+                if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+                    pendantMachine.connectionStatus = connected ? "Connected" : "N/C";
+                    xSemaphoreGive(stateMutex);
+                }
+            }
             lastPingMs = nowMs;
         }
 
@@ -440,6 +444,10 @@ void setup_pendant() {
     dbg_printf("Pendant rotation: %s (%d)\n",
                pendantMachine.displayRotation.c_str(), savedRotation);
 
+    // Force Disconnected state so the first real status report always triggers
+    // the connection setup ($RI=200, $G, $I) — even if FluidNC is already running.
+    set_disconnected_state();
+
     // Register scene so FluidNC callbacks update pendantMachine
     activate_scene(&pendantScene);
 
@@ -468,11 +476,6 @@ void loop_pendant() {
                 }
                 break;
         }
-    }
-
-    // Connection timeout — clear flag if no FluidNC data for 3 seconds
-    if (pendantConnected && (millis() - lastFluidNCDataMs) > 3000) {
-        pendantConnected = false;
     }
 
     // Periodic sprite refresh (100ms)
