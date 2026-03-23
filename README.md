@@ -22,6 +22,13 @@ v0.1
 v0.2
 * Fixed the FluidNC Status screen - it now reports controller info correctly
 
+v0.3
+* Feed and spindle override preset buttons now send real commands to the controller
+* Work zero buttons now correctly target the selected coordinate system (G54–G57)
+* Faster connection to controller on startup
+* Only axes available on the connected machine are shown throughout the UI
+* FluidNC screen now shows live firmware version, IP address and WiFi SSID from the controller
+
 
 **2025-01-15**
 * Properly debounced the physical buttons
