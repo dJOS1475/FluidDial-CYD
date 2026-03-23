@@ -1,7 +1,7 @@
 # FluidDial-CYD: 
 The CYD_Buttons version has been cloned into CYD_New_UI - the UI has been rebuilt from scratch and optimised for CYD equipped FluidDial CNC Pendants with 3 physical buttons and a jog dial, and is designed to work with the FluidNC Firmware.
 
-*** **This Firmware is a Work In-progress** - FluidNC Control is now partly functional ***
+*** **This Firmware is a Work In-progress** - FluidNC Control is now mostly functional ***
 
 **Updates:**
 
@@ -20,6 +20,9 @@ v0.3
 
 **2026-03-22**
 
+v0.2
+* Fixed the FluidNC Status screen - it now reports controller info correctly
+
 v0.1
 
 * Rebuilt with Hardware control now running on CPU Core 0 and the UI on CPU Core 1
@@ -31,10 +34,6 @@ v0.1
 * Fixed upload speed to reliably flash the device
 * Fixed UI freezing when turning the encoder with no controller connected
 * There are still a lot of things needing fixing, but core functionality is working.
-
-v0.2
-* Fixed the FluidNC Status screen - it now reports controller info correctly
-
 
 
 **2025-01-15**
@@ -49,6 +48,7 @@ v0.2
 * Probe Screen created and button added to Main Menu
 * Screen can be rotated 180 degress via the Jog Dial from the FluidNC
 * Screen Rotation is saved and will be recalled on restart
+
 
 **Design Goals:**
 
