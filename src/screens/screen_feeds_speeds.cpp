@@ -181,6 +181,24 @@ void redrawSpindleOverrideButtons() {
     updateSpindleOverrideDisplay();
 }
 
+// Send realtime commands to reach a target feed override %.
+// Resets to 100% first, then applies fine ±1% steps.
+static void applyFeedOverride(int targetPct) {
+    if (!pendantConnected) return;
+    fnc_realtime(FeedOvrReset);
+    int delta = targetPct - 100;
+    for (int i = 0; i < abs(delta); i++)
+        fnc_realtime(delta > 0 ? FeedOvrFinePlus : FeedOvrFineMinus);
+}
+
+static void applySpindleOverride(int targetPct) {
+    if (!pendantConnected) return;
+    fnc_realtime(SpindleOvrReset);
+    int delta = targetPct - 100;
+    for (int i = 0; i < abs(delta); i++)
+        fnc_realtime(delta > 0 ? SpindleOvrFinePlus : SpindleOvrFineMinus);
+}
+
 void handleFeedsSpeedsTouch(int x, int y) {
     int pcts[] = { 50, 75, 100, 125, 150 };
 
@@ -188,20 +206,23 @@ void handleFeedsSpeedsTouch(int x, int y) {
     for (int i = 0; i < 3; i++) {
         if (isTouchInBounds(x, y, 5 + i * 78, 95, 72, 37)) {
             pendantFeeds.selectedFeedOverride = i;
-            pendantMachine.feedOverride = pcts[i];
+            pendantMachine.feedOverride       = pcts[i];
+            applyFeedOverride(pcts[i]);
             redrawFeedOverrideButtons();
             return;
         }
     }
     if (isTouchInBounds(x, y, 5, 137, 72, 37)) {
         pendantFeeds.selectedFeedOverride = 3;
-        pendantMachine.feedOverride = 125;
+        pendantMachine.feedOverride       = 125;
+        applyFeedOverride(125);
         redrawFeedOverrideButtons();
         return;
     }
     if (isTouchInBounds(x, y, 161, 137, 72, 37)) {
         pendantFeeds.selectedFeedOverride = 4;
-        pendantMachine.feedOverride = 150;
+        pendantMachine.feedOverride       = 150;
+        applyFeedOverride(150);
         redrawFeedOverrideButtons();
         return;
     }
@@ -210,20 +231,23 @@ void handleFeedsSpeedsTouch(int x, int y) {
     for (int i = 0; i < 3; i++) {
         if (isTouchInBounds(x, y, 5 + i * 78, 194, 72, 37)) {
             pendantFeeds.selectedSpindleOverride = i;
-            pendantMachine.spindleOverride = pcts[i];
+            pendantMachine.spindleOverride       = pcts[i];
+            applySpindleOverride(pcts[i]);
             redrawSpindleOverrideButtons();
             return;
         }
     }
     if (isTouchInBounds(x, y, 5, 236, 72, 37)) {
         pendantFeeds.selectedSpindleOverride = 3;
-        pendantMachine.spindleOverride = 125;
+        pendantMachine.spindleOverride       = 125;
+        applySpindleOverride(125);
         redrawSpindleOverrideButtons();
         return;
     }
     if (isTouchInBounds(x, y, 161, 236, 72, 37)) {
         pendantFeeds.selectedSpindleOverride = 4;
-        pendantMachine.spindleOverride = 150;
+        pendantMachine.spindleOverride       = 150;
+        applySpindleOverride(150);
         redrawSpindleOverrideButtons();
         return;
     }

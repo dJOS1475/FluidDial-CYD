@@ -138,10 +138,11 @@ void handleProbingWorkTouch(int x, int y) {
         }
     }
 
-    // Set Work Zero buttons — layout matches drawProbingWorkScreen()
+    // Set Work Zero buttons — P number matches selected coord system (G54=P1 … G57=P4)
     {
         const char* axisLabels[] = { "X", "Y", "Z", "A" };
-        const char* axisCmds[]   = { "G10 L20 P1 X0", "G10 L20 P1 Y0", "G10 L20 P1 Z0", "G10 L20 P1 A0" };
+        const char* axisLetters[] = { "X", "Y", "Z", "A" };
+        int pNum      = pendantProbing.selectedCoordIndex + 1;  // G54→1, G55→2, G56→3, G57→4
         int numAx     = pendantMachine.numAxes;
         int totalBtns = numAx + 1;
         int btnW      = 230 / totalBtns;
@@ -150,7 +151,11 @@ void handleProbingWorkTouch(int x, int y) {
                 drawButton(5 + i * btnW, 230, btnW - 2, 38, axisLabels[i], COLOR_WHITE, COLOR_DARK_GREEN, 3);
                 delay_ms(150);
                 drawButton(5 + i * btnW, 230, btnW - 2, 38, axisLabels[i], COLOR_DARK_GREEN, COLOR_WHITE, 3);
-                if (pendantConnected) send_line(axisCmds[i]);
+                if (pendantConnected) {
+                    char cmd[32];
+                    snprintf(cmd, sizeof(cmd), "G10 L20 P%d %s0", pNum, axisLetters[i]);
+                    send_line(cmd);
+                }
                 return;
             }
         }
@@ -160,7 +165,8 @@ void handleProbingWorkTouch(int x, int y) {
             delay_ms(150);
             drawButton(allX, 230, btnW - 2, 38, "ALL", COLOR_DARK_GREEN, COLOR_WHITE, 2);
             if (pendantConnected) {
-                char cmd[48] = "G10 L20 P1";
+                char cmd[48];
+                snprintf(cmd, sizeof(cmd), "G10 L20 P%d", pNum);
                 const char* letters[] = { " X0", " Y0", " Z0", " A0" };
                 for (int i = 0; i < numAx; i++) strncat(cmd, letters[i], sizeof(cmd) - strlen(cmd) - 1);
                 send_line(cmd);
