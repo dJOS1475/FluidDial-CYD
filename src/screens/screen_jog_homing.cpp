@@ -54,10 +54,11 @@ void drawJogHomingScreen() {
     // For 3-axis machines the 4th button is "All" ($H); for 4-axis it is "A".
     {
         const int HW = 57;  // 230 / 4
-        String homeNames[4] = { "X", "Y", "Z", numAx < 4 ? "All" : "A" };
+        String homeNames[4] = { "X", "Y", "Z", numAx < 4 ? "ALL" : "A" };
         int    numHome       = (numAx < 4) ? numAx + 1 : 4;
         for (int i = 0; i < numHome; i++) {
-            drawButton(5 + i * HW, 173, HW - 4, 38, homeNames[i], COLOR_DARK_GREEN, COLOR_WHITE, 3);
+            int sz = (i == numAx && numAx < 4) ? 2 : 3;  // "ALL" uses size 2, axis letters size 3
+            drawButton(5 + i * HW, 173, HW - 4, 38, homeNames[i], COLOR_DARK_GREEN, COLOR_WHITE, sz);
         }
     }
 
@@ -163,13 +164,14 @@ void handleJogHomingTouch(int x, int y) {
     // Home buttons — always 4 at fixed 57px width
     {
         const int HW = 57;
-        String homeNames[4] = { "X", "Y", "Z", numAx < 4 ? "All" : "A" };
+        String homeNames[4] = { "X", "Y", "Z", numAx < 4 ? "ALL" : "A" };
         int    numHome       = (numAx < 4) ? numAx + 1 : 4;
         for (int i = 0; i < numHome; i++) {
             if (isTouchInBounds(x, y, 5 + i * HW, 173, HW - 4, 38)) {
-                drawButton(5 + i * HW, 173, HW - 4, 38, homeNames[i], COLOR_WHITE, COLOR_DARK_GREEN, 3);
+                int sz = (i == numAx && numAx < 4) ? 2 : 3;
+                drawButton(5 + i * HW, 173, HW - 4, 38, homeNames[i], COLOR_WHITE, COLOR_DARK_GREEN, sz);
                 delay_ms(150);
-                drawButton(5 + i * HW, 173, HW - 4, 38, homeNames[i], COLOR_DARK_GREEN, COLOR_WHITE, 3);
+                drawButton(5 + i * HW, 173, HW - 4, 38, homeNames[i], COLOR_DARK_GREEN, COLOR_WHITE, sz);
                 if (!pendantConnected) return;
                 char cmd[16];
                 if (i == numAx) {
