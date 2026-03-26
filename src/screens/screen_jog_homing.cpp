@@ -50,8 +50,15 @@ void drawJogHomingScreen() {
     display.setCursor(5, 161);
     display.print("HOME");
 
-    for (int i = 0; i < numAx; i++) {
-        drawButton(5 + i * btnW, 173, btnW - 4, 38, axisNames[i], COLOR_DARK_GREEN, COLOR_WHITE, 3);
+    // Home row always has 4 buttons at fixed 57px width.
+    // For 3-axis machines the 4th button is "All" ($H); for 4-axis it is "A".
+    {
+        const int HW = 57;  // 230 / 4
+        String homeNames[4] = { "X", "Y", "Z", numAx < 4 ? "All" : "A" };
+        int    numHome       = (numAx < 4) ? numAx + 1 : 4;
+        for (int i = 0; i < numHome; i++) {
+            drawButton(5 + i * HW, 173, HW - 4, 38, homeNames[i], COLOR_DARK_GREEN, COLOR_WHITE, 3);
+        }
     }
 
     display.setTextColor(COLOR_GRAY_TEXT);
@@ -153,18 +160,27 @@ void handleJogHomingTouch(int x, int y) {
         }
     }
 
-    // Home buttons
-    String axisNames[] = { "X", "Y", "Z", "A" };
-    for (int i = 0; i < numAx; i++) {
-        if (isTouchInBounds(x, y, 5 + i * btnW, 173, btnW - 4, 38)) {
-            drawButton(5 + i * btnW, 173, btnW - 4, 38, axisNames[i], COLOR_WHITE, COLOR_DARK_GREEN, 3);
-            delay_ms(150);
-            drawButton(5 + i * btnW, 173, btnW - 4, 38, axisNames[i], COLOR_DARK_GREEN, COLOR_WHITE, 3);
-            if (!pendantConnected) return;
-            char cmd[16];
-            snprintf(cmd, sizeof(cmd), "$H%s", axisNames[i].c_str());
-            send_line(cmd);
-            return;
+    // Home buttons — always 4 at fixed 57px width
+    {
+        const int HW = 57;
+        String homeNames[4] = { "X", "Y", "Z", numAx < 4 ? "All" : "A" };
+        int    numHome       = (numAx < 4) ? numAx + 1 : 4;
+        for (int i = 0; i < numHome; i++) {
+            if (isTouchInBounds(x, y, 5 + i * HW, 173, HW - 4, 38)) {
+                drawButton(5 + i * HW, 173, HW - 4, 38, homeNames[i], COLOR_WHITE, COLOR_DARK_GREEN, 3);
+                delay_ms(150);
+                drawButton(5 + i * HW, 173, HW - 4, 38, homeNames[i], COLOR_DARK_GREEN, COLOR_WHITE, 3);
+                if (!pendantConnected) return;
+                char cmd[16];
+                if (i == numAx) {
+                    send_line("$H");          // "All" — home all axes
+                } else {
+                    String axisNames[] = { "X", "Y", "Z", "A" };
+                    snprintf(cmd, sizeof(cmd), "$H%s", axisNames[i].c_str());
+                    send_line(cmd);
+                }
+                return;
+            }
         }
     }
 

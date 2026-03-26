@@ -58,22 +58,25 @@ void updateProbePositionDisplay() {
     if (!spriteAxisDisplay.getBuffer()) return;
 
     float px, py, pz, pa;
+    int   numAx;
     if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
         px = pendantMachine.posX; py = pendantMachine.posY;
         pz = pendantMachine.posZ; pa = pendantMachine.posA;
+        numAx = pendantMachine.numAxes;
         xSemaphoreGive(stateMutex);
     } else {
         px = pendantMachine.posX; py = pendantMachine.posY;
         pz = pendantMachine.posZ; pa = pendantMachine.posA;
+        numAx = pendantMachine.numAxes;
     }
 
     spriteAxisDisplay.fillSprite(COLOR_BACKGROUND);
     spriteAxisDisplay.setTextColor(COLOR_ORANGE);
     spriteAxisDisplay.setTextSize(2);
     spriteAxisDisplay.setCursor(0,  7); spriteAxisDisplay.print("X "); spriteAxisDisplay.print(px, 1);
-    spriteAxisDisplay.setCursor(85, 7); spriteAxisDisplay.print("Y "); spriteAxisDisplay.print(py, 1);
-    spriteAxisDisplay.setCursor(0,  27); spriteAxisDisplay.print("Z "); spriteAxisDisplay.print(pz, 1);
-    spriteAxisDisplay.setCursor(85, 27); spriteAxisDisplay.print("A "); spriteAxisDisplay.print(pa, 1);
+    if (numAx > 1) { spriteAxisDisplay.setCursor(85, 7);  spriteAxisDisplay.print("Y "); spriteAxisDisplay.print(py, 1); }
+    if (numAx > 2) { spriteAxisDisplay.setCursor(0,  27); spriteAxisDisplay.print("Z "); spriteAxisDisplay.print(pz, 1); }
+    if (numAx > 3) { spriteAxisDisplay.setCursor(85, 27); spriteAxisDisplay.print("A "); spriteAxisDisplay.print(pa, 1); }
     spriteAxisDisplay.pushSprite(5, 57);
 }
 
