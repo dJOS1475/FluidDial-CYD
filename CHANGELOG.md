@@ -8,7 +8,7 @@ The CYD_Buttons version has been cloned into CYD_New_UI - the UI has been rebuil
 
 **2026-03-26**
 
-v0.4
+v1.0.0
 * Spindle screen now reads min/max RPM limits directly from the controller ($30/$31)
 * RPM preset buttons are now calculated dynamically at 25%, 50% and 100% of the controller's max RPM
 * RPM preset labels now display in short format (e.g. 6k instead of 6000)
