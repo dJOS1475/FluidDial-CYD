@@ -6,6 +6,19 @@ The CYD_Buttons version has been cloned into CYD_New_UI - the UI has been rebuil
 **ChangeLog:**
 
 
+**2026-03-26**
+
+v0.4
+* Spindle screen now reads min/max RPM limits directly from the controller ($30/$31)
+* RPM preset buttons are now calculated dynamically at 25%, 50% and 100% of the controller's max RPM
+* RPM preset labels now display in short format (e.g. 6k instead of 6000)
+* Added Dial mode button on spindle screen — when active, the jog dial sets RPM in 1000 RPM increments within the controller's valid min/max range
+* Jog & Homing screen now shows an "ALL" home button when 3 axes are detected, replacing the unused A-axis home button
+* Probe screen now respects the number of axes detected — 4th axis is hidden on 3-axis machines
+* FluidNC screen flickering fixed using sprite rendering
+* All screens that display or interact with axis positions now use live axis count from the controller
+
+
 **2026-03-23**
 
 v0.3.2

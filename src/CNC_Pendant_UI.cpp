@@ -20,6 +20,7 @@
 #include "Scene.h"
 #include "FluidNCModel.h"
 #include "FileParser.h"
+#include "ConfigItem.h"
 #include "Encoder.h"
 #include "GrblParserC.h"
 
@@ -209,7 +210,13 @@ static void handlePendantTouch(int x, int y) {
 
 // ===== Encoder Delta Handler (Core 1) =====
 static void handleEncoderDelta(int32_t delta) {
-    if (currentPendantScreen == PSCREEN_JOG_HOMING) {
+    if (currentPendantScreen == PSCREEN_SPINDLE_CONTROL && pendantSpindle.dialMode) {
+        int maxRPM = pendantMachine.spindleMaxRPM > 0 ? pendantMachine.spindleMaxRPM : 24000;
+        int minRPM = pendantMachine.spindleMinRPM;
+        pendantMachine.spindleRPM = constrain(pendantMachine.spindleRPM + delta * 1000, minRPM, maxRPM);
+        updateSpindleRPMDisplay();
+        return;
+    } else if (currentPendantScreen == PSCREEN_JOG_HOMING) {
         if (!pendantConnected) return;
         // delta is already in whole detents (converted in pendant_hw_task)
         String axisNames[] = { "X", "Y", "Z", "A" };
@@ -273,6 +280,16 @@ static void updateCurrentScreenSprites() {
     }
 }
 
+// ===== Spindle config items — request $30 (max RPM) and $31 (min RPM) from FluidNC =====
+static IntConfigItem spindleMaxItem("$30");
+static IntConfigItem spindleMinItem("$31");
+
+// Called from enterSpindleControl() on Core 1 — sends $30/$31 queries to FluidNC
+void requestSpindleConfig() {
+    spindleMaxItem.init();
+    spindleMinItem.init();
+}
+
 // ===== PendantScene: bridges FluidNC callbacks → pendantMachine (Core 0) =====
 class PendantScene : public Scene {
 public:
@@ -313,6 +330,14 @@ public:
     }
 
     void reDisplay() override {
+        // Copy any newly-received config values into pendantMachine
+        if (spindleMaxItem.known() || spindleMinItem.known()) {
+            if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+                if (spindleMaxItem.known()) pendantMachine.spindleMaxRPM = spindleMaxItem.get();
+                if (spindleMinItem.known()) pendantMachine.spindleMinRPM = spindleMinItem.get();
+                xSemaphoreGive(stateMutex);
+            }
+        }
         if (hwEventQueue) {
             HwEvent ev = { HwEvent::STATE_UPDATE, 0 };
             xQueueSend(hwEventQueue, &ev, 0);

@@ -54,8 +54,10 @@ struct MachineState {
     int    spindleRPM    = 0;
     String spindleDir    = "Fwd";
     bool   spindleRunning = false;
-    int    feedOverride   = 100;
+    int    feedOverride    = 100;
     int    spindleOverride = 100;
+    int    spindleMaxRPM   = 24000;
+    int    spindleMinRPM   = 0;
     String fluidDialVersion = "v3.7.17";
     String fluidNCVersion   = "v3.7.16";
     String baudRate         = "1000000";
@@ -84,8 +86,9 @@ struct SDCardState {
 };
 
 struct SpindleState {
-    int  selectedPreset = 1;   // 0=6000, 1=12000, 2=24000
+    int  selectedPreset = 1;   // 0=25%, 1=50%, 2=100% of max
     bool directionFwd   = true;
+    bool dialMode       = false; // true = encoder adjusts RPM in 1000 RPM steps
 };
 
 struct FeedsState {

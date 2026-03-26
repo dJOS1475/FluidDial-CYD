@@ -8,14 +8,55 @@ See CHANGELOG.md
 
 **Design Goals:**
 
-All Menu navigation and as many features as possible will be managed via the touch screen. The Physical jog dial will only move the CNC machine when in the Jog & Homing screen (safety feature). The Jog Dial will also be able to scroll through selected features depending on the screen (WIP). eg on the FluidNC screen, the jog Dial will rotate the display. 
+All menu navigation and as many features as possible are managed via the touch screen. The physical jog dial context-switches depending on the active screen — it only moves the CNC machine on the Jog & Homing screen (a safety feature), and serves other purposes elsewhere.
 
-The 3 physical buttons will always be:
-* Red: e-stop
+The 3 physical buttons always perform the same function regardless of the active screen:
+* Red: E-stop (sends CTRL-X reset to controller)
 * Yellow: context sensitive
-  * In ALARM → Clear Alarm
+  * In ALARM → Clear Alarm ($X)
   * Otherwise → Pause/Hold
 * Green: Cycle Start
+
+---
+
+**Screens & Features:**
+
+**Main Menu** — touch navigation to all screens.
+
+**Status** — live DRO showing machine position, feed rate, spindle RPM, active file, and machine state. Axis count is detected automatically from the connected controller.
+
+**Jog & Homing**
+* Jog dial moves the selected axis by the chosen increment (0.1 / 1 / 10 / 100 mm)
+* Axis selection and increment buttons on screen
+* Home buttons for each detected axis, plus an "ALL" home button on 3-axis machines
+* Only axes present on the connected machine are shown
+
+**Work Area (Probing Work)**
+* Coordinate system selection (G54–G57)
+* Zero individual axes or all at once for the selected coordinate system
+
+**Probing**
+* Runs probe macro files stored on the FluidNC controller
+* Z Surface probe: runs `probe_work_z.nc`
+* Tool Height setter: runs `probe_tool_height.nc`
+* Example macro files are included in the `/macros` folder — see `macros/INSTRUCTIONS.md`
+
+**Feeds & Speeds**
+* Feed and spindle override controls with fine adjustment and reset buttons
+
+**Spindle Control**
+* Direction selection (Forward / Reverse → M3 / M4)
+* RPM presets at 25%, 50% and 100% of the controller's maximum RPM (read live from `$30`)
+* Preset labels shown in short format (e.g. 6k, 12k, 24k)
+* Minimum and maximum RPM values displayed, read directly from the controller (`$30` / `$31`)
+* **Dial mode** — tap the "Dial" button to enable jog-dial RPM selection: the encoder adjusts the target RPM in 1000 RPM steps, clamped to the controller's valid range
+* Start / Stop buttons send M3/M4/M5 with the selected RPM
+
+**Macros** — runs up to 10 user-configured macros stored on the controller.
+
+**SD Card** — browse and run G-code files from the controller's SD card.
+
+**FluidNC** — shows live controller info: firmware version, WiFi SSID, IP address, connection status, free heap. Jog dial rotates the display 180°; rotation is saved across restarts.
 
 <img src="https://raw.githubusercontent.com/dJOS1475/FluidDial-CYD/refs/heads/main/new_ui/Pendant3.jpeg" alt="CYD Dial Pendant With Buttons and Jog Dial" height="500">
 
