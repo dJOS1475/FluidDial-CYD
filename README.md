@@ -5,6 +5,9 @@ The CYD_Buttons version has been cloned into CYD_New_UI - the UI has been rebuil
 **Updates:**
 See CHANGELOG.md
 
+**Web Installer** (use Chrome/Edge): 
+https://djos1475.github.io/FluidDial-CYD/
+
 **Design Goals:**
 
 All menu navigation and as many features as possible are managed via the touch screen. The physical jog dial context-switches depending on the active screen — it only moves the CNC machine on the Jog & Homing screen (a safety feature), and serves other purposes elsewhere.
