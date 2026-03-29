@@ -222,8 +222,13 @@ static void handleEncoderDelta(int32_t delta) {
         String axisNames[] = { "X", "Y", "Z", "A" };
         float  distance    = (float)delta * pendantJog.increment;
         char   cmd[64];
-        snprintf(cmd, sizeof(cmd), "$J=G91 %s%.3f F1000",
-                 axisNames[pendantJog.selectedAxis].c_str(), distance);
+        if (pendantMachine.inInches) {
+            snprintf(cmd, sizeof(cmd), "$J=G91 G20 %s%.4f F100",
+                     axisNames[pendantJog.selectedAxis].c_str(), distance);
+        } else {
+            snprintf(cmd, sizeof(cmd), "$J=G91 G21 %s%.3f F1000",
+                     axisNames[pendantJog.selectedAxis].c_str(), distance);
+        }
         send_line(cmd);
     } else if (currentPendantScreen == PSCREEN_FLUIDNC) {
         static unsigned long lastRotationMs = 0;
@@ -318,7 +323,8 @@ public:
     void onStateChange(state_t /*newState*/) override {
         if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
             pendantMachine.status           = my_state_string;
-            pendantMachine.connectionStatus = "Connected";  // we're in a callback, so we ARE connected
+            pendantMachine.connectionStatus = "Connected";
+            pendantMachine.inInches         = inInches;
             if (wifi_ip.length())   pendantMachine.ipAddress = String(wifi_ip.c_str());
             if (wifi_ssid.length()) pendantMachine.wifiSSID  = String(wifi_ssid.c_str());
             xSemaphoreGive(stateMutex);

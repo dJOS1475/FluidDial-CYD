@@ -65,6 +65,7 @@ struct MachineState {
     String connectionStatus = "N/C";
     int    freeHeap         = 0;
     int    numAxes          = 3;
+    bool   inInches         = false;
     String workCoordSystem  = "G54";
     String ipAddress        = "---";
     String wifiSSID         = "---";

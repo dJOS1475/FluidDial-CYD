@@ -8,6 +8,14 @@ void enterJogHoming() {
     spriteFileDisplay.deleteSprite();
     spritesInitialized = false;
 
+    // Re-apply the current increment in case units changed since last visit
+    {
+        float mmInc[] = { 0.1f,   1.0f,   10.0f,  100.0f };
+        float inInc[] = { 0.001f, 0.010f, 0.100f, 1.000f };
+        int   idx     = pendantJog.selectedIncrement;
+        pendantJog.increment = pendantMachine.inInches ? inInc[idx] : mmInc[idx];
+    }
+
     if (ESP.getFreeHeap() < 50000) return;
 
     spriteAxisDisplay.createSprite(230, 55);
@@ -65,12 +73,14 @@ void drawJogHomingScreen() {
     display.setTextColor(COLOR_GRAY_TEXT);
     display.setTextSize(1);
     display.setCursor(5, 219);
-    display.print("JOG INCREMENT");
+    display.print(pendantMachine.inInches ? "JOG INCREMENT (in)" : "JOG INCREMENT (mm)");
 
-    String increments[] = { "0.1", "1", "10", "100" };
+    const char* mmInc[] = { "0.1",  "1",    "10",   "100"  };
+    const char* inInc[] = { ".001", ".010", ".100", "1.00" };
+    const char** incLabels = pendantMachine.inInches ? inInc : mmInc;
     for (int i = 0; i < 4; i++) {
         uint16_t bg = (i == pendantJog.selectedIncrement) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
-        drawButton(5 + i * 56, 231, 52, 38, increments[i], bg, COLOR_WHITE, 2);
+        drawButton(5 + i * 56, 231, 52, 38, incLabels[i], bg, COLOR_WHITE, 2);
     }
 
     drawButton(5, 277, 112, 40, "Main Menu", COLOR_BLUE, COLOR_WHITE, 2);
@@ -98,9 +108,12 @@ void updateJogAxisDisplay() {
 
     // Large selected axis + position on one line
     char posBuf[12];
-    dtostrf(positions[pendantJog.selectedAxis], 1, 2, posBuf);
+    int  decPlaces = pendantMachine.inInches ? 4 : 2;
+    dtostrf(positions[pendantJog.selectedAxis], 1, decPlaces, posBuf);
     char mainLine[32];
-    snprintf(mainLine, sizeof(mainLine), "%s %s mm", axisNames[pendantJog.selectedAxis].c_str(), posBuf);
+    snprintf(mainLine, sizeof(mainLine), "%s %s %s",
+             axisNames[pendantJog.selectedAxis].c_str(), posBuf,
+             pendantMachine.inInches ? "in" : "mm");
     spriteAxisDisplay.setTextColor(COLOR_GREEN);
     spriteAxisDisplay.setTextSize(3);
     spriteAxisDisplay.setCursor(5, 5);
@@ -140,10 +153,12 @@ void redrawJogAxisButtons() {
 
 void redrawJogIncrementButtons() {
     if (currentPendantScreen != PSCREEN_JOG_HOMING) return;
-    String increments[] = { "0.1", "1", "10", "100" };
+    const char* mmInc[] = { "0.1",  "1",    "10",   "100"  };
+    const char* inInc[] = { ".001", ".010", ".100", "1.00" };
+    const char** incLabels = pendantMachine.inInches ? inInc : mmInc;
     for (int i = 0; i < 4; i++) {
         uint16_t bg = (i == pendantJog.selectedIncrement) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
-        drawButton(5 + i * 56, 231, 52, 38, increments[i], bg, COLOR_WHITE, 2);
+        drawButton(5 + i * 56, 231, 52, 38, incLabels[i], bg, COLOR_WHITE, 2);
     }
 }
 
@@ -190,8 +205,9 @@ void handleJogHomingTouch(int x, int y) {
     for (int i = 0; i < 4; i++) {
         if (isTouchInBounds(x, y, 5 + i * 56, 231, 52, 38)) {
             pendantJog.selectedIncrement = i;
-            float increments[] = { 0.1f, 1.0f, 10.0f, 100.0f };
-            pendantJog.increment = increments[i];
+            float mmInc[] = { 0.1f,   1.0f,   10.0f,  100.0f };
+            float inInc[] = { 0.001f, 0.010f, 0.100f, 1.000f };
+            pendantJog.increment = pendantMachine.inInches ? inInc[i] : mmInc[i];
             redrawJogIncrementButtons();
             return;
         }
