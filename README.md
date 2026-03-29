@@ -3,7 +3,7 @@ The CYD_Buttons version has been cloned into CYD_New_UI - the UI has been rebuil
 
 
 **Updates:**
-See CHANGELOG.md
+See [CHANGELOG.md](https://raw.githubusercontent.com/dJOS1475/FluidDial-CYD/refs/heads/main/CHANGELOG.md)
 
 **Web Installer** (use Chrome/Edge): 
 https://djos1475.github.io/FluidDial-CYD/
