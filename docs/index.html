@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FluidDial-CYD Installer</title>
+  <script
+    type="module"
+    src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"
+  ></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #58a6ff;
+      margin-bottom: 8px;
+    }
+
+    header p {
+      color: #8b949e;
+      font-size: 1rem;
+    }
+
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 32px;
+      width: 100%;
+      max-width: 560px;
+      margin-bottom: 24px;
+    }
+
+    .card h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: #e6edf3;
+    }
+
+    .card p {
+      color: #8b949e;
+      line-height: 1.6;
+      margin-bottom: 12px;
+      font-size: 0.95rem;
+    }
+
+    .card p:last-child { margin-bottom: 0; }
+
+    .install-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    esp-web-install-button {
+      --esp-tools-button-color: #238636;
+      --esp-tools-button-text-color: #ffffff;
+      --esp-tools-button-border-radius: 8px;
+    }
+
+    esp-web-install-button[unsupported] p {
+      color: #f85149;
+      font-size: 0.9rem;
+      text-align: center;
+    }
+
+    .version-badge {
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: 0.85rem;
+      color: #8b949e;
+    }
+
+    .requirements {
+      list-style: none;
+      padding: 0;
+    }
+
+    .requirements li {
+      padding: 8px 0;
+      border-bottom: 1px solid #21262d;
+      color: #8b949e;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .requirements li:last-child { border-bottom: none; }
+
+    .requirements li::before {
+      content: "✓";
+      color: #3fb950;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+
+    .note {
+      background: #1c2128;
+      border-left: 3px solid #388bfd;
+      border-radius: 0 6px 6px 0;
+      padding: 12px 16px;
+      font-size: 0.85rem;
+      color: #8b949e;
+      margin-top: 12px;
+    }
+
+    footer {
+      margin-top: 40px;
+      text-align: center;
+      color: #484f58;
+      font-size: 0.85rem;
+    }
+
+    footer a {
+      color: #58a6ff;
+      text-decoration: none;
+    }
+
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>FluidDial-CYD</h1>
+    <p>Web Installer for the CYD FluidNC Pendant</p>
+  </header>
+
+  <div class="card">
+    <h2>Requirements</h2>
+    <ul class="requirements">
+      <li>Google Chrome or Microsoft Edge (version 89+)</li>
+      <li>CYD (Cheap Yellow Display) ESP32 board</li>
+      <li>USB data cable (not charge-only)</li>
+      <li>Windows, macOS, or Linux</li>
+    </ul>
+    <div class="note">
+      Web Serial is not supported in Firefox or Safari. Use Chrome or Edge.
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Install Firmware</h2>
+    <div class="install-section">
+      <div class="version-badge">v1.0 — Latest Release</div>
+      <p style="text-align:center;">
+        Connect your CYD to USB, then click the button below.<br />
+        Select the correct COM port when prompted.
+      </p>
+      <esp-web-install-button manifest="manifest.json">
+        <button slot="activate">
+          <strong>Connect &amp; Install</strong>
+        </button>
+        <span slot="unsupported">
+          <p>
+            Your browser does not support Web Serial.<br />
+            Please use Chrome or Edge.
+          </p>
+        </span>
+      </esp-web-install-button>
+      <div class="note">
+        <strong>First install:</strong> You will be prompted to erase the device — select Yes to ensure a clean installation.<br /><br />
+        <strong>Update:</strong> If you have already installed FluidDial-CYD, you can update without erasing — your settings will be preserved.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>After Installing</h2>
+    <p>Connect your CYD pendant to your FluidNC controller via UART (TX/RX). The pendant will automatically detect the controller and display axis positions, machine state, and allow jogging, homing, probing, and spindle control.</p>
+    <p>See the <a href="https://github.com/dJOS1475/FluidDial-CYD" style="color:#58a6ff;">GitHub repository</a> for full documentation and wiring instructions.</p>
+  </div>
+
+  <footer>
+    <p>
+      FluidDial-CYD is open source —
+      <a href="https://github.com/dJOS1475/FluidDial-CYD">View on GitHub</a>
+    </p>
+  </footer>
+
+</body>
+</html>
