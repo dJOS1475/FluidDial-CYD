@@ -1,13 +1,13 @@
 {
   "name": "FluidDial-CYD",
-  "version": "1.0",
+  "version": "1.1.0",
   "new_install_prompt_erase": true,
   "builds": [
     {
       "chipFamily": "ESP32",
       "parts": [
         {
-          "path": "https://github.com/dJOS1475/FluidDial-CYD/releases/download/v1.0/merged-flash.bin",
+          "path": "https://github.com/dJOS1475/FluidDial-CYD/releases/download/v1.1.0/merged-flash.bin",
           "offset": 0
         }
       ]

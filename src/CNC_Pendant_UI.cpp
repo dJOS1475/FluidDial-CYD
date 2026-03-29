@@ -424,7 +424,7 @@ void pendant_hw_task(void* /*pvParameters*/) {
             }
             lastBtnRaw[i] = raw;
 
-            if ((now - lastDebounce[i]) > 50) {
+            if ((now - lastDebounce[i]) > 100) {
                 bool pressed = !raw;
                 if (pressed && btnState[i] && !btnHandled[i]) {
                     btnHandled[i] = true;
