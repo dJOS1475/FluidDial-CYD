@@ -6,6 +6,20 @@ The CYD_Buttons version has been cloned into CYD_New_UI - the UI has been rebuil
 **ChangeLog:**
 
 
+**2026-03-29**
+
+v1.2.0
+* Automatic metric/imperial detection — pendant reads G20/G21 modal state from the controller and switches units throughout the UI without any manual configuration
+* Jog increments switch automatically between mm (0.1 / 1 / 10 / 100) and imperial thou (.001 / .010 / .100 / 1.00)
+* Jog commands include explicit G20/G21 to prevent unit mismatch, with appropriate feed rates for each unit system
+* Position display on Jog & Homing screen shows mm or in with correct decimal places (2 for metric, 4 for imperial)
+* Increment row label updates to show (mm) or (in) to match the active unit system
+
+v1.1.0
+* Button debounce increased to 100ms for improved reliability
+* Pendant firmware version displayed as numeric only (e.g. v1.1.0) on the FluidNC screen
+* Web installer published at https://djos1475.github.io/FluidDial-CYD/ — flash directly from Chrome/Edge with no software required
+
 **2026-03-26**
 
 v1.0.0
