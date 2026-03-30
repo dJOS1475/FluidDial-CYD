@@ -84,6 +84,7 @@ struct SDCardState {
     int    scrollOffset  = 0;
     String files[20];
     int    fileCount     = 0;
+    bool   loading       = false;
 };
 
 struct SpindleState {
@@ -147,6 +148,7 @@ void   drawMultiLineButton(int x, int y, int w, int h, String line1, String line
 void   drawTitle(String title);
 void   drawInfoBox(int x, int y, int w, int h, String label, String value, uint16_t valueColor = COLOR_ORANGE);
 void   drawCurrentPendantScreen();
+void   navigateTo(PendantScreen next);
 
 // ===== Screen Lifecycle (declared in each screen header, called by coordinator) =====
 // Each screen exposes: enterXxx(), exitXxx(), drawXxx(), handleXxxTouch(int,int)

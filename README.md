@@ -13,11 +13,9 @@ https://djos1475.github.io/FluidDial-CYD/
 All menu navigation and as many features as possible are managed via the touch screen. The physical jog dial context-switches depending on the active screen — it only moves the CNC machine on the Jog & Homing screen (a safety feature), and serves other purposes elsewhere.
 
 The 3 physical buttons always perform the same function regardless of the active screen:
-* Red: E-stop (sends CTRL-X reset to controller)
-* Yellow: context sensitive
-  * In ALARM → Clear Alarm ($X)
-  * Otherwise → Pause/Hold
-* Green: Cycle Start
+* Red: Cancel — soft reset, stops all motion and spindle, clears alarm state. Position is retained and no rehoming is required. The cancelled operation cannot be resumed with Green.
+* Yellow: Pause — holds current motion (Feed Hold). Spindle remains running. Green will resume.
+* Green: Start / Resume — starts a new job or resumes after a Yellow pause.
 
 ---
 
@@ -28,7 +26,9 @@ The 3 physical buttons always perform the same function regardless of the active
 **Status** — live DRO showing machine position, feed rate, spindle RPM, active file, and machine state. Axis count is detected automatically from the connected controller.
 
 **Jog & Homing**
-* Jog dial moves the selected axis by the chosen increment (0.1 / 1 / 10 / 100 mm)
+* Jog dial moves the selected axis by the chosen increment
+* Metric: 0.1 / 1 / 10 / 100 mm — Imperial: .001 / .010 / .100 / 1.00 in
+* Units detected automatically from the controller (G20/G21) — no manual switching needed
 * Axis selection and increment buttons on screen
 * Home buttons for each detected axis, plus an "ALL" home button on 3-axis machines
 * Only axes present on the connected machine are shown
@@ -56,7 +56,7 @@ The 3 physical buttons always perform the same function regardless of the active
 
 **Macros** — runs up to 10 user-configured macros stored on the controller.
 
-**SD Card** — browse and run G-code files from the controller's SD card.
+**SD Card** — browse and run G-code files live from the controller's SD card. File list loads automatically on entry with a Refresh button to reload. Selecting a file starts it immediately and navigates to the Status screen.
 
 **FluidNC** — shows live controller info: firmware version, WiFi SSID, IP address, connection status, free heap. Jog dial rotates the display 180°; rotation is saved across restarts.
 

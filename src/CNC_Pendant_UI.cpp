@@ -175,7 +175,7 @@ void drawCurrentPendantScreen() {
     }
 }
 
-static void navigateTo(PendantScreen next) {
+void navigateTo(PendantScreen next) {
     if (next == currentPendantScreen) return;
     callScreenExit(currentPendantScreen);
     previousPendantScreen = currentPendantScreen;
@@ -335,6 +335,25 @@ public:
         }
     }
 
+    void onFilesList() override {
+        // Called from Core 0 (fnc_poll) when FluidNC responds to $Files/ListGCode
+        if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+            pendantSdCard.fileCount    = 0;
+            pendantSdCard.scrollOffset = 0;
+            pendantSdCard.loading      = false;
+            for (auto& fi : fileVector) {
+                if (!fi.isDir() && pendantSdCard.fileCount < 20) {
+                    pendantSdCard.files[pendantSdCard.fileCount++] = String(fi.fileName.c_str());
+                }
+            }
+            xSemaphoreGive(stateMutex);
+        }
+        if (hwEventQueue) {
+            HwEvent ev = { HwEvent::STATE_UPDATE, 0 };
+            xQueueSend(hwEventQueue, &ev, 0);
+        }
+    }
+
     void reDisplay() override {
         // Copy any newly-received config values into pendantMachine
         if (spindleMaxItem.known() || spindleMinItem.known()) {
@@ -435,12 +454,19 @@ void pendant_hw_task(void* /*pvParameters*/) {
                 if (pressed && btnState[i] && !btnHandled[i]) {
                     btnHandled[i] = true;
                     switch (i) {
-                        case 0: fnc_realtime(Reset);      break;  // Red    → E-Stop (Ctrl-X)
-                        case 1:                                                      // Yellow → context
-                            if (state == Alarm && fnc_is_connected()) send_line("$X"); //   Alarm  → Clear Alarm
-                            else if (state != Alarm)                  fnc_realtime(FeedHold); //   Other → Pause/Hold
+                        case 0:  // Red → soft reset (cancels program, clears buffer, stops spindle)
+                            //        $X clears the post-reset alarm so no rehoming is needed.
+                            //        Position is retained; Green cannot resume after this.
+                            fnc_realtime(Reset);
+                            vTaskDelay(pdMS_TO_TICKS(500));  // wait for controller to finish reset
+                            send_line("$X");
                             break;
-                        case 2: fnc_realtime(CycleStart); break;  // Green  → Cycle Start (~)
+                        case 1:  // Yellow → pause motion
+                            fnc_realtime(FeedHold);
+                            break;
+                        case 2:  // Green → start / resume
+                            fnc_realtime(CycleStart);
+                            break;
                     }
                     if (hwEventQueue) {
                         static const HwEvent::Type types[] = {
@@ -516,6 +542,8 @@ void loop_pendant() {
             case HwEvent::STATE_UPDATE:
                 if (currentPendantScreen == PSCREEN_FLUIDNC) {
                     updateFluidNCDisplay();
+                } else if (currentPendantScreen == PSCREEN_SD_CARD) {
+                    drawSDCardScreen();
                 }
                 break;
         }

@@ -6,6 +6,17 @@ The CYD_Buttons version has been cloned into CYD_New_UI - the UI has been rebuil
 **ChangeLog:**
 
 
+**2026-03-30**
+
+v1.3.0
+* SD Card screen now reads GCode files live from the controller's SD card via UART
+* File list loads automatically on entering the SD Card screen, with a Refresh button to reload
+* Shows "Loading..." while waiting for the file list and a clear message if no files are found
+* Physical button behaviour updated:
+  * Red: soft reset (cancels current program/move, stops spindle, clears alarm, position retained — no rehoming needed)
+  * Yellow: pause current motion (Feed Hold)
+  * Green: start or resume paused operation (Cycle Start)
+
 **2026-03-29**
 
 v1.2.0
