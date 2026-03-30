@@ -12,6 +12,9 @@ v1.3.0
 * SD Card screen now reads GCode files live from the controller's SD card via UART
 * File list loads automatically on entering the SD Card screen, with a Refresh button to reload
 * Shows "Loading..." while waiting for the file list and a clear message if no files are found
+* Macros screen now reads macro files live from the controller's local filesystem (localfs)
+* Macro file list loads automatically on entry with the same scroll/Refresh navigation as the SD Card screen
+* Selecting a macro runs it immediately via $Localfs/Run and navigates to the Status screen
 * Physical button behaviour updated:
   * Red: soft reset (cancels current program/move, stops spindle, clears alarm, position retained — no rehoming needed)
   * Yellow: pause current motion (Feed Hold)

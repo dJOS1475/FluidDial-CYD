@@ -54,7 +54,7 @@ The 3 physical buttons always perform the same function regardless of the active
 * **Dial mode** — tap the "Dial" button to enable jog-dial RPM selection: the encoder adjusts the target RPM in 1000 RPM steps, clamped to the controller's valid range
 * Start / Stop buttons send M3/M4/M5 with the selected RPM
 
-**Macros** — runs up to 10 user-configured macros stored on the controller.
+**Macros** — browses and runs macro files live from the controller's local filesystem. File list loads automatically on entry with scroll and Refresh navigation. Selecting a macro runs it immediately and navigates to the Status screen.
 
 **SD Card** — browse and run G-code files live from the controller's SD card. File list loads automatically on entry with a Refresh button to reload. Selecting a file starts it immediately and navigates to the Status screen.
 

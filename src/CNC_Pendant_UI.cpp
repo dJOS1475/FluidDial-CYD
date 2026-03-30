@@ -61,6 +61,7 @@ PendantScreen previousPendantScreen = PSCREEN_MAIN_MENU;
 MachineState  pendantMachine;
 JogState      pendantJog;
 SDCardState   pendantSdCard;
+MacroState    pendantMacros;
 SpindleState  pendantSpindle;
 FeedsState    pendantFeeds;
 ProbingState  pendantProbing;
@@ -338,12 +339,23 @@ public:
     void onFilesList() override {
         // Called from Core 0 (fnc_poll) when FluidNC responds to $Files/ListGCode
         if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-            pendantSdCard.fileCount    = 0;
-            pendantSdCard.scrollOffset = 0;
-            pendantSdCard.loading      = false;
-            for (auto& fi : fileVector) {
-                if (!fi.isDir() && pendantSdCard.fileCount < 20) {
-                    pendantSdCard.files[pendantSdCard.fileCount++] = String(fi.fileName.c_str());
+            if (currentPendantScreen == PSCREEN_MACROS) {
+                pendantMacros.fileCount    = 0;
+                pendantMacros.scrollOffset = 0;
+                pendantMacros.loading      = false;
+                for (auto& fi : fileVector) {
+                    if (!fi.isDir() && pendantMacros.fileCount < 40) {
+                        pendantMacros.files[pendantMacros.fileCount++] = String(fi.fileName.c_str());
+                    }
+                }
+            } else {
+                pendantSdCard.fileCount    = 0;
+                pendantSdCard.scrollOffset = 0;
+                pendantSdCard.loading      = false;
+                for (auto& fi : fileVector) {
+                    if (!fi.isDir() && pendantSdCard.fileCount < 20) {
+                        pendantSdCard.files[pendantSdCard.fileCount++] = String(fi.fileName.c_str());
+                    }
                 }
             }
             xSemaphoreGive(stateMutex);
@@ -544,6 +556,8 @@ void loop_pendant() {
                     updateFluidNCDisplay();
                 } else if (currentPendantScreen == PSCREEN_SD_CARD) {
                     drawSDCardScreen();
+                } else if (currentPendantScreen == PSCREEN_MACROS) {
+                    drawMacrosScreen();
                 }
                 break;
         }

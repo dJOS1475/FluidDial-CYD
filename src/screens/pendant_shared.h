@@ -87,6 +87,14 @@ struct SDCardState {
     bool   loading       = false;
 };
 
+struct MacroState {
+    int    selectedFile  = 0;
+    int    scrollOffset  = 0;
+    String files[40];
+    int    fileCount     = 0;
+    bool   loading       = false;
+};
+
 struct SpindleState {
     int  selectedPreset = 1;   // 0=25%, 1=50%, 2=100% of max
     bool directionFwd   = true;
@@ -116,6 +124,7 @@ struct ProbeState {
 extern MachineState  pendantMachine;
 extern JogState      pendantJog;
 extern SDCardState   pendantSdCard;
+extern MacroState    pendantMacros;
 extern SpindleState  pendantSpindle;
 extern FeedsState    pendantFeeds;
 extern ProbingState  pendantProbing;
