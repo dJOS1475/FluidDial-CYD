@@ -20,6 +20,7 @@ void enterFeedsSpeeds() {
 }
 
 void exitFeedsSpeeds() {
+    pendantFeeds.dialMode = 0;
     spriteStatusBar.deleteSprite();
     spriteAxisDisplay.deleteSprite();
     spriteValueDisplay.deleteSprite();
@@ -121,13 +122,21 @@ void updateFeedOverrideDisplay() {
         fro = pendantMachine.feedOverride;
     }
 
-    spriteAxisDisplay.fillSprite(COLOR_DARKER_BG);
-    spriteAxisDisplay.setTextColor(COLOR_ORANGE);
+    bool active = (pendantFeeds.dialMode == 1);
+    spriteAxisDisplay.fillSprite(active ? COLOR_DARK_GREEN : COLOR_DARKER_BG);
+    spriteAxisDisplay.setTextColor(active ? COLOR_WHITE : COLOR_ORANGE);
     spriteAxisDisplay.setTextSize(2);
     String txt = String(fro) + "%";
     int16_t tw = spriteAxisDisplay.textWidth(txt.c_str());
-    spriteAxisDisplay.setCursor(36 - tw / 2, 11);
+    spriteAxisDisplay.setCursor(36 - tw / 2, active ? 5 : 11);
     spriteAxisDisplay.print(txt);
+    if (active) {
+        spriteAxisDisplay.setTextColor(COLOR_WHITE);
+        spriteAxisDisplay.setTextSize(1);
+        int16_t hw = spriteAxisDisplay.textWidth("DIAL");
+        spriteAxisDisplay.setCursor(36 - hw / 2, 26);
+        spriteAxisDisplay.print("DIAL");
+    }
     spriteAxisDisplay.pushSprite(83, 137);
 }
 
@@ -143,13 +152,21 @@ void updateSpindleOverrideDisplay() {
         sro = pendantMachine.spindleOverride;
     }
 
-    spriteValueDisplay.fillSprite(COLOR_DARKER_BG);
-    spriteValueDisplay.setTextColor(COLOR_GREEN);
+    bool active = (pendantFeeds.dialMode == 2);
+    spriteValueDisplay.fillSprite(active ? COLOR_DARK_GREEN : COLOR_DARKER_BG);
+    spriteValueDisplay.setTextColor(active ? COLOR_WHITE : COLOR_GREEN);
     spriteValueDisplay.setTextSize(2);
     String txt = String(sro) + "%";
     int16_t tw = spriteValueDisplay.textWidth(txt.c_str());
-    spriteValueDisplay.setCursor(36 - tw / 2, 11);
+    spriteValueDisplay.setCursor(36 - tw / 2, active ? 5 : 11);
     spriteValueDisplay.print(txt);
+    if (active) {
+        spriteValueDisplay.setTextColor(COLOR_WHITE);
+        spriteValueDisplay.setTextSize(1);
+        int16_t hw = spriteValueDisplay.textWidth("DIAL");
+        spriteValueDisplay.setCursor(36 - hw / 2, 26);
+        spriteValueDisplay.print("DIAL");
+    }
     spriteValueDisplay.pushSprite(83, 236);
 }
 
@@ -202,57 +219,87 @@ static void applySpindleOverride(int targetPct) {
 void handleFeedsSpeedsTouch(int x, int y) {
     int pcts[] = { 50, 75, 100, 125, 150 };
 
-    // Feed override - row 1
+    // ── Feed override preset buttons ─────────────────────────────────────
     for (int i = 0; i < 3; i++) {
         if (isTouchInBounds(x, y, 5 + i * 78, 95, 72, 37)) {
+            pendantFeeds.dialMode             = 0;
             pendantFeeds.selectedFeedOverride = i;
             pendantMachine.feedOverride       = pcts[i];
             applyFeedOverride(pcts[i]);
             redrawFeedOverrideButtons();
+            updateSpindleOverrideDisplay();  // deactivate spindle dial visual
             return;
         }
     }
     if (isTouchInBounds(x, y, 5, 137, 72, 37)) {
+        pendantFeeds.dialMode             = 0;
         pendantFeeds.selectedFeedOverride = 3;
         pendantMachine.feedOverride       = 125;
         applyFeedOverride(125);
         redrawFeedOverrideButtons();
+        updateSpindleOverrideDisplay();
         return;
     }
+
+    // ── Feed override readout button (centre of row 2) ───────────────────
+    if (isTouchInBounds(x, y, 83, 137, 72, 37)) {
+        pendantFeeds.dialMode = (pendantFeeds.dialMode == 1) ? 0 : 1;  // toggle; deselects spindle
+        updateFeedOverrideDisplay();
+        updateSpindleOverrideDisplay();
+        return;
+    }
+
     if (isTouchInBounds(x, y, 161, 137, 72, 37)) {
+        pendantFeeds.dialMode             = 0;
         pendantFeeds.selectedFeedOverride = 4;
         pendantMachine.feedOverride       = 150;
         applyFeedOverride(150);
         redrawFeedOverrideButtons();
+        updateSpindleOverrideDisplay();
         return;
     }
 
-    // Spindle override - row 1
+    // ── Spindle override preset buttons ──────────────────────────────────
     for (int i = 0; i < 3; i++) {
         if (isTouchInBounds(x, y, 5 + i * 78, 194, 72, 37)) {
+            pendantFeeds.dialMode                = 0;
             pendantFeeds.selectedSpindleOverride = i;
             pendantMachine.spindleOverride       = pcts[i];
             applySpindleOverride(pcts[i]);
             redrawSpindleOverrideButtons();
+            updateFeedOverrideDisplay();  // deactivate feed dial visual
             return;
         }
     }
     if (isTouchInBounds(x, y, 5, 236, 72, 37)) {
+        pendantFeeds.dialMode                = 0;
         pendantFeeds.selectedSpindleOverride = 3;
         pendantMachine.spindleOverride       = 125;
         applySpindleOverride(125);
         redrawSpindleOverrideButtons();
+        updateFeedOverrideDisplay();
         return;
     }
+
+    // ── Spindle override readout button (centre of row 2) ────────────────
+    if (isTouchInBounds(x, y, 83, 236, 72, 37)) {
+        pendantFeeds.dialMode = (pendantFeeds.dialMode == 2) ? 0 : 2;  // toggle; deselects feed
+        updateSpindleOverrideDisplay();
+        updateFeedOverrideDisplay();
+        return;
+    }
+
     if (isTouchInBounds(x, y, 161, 236, 72, 37)) {
+        pendantFeeds.dialMode                = 0;
         pendantFeeds.selectedSpindleOverride = 4;
         pendantMachine.spindleOverride       = 150;
         applySpindleOverride(150);
         redrawSpindleOverrideButtons();
+        updateFeedOverrideDisplay();
         return;
     }
 
     if (isTouchInBounds(x, y, 5, 280, 230, 40)) {
-        currentPendantScreen = PSCREEN_MAIN_MENU;
+        navigateTo(PSCREEN_MAIN_MENU);
     }
 }

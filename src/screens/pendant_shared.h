@@ -74,9 +74,12 @@ struct MachineState {
 };
 
 struct JogState {
-    int   selectedAxis      = 0;   // 0=X, 1=Y, 2=Z, 3=A
+    int   selectedAxis      = 0;     // 0=X, 1=Y, 2=Z, 3=A; -1 = speed dial mode active
     float increment         = 1.0f;
-    int   selectedIncrement = 1;   // 0=0.1, 1=1, 2=10, 3=100
+    int   selectedIncrement = 1;     // 0=0.1, 1=1, 2=10, 3=100
+    bool  speedDialMode     = false; // true = encoder adjusts jog speed, not axis
+    int   jogSpeedMm        = 1000;  // mm/min, range 100–5000, step 100
+    int   jogSpeedIn        = 100;   // ipm,    range  10–500,  step  10
 };
 
 struct SDCardState {
@@ -104,6 +107,7 @@ struct SpindleState {
 struct FeedsState {
     int selectedFeedOverride    = 2;  // 0=50%, 1=75%, 2=100%, 3=125%, 4=150%
     int selectedSpindleOverride = 2;
+    int dialMode                = 0;  // 0=none, 1=feed dial active, 2=spindle dial active
 };
 
 struct ProbingState {
@@ -158,6 +162,27 @@ void   drawTitle(String title);
 void   drawInfoBox(int x, int y, int w, int h, String label, String value, uint16_t valueColor = COLOR_ORANGE);
 void   drawCurrentPendantScreen();
 void   navigateTo(PendantScreen next);
+
+// ===== Alarm Description Helper =====
+// Returns a short human-readable description for FluidNC/GRBL alarm codes.
+// Status strings from FluidNC look like "Alarm:1", "Alarm:2", etc.
+inline String alarmDescription(const String& status) {
+    if (!status.startsWith("Alarm:")) return "";
+    int code = status.substring(6).toInt();
+    switch (code) {
+        case 1:  return "Hard limit triggered";
+        case 2:  return "Soft limit exceeded";
+        case 3:  return "Abort during cycle";
+        case 4:  return "Probe fail - no contact";
+        case 5:  return "Probe fail - contact lost";
+        case 6:  return "Homing fail - reset";
+        case 7:  return "Homing fail - door open";
+        case 8:  return "Homing fail - pull off";
+        case 9:  return "Homing fail - no limit";
+        case 10: return "Homing fail - on limit";
+        default: return "Check controller";
+    }
+}
 
 // ===== Screen Lifecycle (declared in each screen header, called by coordinator) =====
 // Each screen exposes: enterXxx(), exitXxx(), drawXxx(), handleXxxTouch(int,int)

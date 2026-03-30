@@ -48,7 +48,7 @@ void setup() {
         "PendantHW",       // name
         4096,              // stack size (bytes)
         nullptr,           // parameter
-        2,                 // priority (higher than loop's priority of 1)
+        1,                 // priority — same as loop; keep below FluidNC Core 0 tasks
         nullptr,           // handle (not needed)
         0                  // core 0
     );

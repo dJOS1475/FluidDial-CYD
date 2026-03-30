@@ -61,12 +61,6 @@ void updateStatusMachineStatus() {
 
     spriteStatusBar.fillSprite(COLOR_DARKER_BG);
 
-    spriteStatusBar.setTextColor(COLOR_GRAY_TEXT);
-    spriteStatusBar.setTextSize(1);
-    int16_t lw = spriteStatusBar.textWidth("MACHINE STATUS");
-    spriteStatusBar.setCursor(115 - lw / 2, 5);
-    spriteStatusBar.print("MACHINE STATUS");
-
     String statusStr;
     if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
         statusStr = pendantMachine.status;
@@ -75,11 +69,30 @@ void updateStatusMachineStatus() {
         statusStr = pendantMachine.status;
     }
 
-    spriteStatusBar.setTextColor(COLOR_CYAN);
-    spriteStatusBar.setTextSize(3);
-    int16_t sw = spriteStatusBar.textWidth(statusStr.c_str());
-    spriteStatusBar.setCursor(115 - sw / 2, 22);
-    spriteStatusBar.print(statusStr);
+    if (statusStr.startsWith("Alarm")) {
+        // Alarm: show description on label line, "ALARM" in red on status line
+        String desc = alarmDescription(statusStr);
+        spriteStatusBar.setTextColor(TFT_RED);
+        spriteStatusBar.setTextSize(1);
+        int16_t dw = spriteStatusBar.textWidth(desc.c_str());
+        spriteStatusBar.setCursor(115 - dw / 2, 5);
+        spriteStatusBar.print(desc);
+        spriteStatusBar.setTextSize(3);
+        int16_t sw = spriteStatusBar.textWidth("ALARM");
+        spriteStatusBar.setCursor(115 - sw / 2, 22);
+        spriteStatusBar.print("ALARM");
+    } else {
+        spriteStatusBar.setTextColor(COLOR_GRAY_TEXT);
+        spriteStatusBar.setTextSize(1);
+        int16_t lw = spriteStatusBar.textWidth("MACHINE STATUS");
+        spriteStatusBar.setCursor(115 - lw / 2, 5);
+        spriteStatusBar.print("MACHINE STATUS");
+        spriteStatusBar.setTextColor(COLOR_CYAN);
+        spriteStatusBar.setTextSize(3);
+        int16_t sw = spriteStatusBar.textWidth(statusStr.c_str());
+        spriteStatusBar.setCursor(115 - sw / 2, 22);
+        spriteStatusBar.print(statusStr);
+    }
 
     spriteStatusBar.pushSprite(5, 40);
 }

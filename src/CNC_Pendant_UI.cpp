@@ -219,18 +219,46 @@ static void handleEncoderDelta(int32_t delta) {
         return;
     } else if (currentPendantScreen == PSCREEN_JOG_HOMING) {
         if (!pendantConnected) return;
+        if (pendantJog.speedDialMode) {
+            // Adjust jog speed — metric: 100 mm/min/step, imperial: 10 ipm/step
+            if (pendantMachine.inInches) {
+                pendantJog.jogSpeedIn = constrain(pendantJog.jogSpeedIn + delta * 10, 10, 500);
+            } else {
+                pendantJog.jogSpeedMm = constrain(pendantJog.jogSpeedMm + delta * 100, 100, 5000);
+            }
+            redrawJogSpeedButton();
+            updateJogAxisDisplay();
+            return;
+        }
+        if (pendantJog.selectedAxis < 0) return;  // no axis selected — do nothing
         // delta is already in whole detents (converted in pendant_hw_task)
         String axisNames[] = { "X", "Y", "Z", "A" };
         float  distance    = (float)delta * pendantJog.increment;
         char   cmd[64];
         if (pendantMachine.inInches) {
-            snprintf(cmd, sizeof(cmd), "$J=G91 G20 %s%.4f F100",
-                     axisNames[pendantJog.selectedAxis].c_str(), distance);
+            snprintf(cmd, sizeof(cmd), "$J=G91 G20 %s%.4f F%d",
+                     axisNames[pendantJog.selectedAxis].c_str(), distance, pendantJog.jogSpeedIn);
         } else {
-            snprintf(cmd, sizeof(cmd), "$J=G91 G21 %s%.3f F1000",
-                     axisNames[pendantJog.selectedAxis].c_str(), distance);
+            snprintf(cmd, sizeof(cmd), "$J=G91 G21 %s%.3f F%d",
+                     axisNames[pendantJog.selectedAxis].c_str(), distance, pendantJog.jogSpeedMm);
         }
         send_line(cmd);
+    } else if (currentPendantScreen == PSCREEN_FEEDS_SPEEDS) {
+        if (!pendantConnected) return;
+        if (pendantFeeds.dialMode == 1) {
+            // Feed override — 10% per detent via 10× fine steps
+            int steps = abs(delta) * 10;
+            for (int i = 0; i < steps; i++)
+                fnc_realtime(delta > 0 ? FeedOvrFinePlus : FeedOvrFineMinus);
+            updateFeedOverrideDisplay();
+        } else if (pendantFeeds.dialMode == 2) {
+            // Spindle override — 10% per detent via 10× fine steps
+            int steps = abs(delta) * 10;
+            for (int i = 0; i < steps; i++)
+                fnc_realtime(delta > 0 ? SpindleOvrFinePlus : SpindleOvrFineMinus);
+            updateSpindleOverrideDisplay();
+        }
+        return;
     } else if (currentPendantScreen == PSCREEN_FLUIDNC) {
         static unsigned long lastRotationMs = 0;
         if (millis() - lastRotationMs > 300) {
@@ -413,10 +441,13 @@ void pendant_hw_task(void* /*pvParameters*/) {
         fnc_poll();
 
         // Drive ping + connection state from Core 0.
-        // fnc_is_connected() is backed by update_rx_time() (called per UART byte) so it
-        // reliably reflects whether FluidNC is actually responding.
-        unsigned long nowMs = millis();
-        if (nowMs - lastPingMs >= 200) {
+        // Ping interval is adaptive: slow down to 1000ms while the machine is Running
+        // so the $? realtime byte doesn't add UART load during active motion.
+        // When idle/stopped/alarm, keep 200ms for snappy connection detection.
+        unsigned long nowMs    = millis();
+        bool          running  = pendantMachine.status.startsWith("Run");
+        unsigned long pingInterval = running ? 1000UL : 200UL;
+        if (nowMs - lastPingMs >= pingInterval) {
             bool connected = fnc_is_connected();
             if (connected != pendantConnected) {
                 pendantConnected = connected;
