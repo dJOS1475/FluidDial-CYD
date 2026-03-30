@@ -15,6 +15,7 @@ v1.3.0
 * Macros screen now reads macro files live from the controller's local filesystem (localfs)
 * Macro file list loads automatically on entry with the same scroll/Refresh navigation as the SD Card screen
 * Selecting a macro runs it immediately via $Localfs/Run and navigates to the Status screen
+* Jog & Homing screen displays alarm state (e.g. Alarm:1) in red where the unit label normally appears when a limit switch or other alarm is triggered
 * Physical button behaviour updated:
   * Red: soft reset (cancels current program/move, stops spindle, clears alarm, position retained — no rehoming needed)
   * Yellow: pause current motion (Feed Hold)

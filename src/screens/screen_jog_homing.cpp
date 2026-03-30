@@ -70,10 +70,15 @@ void drawJogHomingScreen() {
         }
     }
 
-    display.setTextColor(COLOR_GRAY_TEXT);
     display.setTextSize(1);
     display.setCursor(5, 219);
-    display.print(pendantMachine.inInches ? "JOG INCREMENT (in)" : "JOG INCREMENT (mm)");
+    if (pendantMachine.status.startsWith("Alarm")) {
+        display.setTextColor(TFT_RED);
+        display.print("JOG INCREMENT  *** " + pendantMachine.status + " ***");
+    } else {
+        display.setTextColor(COLOR_GRAY_TEXT);
+        display.print(pendantMachine.inInches ? "JOG INCREMENT (in)" : "JOG INCREMENT (mm)");
+    }
 
     const char* mmInc[] = { "0.1",  "1",    "10",   "100"  };
     const char* inInc[] = { ".001", ".010", ".100", "1.00" };
@@ -106,15 +111,18 @@ void updateJogAxisDisplay() {
     String axisNames[] = { "X", "Y", "Z", "A" };
     float  positions[] = { px, py, pz, pa };
 
-    // Large selected axis + position on one line
+    bool   inAlarm = pendantMachine.status.startsWith("Alarm");
+
+    // Large selected axis + position on one line; unit replaced with alarm state when active
     char posBuf[12];
     int  decPlaces = pendantMachine.inInches ? 4 : 2;
     dtostrf(positions[pendantJog.selectedAxis], 1, decPlaces, posBuf);
+    String unitOrAlarm = inAlarm ? pendantMachine.status : (pendantMachine.inInches ? "in" : "mm");
     char mainLine[32];
     snprintf(mainLine, sizeof(mainLine), "%s %s %s",
              axisNames[pendantJog.selectedAxis].c_str(), posBuf,
-             pendantMachine.inInches ? "in" : "mm");
-    spriteAxisDisplay.setTextColor(COLOR_GREEN);
+             unitOrAlarm.c_str());
+    spriteAxisDisplay.setTextColor(inAlarm ? TFT_RED : COLOR_GREEN);
     spriteAxisDisplay.setTextSize(3);
     spriteAxisDisplay.setCursor(5, 5);
     spriteAxisDisplay.print(mainLine);

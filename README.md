@@ -32,6 +32,7 @@ The 3 physical buttons always perform the same function regardless of the active
 * Axis selection and increment buttons on screen
 * Home buttons for each detected axis, plus an "ALL" home button on 3-axis machines
 * Only axes present on the connected machine are shown
+* Alarm state (e.g. from a limit switch) is displayed in red where the unit label normally appears
 
 **Work Area (Probing Work)**
 * Coordinate system selection (G54–G57)
