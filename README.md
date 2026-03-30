@@ -21,9 +21,9 @@ The 3 physical buttons always perform the same function regardless of the active
 
 **Screens & Features:**
 
-**Main Menu** — touch navigation to all screens.
+**Main Menu** — touch navigation to all screens. Shows live machine status; alarm states display a human-readable description in red (e.g. "Hard limit triggered").
 
-**Status** — live DRO showing machine position, feed rate, spindle RPM, active file, and machine state. Axis count is detected automatically from the connected controller.
+**Status** — live DRO showing machine position, feed rate, spindle RPM, active file, and machine state. Axis count is detected automatically from the connected controller. Alarm states show a human-readable description in red.
 
 **Jog & Homing**
 * Jog dial moves the selected axis by the chosen increment
@@ -33,6 +33,7 @@ The 3 physical buttons always perform the same function regardless of the active
 * Home buttons for each detected axis, plus an "ALL" home button on 3-axis machines
 * Only axes present on the connected machine are shown
 * Alarm state (e.g. from a limit switch) is displayed in red where the unit label normally appears
+* **Speed button** (bottom row, between Main Menu and Work Area) — tap to set jog speed with the dial: 100 mm/min steps (metric) or 10 ipm steps (imperial), range 100–5000 mm/min / 10–500 ipm; button highlights green when active; tap any axis to return to jogging
 
 **Work Area (Probing Work)**
 * Coordinate system selection (G54–G57)
@@ -45,7 +46,8 @@ The 3 physical buttons always perform the same function regardless of the active
 * Example macro files are included in the `/macros` folder — see `macros/INSTRUCTIONS.md`
 
 **Feeds & Speeds**
-* Feed and spindle override controls with fine adjustment and reset buttons
+* Feed and spindle override preset buttons (50% / 75% / 100% / 125% / 150%)
+* **Dial mode** — tap the live percentage readout to activate dial mode (highlights green); the jog dial then adjusts that override in 10% increments; only one (feed or spindle) can be active at a time; tapping a preset or the other readout deactivates it
 
 **Spindle Control**
 * Direction selection (Forward / Reverse → M3 / M4)

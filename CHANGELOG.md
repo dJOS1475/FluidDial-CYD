@@ -6,6 +6,16 @@ The CYD_Buttons version has been cloned into CYD_New_UI - the UI has been rebuil
 **ChangeLog:**
 
 
+**2026-03-31**
+
+v1.4.0
+* Alarm state now shows a human-readable description on the Main Menu and Status screens (e.g. "Hard limit triggered", "Homing fail - pull off") — alarm codes 1–10 covered
+* Motion smoothness improvement: pendant hardware task priority reduced to avoid competing with FluidNC's Core 0 motion tasks
+* Motion smoothness improvement: $? ping interval extended to 1000ms while the machine is Running (200ms when idle/stopped/alarm) to reduce UART load during active motion
+* Jog & Homing screen: new Speed button in the bottom row displays current jog speed (e.g. F:1000) and allows the jog dial to set the speed in 100 mm/min or 10 ipm increments; the button highlights green when active and the jog axis is deselected — tap any axis button to return to jogging
+* Jog commands now use the user-configured jog speed instead of the previous hardcoded values
+* Feeds & Speeds screen: the feed and spindle override percentage readouts are now tappable buttons; tapping one activates dial mode (button highlights green) and the jog dial adjusts the override in 10% increments; only one can be active at a time — tapping the other or any preset button deactivates dial mode
+
 **2026-03-30**
 
 v1.3.0
