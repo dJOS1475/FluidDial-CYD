@@ -69,7 +69,7 @@ Wiki pages for more information: CYD Dial Pendant (http://wiki.fluidnc.com/en/ha
 
 See the **Compiling Firmware** section on how to test this version - use **cyd_new_ui**: (http://wiki.fluidnc.com/en/hardware/official/CYD_Dial_Pendant)
 
-FluidNC Discord: https://discord.com/channels/780079161460916227/1453176703009423514
+FluidNC Discord Topic: https://discord.com/channels/780079161460916227/1453176703009423514
 
 Firmware in Action: 
 [![Watch the video](https://img.youtube.com/vi/d5PogiUiiaw/maxresdefault.jpg)](https://youtu.be/d5PogiUiiaw)
