@@ -17,6 +17,8 @@ The 3 physical buttons always perform the same function regardless of the active
 * Yellow: Pause — holds current motion (Feed Hold). Spindle remains running. Green will resume.
 * Green: Start / Resume — starts a new job or resumes after a Yellow pause.
 
+Firmware in Action: 
+[![Watch the video](https://img.youtube.com/vi/d5PogiUiiaw/maxresdefault.jpg)](https://youtu.be/d5PogiUiiaw)
 ---
 
 **Screens & Features:**
@@ -70,8 +72,5 @@ Wiki pages for more information: CYD Dial Pendant (http://wiki.fluidnc.com/en/ha
 See the **Compiling Firmware** section on how to test this version - use **cyd_new_ui**: (http://wiki.fluidnc.com/en/hardware/official/CYD_Dial_Pendant)
 
 FluidNC Discord Topic: https://discord.com/channels/780079161460916227/1453176703009423514
-
-Firmware in Action: 
-[![Watch the video](https://img.youtube.com/vi/d5PogiUiiaw/maxresdefault.jpg)](https://youtu.be/d5PogiUiiaw)
 
 [![Donate](https://img.shields.io/badge/Donate-PayPal-blue?logo=paypal)](https://paypal.me/derekjosborn)
