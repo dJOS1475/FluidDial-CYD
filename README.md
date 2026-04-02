@@ -17,8 +17,7 @@ The 3 physical buttons always perform the same function regardless of the active
 * Yellow: Pause — holds current motion (Feed Hold). Spindle remains running. Green will resume.
 * Green: Start / Resume — starts a new job or resumes after a Yellow pause.
 
-Firmware in Action: 
-[![Watch the video](https://img.youtube.com/vi/d5PogiUiiaw/maxresdefault.jpg)](https://youtu.be/d5PogiUiiaw)
+<img src="https://raw.githubusercontent.com/dJOS1475/FluidDial-CYD/refs/heads/main/new_ui/Pendant3.jpeg" alt="CYD Dial Pendant With Buttons and Jog Dial" height="400">
 ---
 
 **Screens & Features:**
@@ -65,12 +64,13 @@ Firmware in Action:
 
 **FluidNC** — shows live controller info: firmware version, WiFi SSID, IP address, connection status, free heap. Jog dial rotates the display 180°; rotation is saved across restarts.
 
-<img src="https://raw.githubusercontent.com/dJOS1475/FluidDial-CYD/refs/heads/main/new_ui/Pendant3.jpeg" alt="CYD Dial Pendant With Buttons and Jog Dial" height="500">
-
 Wiki pages for more information: CYD Dial Pendant (http://wiki.fluidnc.com/en/hardware/official/CYD_Dial_Pendant).
 
 See the **Compiling Firmware** section on how to test this version - use **cyd_new_ui**: (http://wiki.fluidnc.com/en/hardware/official/CYD_Dial_Pendant)
 
 FluidNC Discord Topic: https://discord.com/channels/780079161460916227/1453176703009423514
+
+Firmware in Action (v1.0): 
+[![Watch the video](https://img.youtube.com/vi/d5PogiUiiaw/maxresdefault.jpg)](https://youtu.be/d5PogiUiiaw)
 
 [![Donate](https://img.shields.io/badge/Donate-PayPal-blue?logo=paypal)](https://paypal.me/derekjosborn)
