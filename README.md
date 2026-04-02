@@ -43,7 +43,7 @@ The 3 physical buttons always perform the same function regardless of the active
 * Runs probe macro files stored on the FluidNC controller
 * Z Surface probe: runs `probe_work_z.nc`
 * Tool Height setter: runs `probe_tool_height.nc`
-* Example macro files are included in the `/macros` folder — see `macros/INSTRUCTIONS.md`
+* Example macro files are included in the `/macros` folder — see [`macros/INSTRUCTIONS.md`](https://github.com/dJOS1475/FluidDial-CYD/blob/main/macros/INSTRUCTIONS.md)
 
 **Feeds & Speeds**
 * Feed and spindle override preset buttons (50% / 75% / 100% / 125% / 150%)
