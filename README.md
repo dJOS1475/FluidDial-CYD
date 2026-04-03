@@ -1,5 +1,5 @@
 # FluidDial-CYD: 
-The CYD_Buttons version has been cloned into CYD_New_UI - the UI has been rebuilt from scratch and optimised for CYD equipped FluidDial CNC Pendants with 3 physical buttons and a jog dial, and is designed to work with the FluidNC Firmware.
+The UI has been rebuilt from scratch and optimised for CYD equipped FluidDial CNC Pendants with 3 physical buttons and a jog dial, and is designed to work with the FluidNC Firmware.
 
 
 **Updates:**
