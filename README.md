@@ -1,7 +1,7 @@
 # FluidDial-CYD: 
 FluidDial-CYD is a custom firmware for capacitive CYD-equipped FluidDial CNC pendants. The UI has been rebuilt from the ground up for devices with 3 physical buttons and a jog dial. 
 
-Feedback is welcome - If you find an issue or have a request for improvements, please log an issue and I'll investigate.
+Feedback is welcome - If you find an issue or have a request for improvements, please log an [Issue](https://github.com/dJOS1475/FluidDial-CYD/issues) and I'll investigate.
 
 **Updates:**
 See [CHANGELOG.md](https://github.com/dJOS1475/FluidDial-CYD/blob/main/CHANGELOG.md)
