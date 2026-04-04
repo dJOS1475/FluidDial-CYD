@@ -7,6 +7,8 @@ See [CHANGELOG.md](https://github.com/dJOS1475/FluidDial-CYD/blob/main/CHANGELOG
 **Web Installer** (use Chrome/Edge): 
 https://djos1475.github.io/FluidDial-CYD/
 
+If you have problems with FluidDial-CYD Installer, there are some alternative methods you can try.  The precompiled binary images can be downloaded from the [Releases section](https://github.com/dJOS1475/FluidDial-CYD/releases) .  They can be installed with any “esptool” ESP32 firmware download program   The merged-flash.bin image should be downloaded to FLASH at address 0x0000.  One such download program is this [web installer](https://espressif.github.io/esptool-js/); there are many others.
+
 **Design Goals:**
 
 All menu navigation and as many features as possible are managed via the touch screen. The physical jog dial context-switches depending on the active screen — it only moves the CNC machine on the Jog & Homing screen (a safety feature), and serves other purposes elsewhere.
