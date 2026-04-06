@@ -12,11 +12,8 @@ static const int SPD_H = 40;
 // ===== Helpers =====
 
 static String speedLabel() {
-    if (pendantMachine.inInches) {
-        return "F:" + String(pendantJog.jogSpeedIn) + "i";
-    } else {
-        return "F:" + String(pendantJog.jogSpeedMm);
-    }
+    return pendantMachine.inInches ? String(pendantJog.jogSpeedIn)
+                                   : String(pendantJog.jogSpeedMm);
 }
 
 void redrawJogSpeedButton() {
@@ -121,9 +118,9 @@ void drawJogHomingScreen() {
     }
 
     // Bottom row: Main Menu | Speed | Work Area
-    drawButton(5,   SPD_Y, 73, SPD_H, "Main Menu", COLOR_BLUE, COLOR_WHITE, 2);
+    drawButton(5,   SPD_Y, 73, SPD_H, "Main Menu", COLOR_BLUE, COLOR_WHITE, 1);
     redrawJogSpeedButton();
-    drawButton(162, SPD_Y, 73, SPD_H, "Work Area", COLOR_BLUE, COLOR_WHITE, 2);
+    drawButton(162, SPD_Y, 73, SPD_H, "Work Area", COLOR_BLUE, COLOR_WHITE, 1);
 }
 
 // ===== Sprite update =====

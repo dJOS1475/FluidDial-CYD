@@ -3,6 +3,12 @@
 **ChangeLog:**
 
 
+**2026-04-07**
+
+v1.4.1
+* Jog & Homing screen: speed button now shows only the numeric value (e.g. 1000) instead of the prefixed label, fitting cleanly on the button
+* Jog & Homing screen: "Main Menu" and "Work Area" button text reduced to fit correctly
+
 **2026-03-31**
 
 v1.4.0
