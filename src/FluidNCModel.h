@@ -29,6 +29,7 @@ extern const char* my_state_string;
 
 extern int                n_axes;
 extern pos_t              myAxes[6];
+extern pos_t              myMachineAxes[6];
 extern bool               myLimitSwitches[6];
 extern bool               myProbeSwitch;
 extern const char*        myCtrlPins;

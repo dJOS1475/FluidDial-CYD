@@ -17,6 +17,7 @@ const char*        my_state_string    = "N/C";
 state_t            state              = Idle;
 int                n_axes             = 3;
 pos_t              myAxes[6]          = { 0 };
+pos_t              myMachineAxes[6]   = { 0 };
 bool               myLimitSwitches[6] = { false };
 bool               myProbeSwitch      = false;
 const char*        myFile             = "";  // running SD filename
@@ -139,11 +140,15 @@ extern "C" void show_control_pins(const char* pins) {
 extern "C" void show_dro(const pos_t* axes, const pos_t* wco, bool isMpos, bool* limits, size_t n_axis) {
     n_axes = (int)n_axis;
     for (int axis = 0; axis < n_axis; axis++) {
+        // Work pos (DRO)
         e4_t axis_val = axes[axis];
         if (isMpos) {
             axis_val -= wco[axis];
         }
         myAxes[axis] = inInches ? e4_mm_to_inch(axis_val) : axis_val;
+        // Machine pos (absolute)
+        e4_t mach_val = isMpos ? axes[axis] : (axes[axis] + wco[axis]);
+        myMachineAxes[axis] = inInches ? e4_mm_to_inch(mach_val) : mach_val;
     }
 }
 #else
@@ -156,10 +161,14 @@ pos_t toMm(pos_t position) {
 
 extern "C" void show_dro(const pos_t* axes, const pos_t* wco, bool isMpos, bool* limits, size_t n_axis) {
     for (int axis = 0; axis < n_axis; axis++) {
+        // Work pos (DRO)
         myAxes[axis] = fromMm(axes[axis]);
         if (isMpos) {
             myAxes[axis] -= fromMm(wco[axis]);
         }
+        // Machine pos (absolute)
+        myMachineAxes[axis] = isMpos ? fromMm(axes[axis])
+                                     : fromMm(axes[axis]) + fromMm(wco[axis]);
     }
 }
 #endif

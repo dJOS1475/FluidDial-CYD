@@ -44,6 +44,9 @@ void enterJogHoming() {
         pendantJog.selectedAxis  = 0;
     }
 
+    // Request per-axis max rate from controller ($110) to set jog speed cap
+    if (pendantConnected) requestJogConfig();
+
     if (ESP.getFreeHeap() < 50000) return;
 
     spriteAxisDisplay.createSprite(230, 55);

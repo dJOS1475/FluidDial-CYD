@@ -9,6 +9,8 @@ void enterSDCard() {
     spriteFileDisplay.deleteSprite();
     spritesInitialized = false;
 
+    pendantSdCard.pendingRun = false;
+
     // Request a fresh file list from the controller
     if (pendantConnected) {
         pendantSdCard.loading      = true;
@@ -42,8 +44,14 @@ void drawSDCardScreen() {
             int displayIndex = i + pendantSdCard.scrollOffset;
             if (displayIndex >= pendantSdCard.fileCount) break;
 
-            uint16_t bg = (displayIndex == pendantSdCard.selectedFile)
-                          ? COLOR_BUTTON_ACTIVE : COLOR_BUTTON_GRAY;
+            uint16_t bg;
+            if (displayIndex == pendantSdCard.selectedFile && pendantSdCard.pendingRun) {
+                bg = COLOR_DARK_GREEN;  // pending run = green highlight
+            } else if (displayIndex == pendantSdCard.selectedFile) {
+                bg = COLOR_BUTTON_ACTIVE;
+            } else {
+                bg = COLOR_BUTTON_GRAY;
+            }
             display.fillRoundRect(5, 40 + i * 40, 230, 36, 8, bg);
             display.setTextColor(COLOR_WHITE);
             display.setTextSize(1);
@@ -57,23 +65,24 @@ void drawSDCardScreen() {
     drawButton(83,  242, 72, 36, "Refresh", COLOR_DARK_GREEN,  COLOR_WHITE, 1);
     drawButton(161, 242, 72, 36, ">>",      COLOR_BUTTON_GRAY, COLOR_WHITE, 2);
 
-    drawButton(5, 282, 230, 36, "Main Menu", COLOR_BLUE, COLOR_WHITE, 2);
+    if (pendantSdCard.pendingRun) {
+        // Confirmation row: CANCEL + RUN FILE
+        drawButton(5,   282, 110, 36, "CANCEL",   COLOR_BLUE,       COLOR_WHITE, 2);
+        drawButton(121, 282, 114, 36, "RUN FILE", COLOR_DARK_GREEN, COLOR_WHITE, 2);
+    } else {
+        drawButton(5, 282, 230, 36, "Main Menu", COLOR_BLUE, COLOR_WHITE, 2);
+    }
 }
 
 void handleSDCardTouch(int x, int y) {
-    // File row taps
+    // File row taps — first tap selects & arms confirmation; second tap on same file does nothing extra
     for (int i = 0; i < 5; i++) {
         if (isTouchInBounds(x, y, 5, 40 + i * 40, 230, 36)) {
             int displayIndex = i + pendantSdCard.scrollOffset;
             if (displayIndex < pendantSdCard.fileCount) {
                 pendantSdCard.selectedFile = displayIndex;
-                if (pendantConnected) {
-                    String cmd = "/sd/" + pendantSdCard.files[displayIndex];
-                    send_line(cmd.c_str());
-                    navigateTo(PSCREEN_STATUS);
-                } else {
-                    drawSDCardScreen();
-                }
+                pendantSdCard.pendingRun   = true;
+                drawSDCardScreen();
             }
             return;
         }
@@ -95,6 +104,7 @@ void handleSDCardTouch(int x, int y) {
             pendantSdCard.fileCount    = 0;
             pendantSdCard.scrollOffset = 0;
             pendantSdCard.selectedFile = 0;
+            pendantSdCard.pendingRun   = false;
             drawSDCardScreen();
             request_file_list("/sd");
         }
@@ -110,7 +120,27 @@ void handleSDCardTouch(int x, int y) {
         return;
     }
 
-    if (isTouchInBounds(x, y, 5, 282, 230, 36)) {
-        navigateTo(PSCREEN_MAIN_MENU);
+    // Bottom row — depends on pendingRun state
+    if (pendantSdCard.pendingRun) {
+        // CANCEL
+        if (isTouchInBounds(x, y, 5, 282, 110, 36)) {
+            pendantSdCard.pendingRun = false;
+            drawSDCardScreen();
+            return;
+        }
+        // RUN FILE
+        if (isTouchInBounds(x, y, 121, 282, 114, 36)) {
+            if (pendantConnected) {
+                String cmd = "/sd/" + pendantSdCard.files[pendantSdCard.selectedFile];
+                send_line(cmd.c_str());
+                pendantSdCard.pendingRun = false;
+                navigateTo(PSCREEN_STATUS);
+            }
+            return;
+        }
+    } else {
+        if (isTouchInBounds(x, y, 5, 282, 230, 36)) {
+            navigateTo(PSCREEN_MAIN_MENU);
+        }
     }
 }

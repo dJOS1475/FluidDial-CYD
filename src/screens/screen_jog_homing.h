@@ -6,4 +6,5 @@ void updateJogAxisDisplay();
 void redrawJogAxisButtons();
 void redrawJogIncrementButtons();
 void redrawJogSpeedButton();
+void requestJogConfig();
 void handleJogHomingTouch(int x, int y);

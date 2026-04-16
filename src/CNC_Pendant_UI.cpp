@@ -221,28 +221,19 @@ static void handleEncoderDelta(int32_t delta) {
         if (!pendantConnected) return;
         if (pendantJog.speedDialMode) {
             // Adjust jog speed — metric: 100 mm/min/step, imperial: 10 ipm/step
+            int maxIn = constrain((int)(pendantJog.maxFeedRate / 25.4f), 10, 2000);
             if (pendantMachine.inInches) {
-                pendantJog.jogSpeedIn = constrain(pendantJog.jogSpeedIn + delta * 10, 10, 500);
+                pendantJog.jogSpeedIn = constrain(pendantJog.jogSpeedIn + delta * 10, 10, maxIn);
             } else {
-                pendantJog.jogSpeedMm = constrain(pendantJog.jogSpeedMm + delta * 100, 100, 5000);
+                pendantJog.jogSpeedMm = constrain(pendantJog.jogSpeedMm + delta * 100, 100, pendantJog.maxFeedRate);
             }
             redrawJogSpeedButton();
             updateJogAxisDisplay();
             return;
         }
         if (pendantJog.selectedAxis < 0) return;  // no axis selected — do nothing
-        // delta is already in whole detents (converted in pendant_hw_task)
-        String axisNames[] = { "X", "Y", "Z", "A" };
-        float  distance    = (float)delta * pendantJog.increment;
-        char   cmd[64];
-        if (pendantMachine.inInches) {
-            snprintf(cmd, sizeof(cmd), "$J=G91 G20 %s%.4f F%d",
-                     axisNames[pendantJog.selectedAxis].c_str(), distance, pendantJog.jogSpeedIn);
-        } else {
-            snprintf(cmd, sizeof(cmd), "$J=G91 G21 %s%.3f F%d",
-                     axisNames[pendantJog.selectedAxis].c_str(), distance, pendantJog.jogSpeedMm);
-        }
-        send_line(cmd);
+        // Accumulate ticks — flushed as a single batched command every 25ms in loop_pendant
+        pendantJog.jogAccumulator += delta;
     } else if (currentPendantScreen == PSCREEN_FEEDS_SPEEDS) {
         if (!pendantConnected) return;
         if (pendantFeeds.dialMode == 1) {
@@ -318,6 +309,13 @@ static void updateCurrentScreenSprites() {
 static IntConfigItem spindleMaxItem("$30");
 static IntConfigItem spindleMinItem("$31");
 
+// ===== Jog config item — request $110 (X-axis max rate) from FluidNC =====
+static IntConfigItem jogMaxRateItem("$110");
+
+void requestJogConfig() {
+    jogMaxRateItem.init();
+}
+
 // Called from enterSpindleControl() on Core 1 — sends $30/$31 queries to FluidNC
 void requestSpindleConfig() {
     spindleMaxItem.init();
@@ -332,10 +330,16 @@ public:
     void onDROChange() override {
         if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
             pendantMachine.numAxes       = n_axes;
+            // posX/Y/Z/A = work pos (DRO values, used by all position displays)
             pendantMachine.posX          = myAxes[0] / 10000.0f;
             pendantMachine.posY          = (n_axes > 1) ? myAxes[1] / 10000.0f : 0.0f;
             pendantMachine.posZ          = (n_axes > 2) ? myAxes[2] / 10000.0f : 0.0f;
             pendantMachine.posA          = (n_axes > 3) ? myAxes[3] / 10000.0f : 0.0f;
+            // workX/Y/Z/A = machine pos (absolute, used by Work Area screen)
+            pendantMachine.workX         = myMachineAxes[0] / 10000.0f;
+            pendantMachine.workY         = (n_axes > 1) ? myMachineAxes[1] / 10000.0f : 0.0f;
+            pendantMachine.workZ         = (n_axes > 2) ? myMachineAxes[2] / 10000.0f : 0.0f;
+            pendantMachine.workA         = (n_axes > 3) ? myMachineAxes[3] / 10000.0f : 0.0f;
             pendantMachine.feedRate      = (int)myFeed;
             pendantMachine.spindleRPM    = (int)mySpeed;
             pendantMachine.feedOverride  = (int)myFro;
@@ -395,13 +399,17 @@ public:
     }
 
     void reDisplay() override {
-        // Copy any newly-received config values into pendantMachine
+        // Copy any newly-received config values into pendantMachine / pendantJog
         if (spindleMaxItem.known() || spindleMinItem.known()) {
             if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
                 if (spindleMaxItem.known()) pendantMachine.spindleMaxRPM = spindleMaxItem.get();
                 if (spindleMinItem.known()) pendantMachine.spindleMinRPM = spindleMinItem.get();
                 xSemaphoreGive(stateMutex);
             }
+        }
+        if (jogMaxRateItem.known()) {
+            int rate = jogMaxRateItem.get();
+            if (rate > 0) pendantJog.maxFeedRate = rate;
         }
         if (hwEventQueue) {
             HwEvent ev = { HwEvent::STATE_UPDATE, 0 };
@@ -591,6 +599,34 @@ void loop_pendant() {
                     drawMacrosScreen();
                 }
                 break;
+        }
+    }
+
+    // Jog accumulator flush (25ms) — batches encoder ticks into one $J command with
+    // velocity scaling: more ticks per window = higher speed (natural acceleration feel)
+    static unsigned long lastJogFlushMs = 0;
+    if (currentPendantScreen == PSCREEN_JOG_HOMING &&
+        pendantJog.jogAccumulator != 0 &&
+        millis() - lastJogFlushMs >= 25) {
+        int32_t ticks = pendantJog.jogAccumulator;
+        pendantJog.jogAccumulator = 0;
+        lastJogFlushMs = millis();
+        if (pendantConnected && !pendantJog.speedDialMode && pendantJog.selectedAxis >= 0) {
+            String axisNames[] = { "X", "Y", "Z", "A" };
+            float  distance    = (float)ticks * pendantJog.increment;
+            int    velFactor   = constrain((int)abs(ticks), 1, 8);
+            char   cmd[64];
+            if (pendantMachine.inInches) {
+                int maxIn  = constrain((int)(pendantJog.maxFeedRate / 25.4f), 10, 2000);
+                int speed  = constrain(pendantJog.jogSpeedIn * velFactor, 10, maxIn);
+                snprintf(cmd, sizeof(cmd), "$J=G91 G20 %s%.4f F%d",
+                         axisNames[pendantJog.selectedAxis].c_str(), distance, speed);
+            } else {
+                int speed = constrain(pendantJog.jogSpeedMm * velFactor, 100, pendantJog.maxFeedRate);
+                snprintf(cmd, sizeof(cmd), "$J=G91 G21 %s%.3f F%d",
+                         axisNames[pendantJog.selectedAxis].c_str(), distance, speed);
+            }
+            send_line(cmd);
         }
     }
 

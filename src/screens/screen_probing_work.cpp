@@ -71,12 +71,12 @@ void updateWorkMachinePos() {
 
     float px, py, pz, pa;
     if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
-        px = pendantMachine.posX; py = pendantMachine.posY;
-        pz = pendantMachine.posZ; pa = pendantMachine.posA;
+        px = pendantMachine.workX; py = pendantMachine.workY;
+        pz = pendantMachine.workZ; pa = pendantMachine.workA;
         xSemaphoreGive(stateMutex);
     } else {
-        px = pendantMachine.posX; py = pendantMachine.posY;
-        pz = pendantMachine.posZ; pa = pendantMachine.posA;
+        px = pendantMachine.workX; py = pendantMachine.workY;
+        pz = pendantMachine.workZ; pa = pendantMachine.workA;
     }
 
     const char* axisNames[] = { "X", "Y", "Z", "A" };
@@ -97,12 +97,12 @@ void updateWorkAreaPos() {
 
     float wx, wy, wz, wa;
     if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
-        wx = pendantMachine.workX; wy = pendantMachine.workY;
-        wz = pendantMachine.workZ; wa = pendantMachine.workA;
+        wx = pendantMachine.posX; wy = pendantMachine.posY;
+        wz = pendantMachine.posZ; wa = pendantMachine.posA;
         xSemaphoreGive(stateMutex);
     } else {
-        wx = pendantMachine.workX; wy = pendantMachine.workY;
-        wz = pendantMachine.workZ; wa = pendantMachine.workA;
+        wx = pendantMachine.posX; wy = pendantMachine.posY;
+        wz = pendantMachine.posZ; wa = pendantMachine.posA;
     }
 
     const char* wAxisNames[] = { "X", "Y", "Z", "A" };
