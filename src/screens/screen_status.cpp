@@ -103,11 +103,6 @@ void updateStatusCurrentFile() {
 
     spriteFileDisplay.fillRoundRect(0, 0, 230, 40, 5, COLOR_DARKER_BG);
 
-    spriteFileDisplay.setTextColor(COLOR_GRAY_TEXT);
-    spriteFileDisplay.setTextSize(1);
-    spriteFileDisplay.setCursor(5, 5);
-    spriteFileDisplay.print("CURRENT FILE");
-
     String fileStr;
     if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
         fileStr = pendantMachine.currentFile;
@@ -116,10 +111,24 @@ void updateStatusCurrentFile() {
         fileStr = pendantMachine.currentFile;
     }
 
-    spriteFileDisplay.setTextColor(COLOR_CYAN);
-    spriteFileDisplay.setTextSize(1);
-    spriteFileDisplay.setCursor(5, 20);
-    spriteFileDisplay.print(fileStr);
+    if (pendantSdCard.loadedFile.length() > 0 && fileStr.length() == 0) {
+        // File queued on pendant, not yet sent to controller
+        spriteFileDisplay.setTextColor(COLOR_GREEN);
+        spriteFileDisplay.setTextSize(1);
+        spriteFileDisplay.setCursor(5, 5);
+        spriteFileDisplay.print("READY — press green to run");
+        spriteFileDisplay.setTextColor(COLOR_GREEN);
+        spriteFileDisplay.setCursor(5, 20);
+        spriteFileDisplay.print(pendantSdCard.loadedFile);
+    } else {
+        spriteFileDisplay.setTextColor(COLOR_GRAY_TEXT);
+        spriteFileDisplay.setTextSize(1);
+        spriteFileDisplay.setCursor(5, 5);
+        spriteFileDisplay.print("CURRENT FILE");
+        spriteFileDisplay.setTextColor(COLOR_CYAN);
+        spriteFileDisplay.setCursor(5, 20);
+        spriteFileDisplay.print(fileStr);
+    }
 
     spriteFileDisplay.pushSprite(5, 95);
 }
