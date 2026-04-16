@@ -3,6 +3,16 @@
 **ChangeLog:**
 
 
+**2026-04-16**
+
+v1.5.0
+* Work Area screen: Machine Position and Work Position labels and data sources corrected — Machine Pos now shows absolute machine coordinates and Work Pos shows the DRO (work coordinate) values
+* Work Area screen: Work Position values now update live as the machine moves
+* SD Card screen: file selection now requires a two-step confirmation — tapping a file highlights it in green and reveals CANCEL and RUN FILE buttons; tapping RUN FILE sends the run command and navigates to the Status screen
+* Jogging: 25 ms accumulator batches encoder ticks into a single $J command per window, eliminating the repeated start/stop micro-moves that caused stuttering
+* Jogging: velocity scaling — turning the dial faster sends a proportionally higher feed rate (up to 8× base speed), giving a natural acceleration feel
+* Jog speed cap: pendant reads $110 (X-axis max rate) from the controller on entry to the Jog & Homing screen and uses that value as the upper limit for jog feed rate
+
 **2026-04-07**
 
 v1.4.1

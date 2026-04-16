@@ -1,6 +1,6 @@
 {
   "name": "FluidDial-CYD",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "new_install_prompt_erase": true,
   "builds": [
     {
