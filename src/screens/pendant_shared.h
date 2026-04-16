@@ -74,12 +74,14 @@ struct MachineState {
 };
 
 struct JogState {
-    int   selectedAxis      = 0;     // 0=X, 1=Y, 2=Z, 3=A; -1 = speed dial mode active
-    float increment         = 1.0f;
-    int   selectedIncrement = 1;     // 0=0.1, 1=1, 2=10, 3=100
-    bool  speedDialMode     = false; // true = encoder adjusts jog speed, not axis
-    int   jogSpeedMm        = 1000;  // mm/min, range 100–5000, step 100
-    int   jogSpeedIn        = 100;   // ipm,    range  10–500,  step  10
+    int          selectedAxis      = 0;     // 0=X, 1=Y, 2=Z, 3=A; -1 = speed dial mode active
+    float        increment         = 1.0f;
+    int          selectedIncrement = 1;     // 0=0.1, 1=1, 2=10, 3=100
+    bool         speedDialMode     = false; // true = encoder adjusts jog speed, not axis
+    int          jogSpeedMm        = 100;   // mm/min, step 100
+    int          jogSpeedIn        = 10;    // ipm,    step  10
+    int          maxFeedRate       = 10000; // mm/min cap, updated from $110 on entry
+    int32_t      jogAccumulator    = 0;     // pending encoder ticks, flushed every 25ms
 };
 
 struct SDCardState {
@@ -88,6 +90,7 @@ struct SDCardState {
     String files[20];
     int    fileCount     = 0;
     bool   loading       = false;
+    bool   pendingRun    = false;  // true = file selected, awaiting RUN confirmation
 };
 
 struct MacroState {

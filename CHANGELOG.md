@@ -5,6 +5,9 @@
 
 **2026-04-16**
 
+v1.5.1
+* Jog & Homing screen: default jog speed reduced to 100 mm/min (10 ipm) for safer initial movement
+
 v1.5.0
 * Work Area screen: Machine Position and Work Position labels and data sources corrected — Machine Pos now shows absolute machine coordinates and Work Pos shows the DRO (work coordinate) values
 * Work Area screen: Work Position values now update live as the machine moves
