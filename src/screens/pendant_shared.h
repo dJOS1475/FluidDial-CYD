@@ -90,7 +90,8 @@ struct SDCardState {
     String files[20];
     int    fileCount     = 0;
     bool   loading       = false;
-    bool   pendingRun    = false;  // true = file selected, awaiting RUN confirmation
+    bool   pendingRun    = false;  // true = file selected, awaiting Load/Run confirmation
+    String loadedFile    = "";     // set by Load; green button sends run command
 };
 
 struct MacroState {

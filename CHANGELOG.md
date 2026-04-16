@@ -5,6 +5,11 @@
 
 **2026-04-16**
 
+v1.5.2
+* SD Card screen: file confirmation buttons changed from "CANCEL / RUN FILE" to "Load / Run"
+* Load queues the file for the green physical button to start — navigate to the Status screen and press green when ready
+* Run sends the file to the controller immediately and navigates to the Status screen
+
 v1.5.1
 * Jog & Homing screen: default jog speed reduced to 100 mm/min (10 ipm) for safer initial movement
 

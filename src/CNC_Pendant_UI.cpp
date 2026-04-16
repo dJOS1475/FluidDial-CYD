@@ -587,8 +587,17 @@ void loop_pendant() {
                 handleEncoderDelta(ev.value);
                 break;
             case HwEvent::BUTTON_RED:
+                break;
             case HwEvent::BUTTON_YELLOW:
+                break;
             case HwEvent::BUTTON_GREEN:
+                // If a file has been loaded via the SD card Load button, run it now
+                if (pendantSdCard.loadedFile.length() > 0 && pendantConnected) {
+                    String cmd = "/sd/" + pendantSdCard.loadedFile;
+                    send_line(cmd.c_str());
+                    pendantSdCard.loadedFile = "";
+                    navigateTo(PSCREEN_STATUS);
+                }
                 break;
             case HwEvent::STATE_UPDATE:
                 if (currentPendantScreen == PSCREEN_FLUIDNC) {

@@ -66,9 +66,9 @@ void drawSDCardScreen() {
     drawButton(161, 242, 72, 36, ">>",      COLOR_BUTTON_GRAY, COLOR_WHITE, 2);
 
     if (pendantSdCard.pendingRun) {
-        // Confirmation row: CANCEL + RUN FILE
-        drawButton(5,   282, 110, 36, "CANCEL",   COLOR_BLUE,       COLOR_WHITE, 2);
-        drawButton(121, 282, 114, 36, "RUN FILE", COLOR_DARK_GREEN, COLOR_WHITE, 2);
+        // Confirmation row: LOAD + RUN
+        drawButton(5,   282, 110, 36, "Load", COLOR_BLUE,       COLOR_WHITE, 2);
+        drawButton(121, 282, 114, 36, "Run",  COLOR_DARK_GREEN, COLOR_WHITE, 2);
     } else {
         drawButton(5, 282, 230, 36, "Main Menu", COLOR_BLUE, COLOR_WHITE, 2);
     }
@@ -122,17 +122,19 @@ void handleSDCardTouch(int x, int y) {
 
     // Bottom row — depends on pendingRun state
     if (pendantSdCard.pendingRun) {
-        // CANCEL
+        // LOAD — store filename, navigate to Status; green button will send run command
         if (isTouchInBounds(x, y, 5, 282, 110, 36)) {
+            pendantSdCard.loadedFile = pendantSdCard.files[pendantSdCard.selectedFile];
             pendantSdCard.pendingRun = false;
-            drawSDCardScreen();
+            navigateTo(PSCREEN_STATUS);
             return;
         }
-        // RUN FILE
+        // RUN — send command immediately
         if (isTouchInBounds(x, y, 121, 282, 114, 36)) {
             if (pendantConnected) {
                 String cmd = "/sd/" + pendantSdCard.files[pendantSdCard.selectedFile];
                 send_line(cmd.c_str());
+                pendantSdCard.loadedFile = "";
                 pendantSdCard.pendingRun = false;
                 navigateTo(PSCREEN_STATUS);
             }
