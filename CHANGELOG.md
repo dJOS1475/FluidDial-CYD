@@ -3,6 +3,17 @@
 **ChangeLog:**
 
 
+**2026-04-19**
+
+v1.5.3
+* Macros screen: reads macro0–macro9 definitions directly from FluidNC config.yaml; displays each macro as "[N] content" and sends $Macro=N on Run — no SD card folder required
+* SD Card: fixed Run command (was sending /sd/filename, now correctly sends $SD/Run=filename)
+* SD Card: Load stores the selected file on the pendant and shows it on the Status screen with "READY — press green to run"; the physical green button sends the run command
+* Status screen: current file shown correctly while a job is running (reads filename from FluidNC status reports)
+* Jog smoothness: removed 25 ms accumulator — each encoder tick dispatches a $J command immediately with a 1000 mm/min floor, eliminating stop/start gaps
+* Physical buttons: debounce reduced from 100 ms to 30 ms, task tick from 5 ms to 2 ms for faster response during a running job
+* Fix: removed stale file-list handler for macros screen that referenced non-existent MacroState fields (would have caused a compile error)
+
 **2026-04-16**
 
 v1.5.2
