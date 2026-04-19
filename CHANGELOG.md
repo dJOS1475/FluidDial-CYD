@@ -6,13 +6,13 @@
 **2026-04-19**
 
 v1.5.3
-* Macros screen: reads macro0–macro9 definitions directly from FluidNC config.yaml; displays each macro as "[N] content" and sends $Macro=N on Run — no SD card folder required
-* SD Card: fixed Run command (was sending /sd/filename, now correctly sends $SD/Run=filename)
-* SD Card: Load stores the selected file on the pendant and shows it on the Status screen with "READY — press green to run"; the physical green button sends the run command
-* Status screen: current file shown correctly while a job is running (reads filename from FluidNC status reports)
-* Jog smoothness: removed 25 ms accumulator — each encoder tick dispatches a $J command immediately with a 1000 mm/min floor, eliminating stop/start gaps
-* Physical buttons: debounce reduced from 100 ms to 30 ms, task tick from 5 ms to 2 ms for faster response during a running job
-* Fix: removed stale file-list handler for macros screen that referenced non-existent MacroState fields (would have caused a compile error)
+* Macros screen: completely rewritten — reads macro0–macro9 directly from FluidNC config.yaml (no SD card folder required); macros display as "[N] content" with Cancel / Run confirmation; Run sends $Macro=N to the controller
+* Status screen: when an SD job is running the Machine Status row splits into two columns — left shows the machine state (Run / Hold / etc.), right shows job progress as a live percentage in green
+* Status screen: current filename now displays correctly while a job is running (filename read from FluidNC status reports each cycle)
+* SD Card: fixed Run command — was incorrectly sending /sd/filename; now correctly sends $SD/Run=filename
+* SD Card: Load queues the selected file on the pendant and navigates to the Status screen; the physical green button sends the run command; Status screen shows "READY — press green to run" with the filename in green until the job starts
+* Jog smoothness: removed the 25 ms accumulator — each encoder tick now dispatches a $J command immediately with a minimum 1000 mm/min feed rate, eliminating the stop/start gaps between moves
+* Physical buttons: debounce reduced from 100 ms to 30 ms and task tick from 5 ms to 2 ms for much faster response during a running job; red button reset is now non-blocking
 
 **2026-04-16**
 
