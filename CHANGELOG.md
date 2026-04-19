@@ -13,6 +13,8 @@ v1.5.3
 * SD Card: Load queues the selected file on the pendant and navigates to the Status screen; the physical green button sends the run command; Status screen shows "READY — press green to run" with the filename in green until the job starts
 * Jog smoothness: removed the 25 ms accumulator — each encoder tick now dispatches a $J command immediately with a minimum 1000 mm/min feed rate, eliminating the stop/start gaps between moves
 * Physical buttons: debounce reduced from 100 ms to 30 ms and task tick from 5 ms to 2 ms for much faster response during a running job; red button reset is now non-blocking
+* Jog & Homing screen: coarse increment set updated — metric: 1 / 10 / 50 / 100 mm; imperial: .05 / .5 / 2.0 / 4.0 in
+* Fix: firmware version now correctly shows v1.5.3 on the FluidNC info screen
 
 **2026-04-16**
 
