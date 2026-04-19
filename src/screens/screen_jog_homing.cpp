@@ -15,9 +15,9 @@ static IncrementSet currentIncrements() {
             s.labels[0]=".0001"; s.labels[1]=".001"; s.labels[2]=".010"; s.labels[3]=".100";
             s.values[0]=0.0001f; s.values[1]=0.001f; s.values[2]=0.010f; s.values[3]=0.100f;
         } else {
-            // coarse imperial: .001 .010 .100 1.00
-            s.labels[0]=".001";  s.labels[1]=".010"; s.labels[2]=".100"; s.labels[3]="1.00";
-            s.values[0]=0.001f;  s.values[1]=0.010f; s.values[2]=0.100f; s.values[3]=1.000f;
+            // coarse imperial: .05 .5 2.0 4.0 in  (~1, 10, 50, 100 mm)
+            s.labels[0]=".05";   s.labels[1]=".5";   s.labels[2]="2.0";  s.labels[3]="4.0";
+            s.values[0]=0.05f;   s.values[1]=0.5f;   s.values[2]=2.0f;   s.values[3]=4.0f;
         }
     } else {
         if (pendantJog.fineIncrements) {
@@ -25,9 +25,9 @@ static IncrementSet currentIncrements() {
             s.labels[0]="0.01"; s.labels[1]="0.1"; s.labels[2]="1";   s.labels[3]="10";
             s.values[0]=0.01f;  s.values[1]=0.1f;  s.values[2]=1.0f;  s.values[3]=10.0f;
         } else {
-            // coarse metric: 0.1 1 10 100
-            s.labels[0]="0.1";  s.labels[1]="1";   s.labels[2]="10";  s.labels[3]="100";
-            s.values[0]=0.1f;   s.values[1]=1.0f;  s.values[2]=10.0f; s.values[3]=100.0f;
+            // coarse metric: 1 10 50 100
+            s.labels[0]="1";    s.labels[1]="10";   s.labels[2]="50";  s.labels[3]="100";
+            s.values[0]=1.0f;   s.values[1]=10.0f;  s.values[2]=50.0f; s.values[3]=100.0f;
         }
     }
     return s;
