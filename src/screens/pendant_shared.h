@@ -41,7 +41,7 @@ struct HwEvent {
 // ===== Machine State =====
 struct MachineState {
     String status        = "N/C";
-    String currentFile   = "No file loaded";
+    String currentFile   = "";
     float  posX          = 0.0f;
     float  posY          = 0.0f;
     float  posZ          = 0.0f;
@@ -75,14 +75,17 @@ struct MachineState {
 
 struct JogState {
     int          selectedAxis      = 0;     // 0=X, 1=Y, 2=Z, 3=A; -1 = speed dial mode active
-    float        increment         = 1.0f;
-    int          selectedIncrement = 1;     // 0=0.1, 1=1, 2=10, 3=100
+    float        increment         = 0.01f;
+    int          selectedIncrement = 1;     // index within the active increment set
+    bool         fineIncrements    = true;  // true=fine set, false=coarse; triple-tap rightmost button
     bool         speedDialMode     = false; // true = encoder adjusts jog speed, not axis
-    int          jogSpeedMm        = 100;   // mm/min, step 100
-    int          jogSpeedIn        = 10;    // ipm,    step  10
+    int          jogSpeedMm        = 5000;  // mm/min cap, step 100 (used to limit $J feed rate)
+    int          jogSpeedIn        = 200;   // ipm cap,    step  10
     int          maxFeedRate       = 10000; // mm/min cap, updated from $110 on entry
-    int32_t      jogAccumulator    = 0;     // pending encoder ticks, flushed every 25ms
 };
+
+// Save jog preferences (fineIncrements + selectedIncrement) to NVS — defined in CNC_Pendant_UI.cpp
+extern void saveJogPrefs();
 
 struct SDCardState {
     int    selectedFile  = 0;
@@ -95,11 +98,13 @@ struct SDCardState {
 };
 
 struct MacroState {
-    int    selectedFile  = 0;
-    int    scrollOffset  = 0;
-    String files[40];
-    int    fileCount     = 0;
-    bool   loading       = false;
+    String content[10];       // macro0..macro9 content from config.yaml (empty = not set)
+    int    indices[10] = {};  // original macro number for each visible entry
+    int    count       = 0;   // number of non-empty macros
+    int    scrollOffset= 0;
+    int    selected    = -1;  // display index of selected macro
+    bool   loading     = true;
+    bool   pendingRun  = false;
 };
 
 struct SpindleState {

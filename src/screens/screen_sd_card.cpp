@@ -132,7 +132,7 @@ void handleSDCardTouch(int x, int y) {
         // RUN — send command immediately
         if (isTouchInBounds(x, y, 121, 282, 114, 36)) {
             if (pendantConnected) {
-                String cmd = "/sd/" + pendantSdCard.files[pendantSdCard.selectedFile];
+                String cmd = "$SD/Run=" + pendantSdCard.files[pendantSdCard.selectedFile];
                 send_line(cmd.c_str());
                 pendantSdCard.loadedFile = "";
                 pendantSdCard.pendingRun = false;

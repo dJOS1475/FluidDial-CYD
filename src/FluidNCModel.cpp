@@ -20,7 +20,8 @@ pos_t              myAxes[6]          = { 0 };
 pos_t              myMachineAxes[6]   = { 0 };
 bool               myLimitSwitches[6] = { false };
 bool               myProbeSwitch      = false;
-const char*        myFile             = "";  // running SD filename
+static char        myFileBuffer[64]   = "";  // running SD filename (safe copy)
+const char*        myFile             = myFileBuffer;
 const char*        myCtrlPins         = "";
 file_percent_t     myPercent          = 0.0;  // percent conplete of SD file
 override_percent_t myFro              = 100;  // Feed rate override
@@ -110,10 +111,17 @@ const char* decode_error_number(int error_num) {
 
 extern "C" void begin_status_report() {
     myPercent = 0;
+    myFileBuffer[0] = '\0';  // clear filename each status cycle; show_file repopulates if running
 }
 
 extern "C" void show_file(const char* filename, file_percent_t percent) {
     myPercent = percent;
+    if (filename && *filename) {
+        strncpy(myFileBuffer, filename, sizeof(myFileBuffer) - 1);
+        myFileBuffer[sizeof(myFileBuffer) - 1] = '\0';
+    } else {
+        myFileBuffer[0] = '\0';
+    }
 }
 
 extern "C" void show_overrides(override_percent_t feed_ovr, override_percent_t rapid_ovr, override_percent_t spindle_ovr) {

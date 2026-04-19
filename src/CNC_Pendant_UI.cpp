@@ -220,20 +220,44 @@ static void handleEncoderDelta(int32_t delta) {
     } else if (currentPendantScreen == PSCREEN_JOG_HOMING) {
         if (!pendantConnected) return;
         if (pendantJog.speedDialMode) {
-            // Adjust jog speed — metric: 100 mm/min/step, imperial: 10 ipm/step
-            int maxIn = constrain((int)(pendantJog.maxFeedRate / 25.4f), 10, 2000);
+            // Adjust jog speed cap — metric: 500 mm/min/step, imperial: 20 ipm/step
+            int maxIn = constrain((int)(pendantJog.maxFeedRate / 25.4f), 40, 400);
             if (pendantMachine.inInches) {
-                pendantJog.jogSpeedIn = constrain(pendantJog.jogSpeedIn + delta * 10, 10, maxIn);
+                pendantJog.jogSpeedIn = constrain(pendantJog.jogSpeedIn + delta * 20, 40, maxIn);
             } else {
-                pendantJog.jogSpeedMm = constrain(pendantJog.jogSpeedMm + delta * 100, 100, pendantJog.maxFeedRate);
+                pendantJog.jogSpeedMm = constrain(pendantJog.jogSpeedMm + delta * 500, 1000, pendantJog.maxFeedRate);
             }
             redrawJogSpeedButton();
             updateJogAxisDisplay();
             return;
         }
         if (pendantJog.selectedAxis < 0) return;  // no axis selected — do nothing
-        // Accumulate ticks — flushed as a single batched command every 25ms in loop_pendant
-        pendantJog.jogAccumulator += delta;
+
+        // Send $J immediately per tick (like cyd_buttons) so FluidNC's planner buffer
+        // stays populated and the deceleration ramp bridges the gap between ticks.
+        // Time-based velocity scaling: fast turns send a proportionally larger distance.
+        {
+            static unsigned long lastTickMs = 0;
+            unsigned long now = millis();
+            unsigned long interval = now - lastTickMs;
+            lastTickMs = now;
+            int velFactor = (interval < 80) ? 4 : (interval < 150) ? 2 : 1;
+
+            String axisNames[] = { "X", "Y", "Z", "A" };
+            float  distance    = (float)delta * velFactor * pendantJog.increment;
+            char   cmd[64];
+            if (pendantMachine.inInches) {
+                int maxIn = constrain((int)(pendantJog.maxFeedRate / 25.4f), 40, 400);
+                int speed = constrain(pendantJog.jogSpeedIn, 40, maxIn);
+                snprintf(cmd, sizeof(cmd), "$J=G91 G20 %s%.4f F%d",
+                         axisNames[pendantJog.selectedAxis].c_str(), distance, speed);
+            } else {
+                int speed = constrain(pendantJog.jogSpeedMm, 1000, pendantJog.maxFeedRate);
+                snprintf(cmd, sizeof(cmd), "$J=G91 G21 %s%.3f F%d",
+                         axisNames[pendantJog.selectedAxis].c_str(), distance, speed);
+            }
+            send_line(cmd);
+        }
     } else if (currentPendantScreen == PSCREEN_FEEDS_SPEEDS) {
         if (!pendantConnected) return;
         if (pendantFeeds.dialMode == 1) {
@@ -263,6 +287,13 @@ static void handleEncoderDelta(int32_t delta) {
             lastRotationMs = millis();
         }
     }
+}
+
+void saveJogPrefs() {
+    preferences.begin("pendant", false);
+    preferences.putBool("jogFineMode", pendantJog.fineIncrements);
+    preferences.putInt("jogSelInc",    pendantJog.selectedIncrement);
+    preferences.end();
 }
 
 // ===== Sprite Periodic Update (Core 1, 100ms cadence) =====
@@ -316,6 +347,18 @@ void requestJogConfig() {
     jogMaxRateItem.init();
 }
 
+// ===== Macro config items — request $macros/macro0..macro9 from FluidNC =====
+static StringConfigItem macroItems[10] = {
+    "$macros/macro0", "$macros/macro1", "$macros/macro2", "$macros/macro3",
+    "$macros/macro4", "$macros/macro5", "$macros/macro6", "$macros/macro7",
+    "$macros/macro8", "$macros/macro9"
+};
+
+void requestMacros() {
+    pendantMacros.loading = true;
+    for (int i = 0; i < 10; i++) macroItems[i].init();
+}
+
 // Called from enterSpindleControl() on Core 1 — sends $30/$31 queries to FluidNC
 void requestSpindleConfig() {
     spindleMaxItem.init();
@@ -344,7 +387,7 @@ public:
             pendantMachine.spindleRPM    = (int)mySpeed;
             pendantMachine.feedOverride  = (int)myFro;
             pendantMachine.spindleOverride = (int)mySro;
-            if (myFile) pendantMachine.currentFile = myFile;
+            pendantMachine.currentFile = (myFile && *myFile) ? myFile : "";
             xSemaphoreGive(stateMutex);
         }
         if (hwEventQueue) {
@@ -370,24 +413,14 @@ public:
 
     void onFilesList() override {
         // Called from Core 0 (fnc_poll) when FluidNC responds to $Files/ListGCode
+        // Macros are now read from config.yaml via StringConfigItem, not file listing.
         if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-            if (currentPendantScreen == PSCREEN_MACROS) {
-                pendantMacros.fileCount    = 0;
-                pendantMacros.scrollOffset = 0;
-                pendantMacros.loading      = false;
-                for (auto& fi : fileVector) {
-                    if (!fi.isDir() && pendantMacros.fileCount < 40) {
-                        pendantMacros.files[pendantMacros.fileCount++] = String(fi.fileName.c_str());
-                    }
-                }
-            } else {
-                pendantSdCard.fileCount    = 0;
-                pendantSdCard.scrollOffset = 0;
-                pendantSdCard.loading      = false;
-                for (auto& fi : fileVector) {
-                    if (!fi.isDir() && pendantSdCard.fileCount < 20) {
-                        pendantSdCard.files[pendantSdCard.fileCount++] = String(fi.fileName.c_str());
-                    }
+            pendantSdCard.fileCount    = 0;
+            pendantSdCard.scrollOffset = 0;
+            pendantSdCard.loading      = false;
+            for (auto& fi : fileVector) {
+                if (!fi.isDir() && pendantSdCard.fileCount < 20) {
+                    pendantSdCard.files[pendantSdCard.fileCount++] = String(fi.fileName.c_str());
                 }
             }
             xSemaphoreGive(stateMutex);
@@ -410,6 +443,28 @@ public:
         if (jogMaxRateItem.known()) {
             int rate = jogMaxRateItem.get();
             if (rate > 0) pendantJog.maxFeedRate = rate;
+        }
+
+        // Rebuild visible macro list from any config items that have arrived
+        {
+            bool anyKnown = false;
+            for (int i = 0; i < 10; i++) {
+                if (macroItems[i].known()) { anyKnown = true; break; }
+            }
+            if (anyKnown) {
+                pendantMacros.count = 0;
+                for (int i = 0; i < 10; i++) {
+                    if (macroItems[i].known()) {
+                        std::string v = macroItems[i].get();
+                        if (!v.empty()) {
+                            pendantMacros.content[pendantMacros.count] = String(v.c_str());
+                            pendantMacros.indices[pendantMacros.count] = i;
+                            pendantMacros.count++;
+                        }
+                    }
+                }
+                pendantMacros.loading = false;
+            }
         }
         if (hwEventQueue) {
             HwEvent ev = { HwEvent::STATE_UPDATE, 0 };
@@ -438,6 +493,10 @@ void pendant_hw_task(void* /*pvParameters*/) {
     bool          btnState[3]    = { true, true, true };
     bool          btnHandled[3]  = { false, false, false };
     int           btnPins[3]     = { red_button_pin, dial_button_pin, green_button_pin };
+
+    // Non-blocking Red button post-reset: send $X 500ms after Reset without blocking the task
+    bool          redResetPending = false;
+    unsigned long redResetMs      = 0;
 
     // Send first $? immediately — fnc_is_connected() uses a 'starting' flag so
     // the very first call fires the ping right away instead of waiting for the timer.
@@ -500,17 +559,15 @@ void pendant_hw_task(void* /*pvParameters*/) {
             }
             lastBtnRaw[i] = raw;
 
-            if ((now - lastDebounce[i]) > 100) {
+            if ((now - lastDebounce[i]) > 30) {
                 bool pressed = !raw;
                 if (pressed && btnState[i] && !btnHandled[i]) {
                     btnHandled[i] = true;
                     switch (i) {
-                        case 0:  // Red → soft reset (cancels program, clears buffer, stops spindle)
-                            //        $X clears the post-reset alarm so no rehoming is needed.
-                            //        Position is retained; Green cannot resume after this.
+                        case 0:  // Red → soft reset then $X after 500ms (non-blocking)
                             fnc_realtime(Reset);
-                            vTaskDelay(pdMS_TO_TICKS(500));  // wait for controller to finish reset
-                            send_line("$X");
+                            redResetPending = true;
+                            redResetMs      = now;
                             break;
                         case 1:  // Yellow → pause motion
                             fnc_realtime(FeedHold);
@@ -532,7 +589,13 @@ void pendant_hw_task(void* /*pvParameters*/) {
             }
         }
 
-        vTaskDelay(pdMS_TO_TICKS(5));  // 5ms → ~200Hz polling
+        // Non-blocking post-reset $X — sent 500ms after Red button without stalling the task
+        if (redResetPending && (millis() - redResetMs >= 500)) {
+            send_line("$X");
+            redResetPending = false;
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(2));  // 2ms → ~500Hz polling for snappy button response
     }
 }
 
@@ -552,10 +615,15 @@ void setup_pendant() {
         pendantMachine.fluidDialVersion = buf;
     }
 
-    // Load saved display rotation
+    // Load saved display rotation and jog preferences
     preferences.begin("pendant", false);
-    int savedRotation = preferences.getInt("rotation", 2);
+    int  savedRotation = preferences.getInt("rotation",    2);
+    bool savedFineInc  = preferences.getBool("jogFineMode", true);
+    int  savedSelInc   = preferences.getInt("jogSelInc",    1);
     preferences.end();
+
+    pendantJog.fineIncrements    = savedFineInc;
+    pendantJog.selectedIncrement = savedSelInc;
 
     pendantMachine.rotation        = savedRotation;
     pendantMachine.displayRotation = (savedRotation == 2) ? "Normal" : "Upside Down";
@@ -593,7 +661,7 @@ void loop_pendant() {
             case HwEvent::BUTTON_GREEN:
                 // If a file has been loaded via the SD card Load button, run it now
                 if (pendantSdCard.loadedFile.length() > 0 && pendantConnected) {
-                    String cmd = "/sd/" + pendantSdCard.loadedFile;
+                    String cmd = "$SD/Run=" + pendantSdCard.loadedFile;
                     send_line(cmd.c_str());
                     pendantSdCard.loadedFile = "";
                     navigateTo(PSCREEN_STATUS);
@@ -608,34 +676,6 @@ void loop_pendant() {
                     drawMacrosScreen();
                 }
                 break;
-        }
-    }
-
-    // Jog accumulator flush (25ms) — batches encoder ticks into one $J command with
-    // velocity scaling: more ticks per window = higher speed (natural acceleration feel)
-    static unsigned long lastJogFlushMs = 0;
-    if (currentPendantScreen == PSCREEN_JOG_HOMING &&
-        pendantJog.jogAccumulator != 0 &&
-        millis() - lastJogFlushMs >= 25) {
-        int32_t ticks = pendantJog.jogAccumulator;
-        pendantJog.jogAccumulator = 0;
-        lastJogFlushMs = millis();
-        if (pendantConnected && !pendantJog.speedDialMode && pendantJog.selectedAxis >= 0) {
-            String axisNames[] = { "X", "Y", "Z", "A" };
-            float  distance    = (float)ticks * pendantJog.increment;
-            int    velFactor   = constrain((int)abs(ticks), 1, 8);
-            char   cmd[64];
-            if (pendantMachine.inInches) {
-                int maxIn  = constrain((int)(pendantJog.maxFeedRate / 25.4f), 10, 2000);
-                int speed  = constrain(pendantJog.jogSpeedIn * velFactor, 10, maxIn);
-                snprintf(cmd, sizeof(cmd), "$J=G91 G20 %s%.4f F%d",
-                         axisNames[pendantJog.selectedAxis].c_str(), distance, speed);
-            } else {
-                int speed = constrain(pendantJog.jogSpeedMm * velFactor, 100, pendantJog.maxFeedRate);
-                snprintf(cmd, sizeof(cmd), "$J=G91 G21 %s%.3f F%d",
-                         axisNames[pendantJog.selectedAxis].c_str(), distance, speed);
-            }
-            send_line(cmd);
         }
     }
 

@@ -1,6 +1,38 @@
 #include "pendant_shared.h"
 #include "screen_jog_homing.h"
 
+// ===== Increment sets =====
+struct IncrementSet {
+    const char* labels[4];
+    float       values[4];
+};
+
+static IncrementSet currentIncrements() {
+    IncrementSet s;
+    if (pendantMachine.inInches) {
+        if (pendantJog.fineIncrements) {
+            // fine imperial: .0001 .001 .010 .100
+            s.labels[0]=".0001"; s.labels[1]=".001"; s.labels[2]=".010"; s.labels[3]=".100";
+            s.values[0]=0.0001f; s.values[1]=0.001f; s.values[2]=0.010f; s.values[3]=0.100f;
+        } else {
+            // coarse imperial: .001 .010 .100 1.00
+            s.labels[0]=".001";  s.labels[1]=".010"; s.labels[2]=".100"; s.labels[3]="1.00";
+            s.values[0]=0.001f;  s.values[1]=0.010f; s.values[2]=0.100f; s.values[3]=1.000f;
+        }
+    } else {
+        if (pendantJog.fineIncrements) {
+            // fine metric: 0.01 0.1 1 10
+            s.labels[0]="0.01"; s.labels[1]="0.1"; s.labels[2]="1";   s.labels[3]="10";
+            s.values[0]=0.01f;  s.values[1]=0.1f;  s.values[2]=1.0f;  s.values[3]=10.0f;
+        } else {
+            // coarse metric: 0.1 1 10 100
+            s.labels[0]="0.1";  s.labels[1]="1";   s.labels[2]="10";  s.labels[3]="100";
+            s.values[0]=0.1f;   s.values[1]=1.0f;  s.values[2]=10.0f; s.values[3]=100.0f;
+        }
+    }
+    return s;
+}
+
 // ===== Layout constants =====
 // Bottom row: Main Menu | Speed | Work Area  (3 equal-ish buttons, 2px gaps)
 // x=5, w=73 | x=80, w=80 | x=162, w=73
@@ -30,12 +62,10 @@ void enterJogHoming() {
     spriteFileDisplay.deleteSprite();
     spritesInitialized = false;
 
-    // Re-apply the current increment in case units changed since last visit
+    // Re-apply the current increment in case units or fine/coarse mode changed since last visit
     {
-        float mmInc[] = { 0.1f,   1.0f,   10.0f,  100.0f };
-        float inInc[] = { 0.001f, 0.010f, 0.100f, 1.000f };
-        int   idx     = pendantJog.selectedIncrement;
-        pendantJog.increment = pendantMachine.inInches ? inInc[idx] : mmInc[idx];
+        IncrementSet incs = currentIncrements();
+        pendantJog.increment = incs.values[pendantJog.selectedIncrement];
     }
 
     // Ensure a valid axis is selected on entry — exit speed dial mode if active
@@ -78,18 +108,6 @@ void drawJogHomingScreen() {
     display.setTextColor(COLOR_GRAY_TEXT);
     display.setTextSize(1);
     display.setCursor(5, 103);
-    display.print("JOG AXIS");
-
-    for (int i = 0; i < numAx; i++) {
-        // Deselect all axis buttons when in speed dial mode
-        uint16_t bg = (!pendantJog.speedDialMode && i == pendantJog.selectedAxis)
-                      ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
-        drawButton(5 + i * btnW, 115, btnW - 4, 38, axisNames[i], bg, COLOR_WHITE, 3);
-    }
-
-    display.setTextColor(COLOR_GRAY_TEXT);
-    display.setTextSize(1);
-    display.setCursor(5, 161);
     display.print("HOME");
 
     {
@@ -98,8 +116,20 @@ void drawJogHomingScreen() {
         int    numHome       = (numAx < 4) ? numAx + 1 : 4;
         for (int i = 0; i < numHome; i++) {
             int sz = (i == numAx && numAx < 4) ? 2 : 3;
-            drawButton(5 + i * HW, 173, HW - 4, 38, homeNames[i], COLOR_DARK_GREEN, COLOR_WHITE, sz);
+            drawButton(5 + i * HW, 115, HW - 4, 38, homeNames[i], COLOR_DARK_GREEN, COLOR_WHITE, sz);
         }
+    }
+
+    display.setTextColor(COLOR_GRAY_TEXT);
+    display.setTextSize(1);
+    display.setCursor(5, 161);
+    display.print("JOG AXIS");
+
+    for (int i = 0; i < numAx; i++) {
+        // Deselect all axis buttons when in speed dial mode
+        uint16_t bg = (!pendantJog.speedDialMode && i == pendantJog.selectedAxis)
+                      ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
+        drawButton(5 + i * btnW, 173, btnW - 4, 38, axisNames[i], bg, COLOR_WHITE, 3);
     }
 
     display.setTextSize(1);
@@ -109,15 +139,15 @@ void drawJogHomingScreen() {
         display.print("JOG INCREMENT  *** " + pendantMachine.status + " ***");
     } else {
         display.setTextColor(COLOR_GRAY_TEXT);
-        display.print(pendantMachine.inInches ? "JOG INCREMENT (in)" : "JOG INCREMENT (mm)");
+        String unitStr = pendantMachine.inInches ? "in" : "mm";
+        String modeStr = pendantJog.fineIncrements ? " — fine" : " — coarse";
+        display.print("JOG INCREMENT (" + unitStr + ")" + modeStr);
     }
 
-    const char* mmInc[] = { "0.1",  "1",    "10",   "100"  };
-    const char* inInc[] = { ".001", ".010", ".100", "1.00" };
-    const char** incLabels = pendantMachine.inInches ? inInc : mmInc;
+    IncrementSet incs = currentIncrements();
     for (int i = 0; i < 4; i++) {
         uint16_t bg = (i == pendantJog.selectedIncrement) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
-        drawButton(5 + i * 56, 231, 52, 38, incLabels[i], bg, COLOR_WHITE, 2);
+        drawButton(5 + i * 56, 231, 52, 38, incs.labels[i], bg, COLOR_WHITE, 2);
     }
 
     // Bottom row: Main Menu | Speed | Work Area
@@ -216,19 +246,17 @@ void redrawJogAxisButtons() {
     for (int i = 0; i < numAx; i++) {
         uint16_t bg = (!pendantJog.speedDialMode && i == pendantJog.selectedAxis)
                       ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
-        drawButton(5 + i * btnW, 115, btnW - 4, 38, axisNames[i], bg, COLOR_WHITE, 3);
+        drawButton(5 + i * btnW, 173, btnW - 4, 38, axisNames[i], bg, COLOR_WHITE, 3);
     }
     updateJogAxisDisplay();
 }
 
 void redrawJogIncrementButtons() {
     if (currentPendantScreen != PSCREEN_JOG_HOMING) return;
-    const char* mmInc[] = { "0.1",  "1",    "10",   "100"  };
-    const char* inInc[] = { ".001", ".010", ".100", "1.00" };
-    const char** incLabels = pendantMachine.inInches ? inInc : mmInc;
+    IncrementSet incs = currentIncrements();
     for (int i = 0; i < 4; i++) {
         uint16_t bg = (i == pendantJog.selectedIncrement) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
-        drawButton(5 + i * 56, 231, 52, 38, incLabels[i], bg, COLOR_WHITE, 2);
+        drawButton(5 + i * 56, 231, 52, 38, incs.labels[i], bg, COLOR_WHITE, 2);
     }
 }
 
@@ -238,28 +266,17 @@ void handleJogHomingTouch(int x, int y) {
     int numAx = pendantMachine.numAxes;
     int btnW  = 230 / numAx;
 
-    // Axis selection — also exits speed dial mode
-    for (int i = 0; i < numAx; i++) {
-        if (isTouchInBounds(x, y, 5 + i * btnW, 115, btnW - 4, 38)) {
-            pendantJog.speedDialMode = false;
-            pendantJog.selectedAxis  = i;
-            redrawJogAxisButtons();
-            redrawJogSpeedButton();
-            return;
-        }
-    }
-
     // Home buttons — always 4 at fixed 57px width
     {
         const int HW = 57;
         String homeNames[4] = { "X", "Y", "Z", numAx < 4 ? "ALL" : "A" };
         int    numHome       = (numAx < 4) ? numAx + 1 : 4;
         for (int i = 0; i < numHome; i++) {
-            if (isTouchInBounds(x, y, 5 + i * HW, 173, HW - 4, 38)) {
+            if (isTouchInBounds(x, y, 5 + i * HW, 115, HW - 4, 38)) {
                 int sz = (i == numAx && numAx < 4) ? 2 : 3;
-                drawButton(5 + i * HW, 173, HW - 4, 38, homeNames[i], COLOR_WHITE, COLOR_DARK_GREEN, sz);
+                drawButton(5 + i * HW, 115, HW - 4, 38, homeNames[i], COLOR_WHITE, COLOR_DARK_GREEN, sz);
                 delay_ms(150);
-                drawButton(5 + i * HW, 173, HW - 4, 38, homeNames[i], COLOR_DARK_GREEN, COLOR_WHITE, sz);
+                drawButton(5 + i * HW, 115, HW - 4, 38, homeNames[i], COLOR_DARK_GREEN, COLOR_WHITE, sz);
                 if (!pendantConnected) return;
                 char cmd[16];
                 if (i == numAx) {
@@ -274,15 +291,54 @@ void handleJogHomingTouch(int x, int y) {
         }
     }
 
-    // Increment selection
-    for (int i = 0; i < 4; i++) {
-        if (isTouchInBounds(x, y, 5 + i * 56, 231, 52, 38)) {
-            pendantJog.selectedIncrement = i;
-            float mmInc[] = { 0.1f,   1.0f,   10.0f,  100.0f };
-            float inInc[] = { 0.001f, 0.010f, 0.100f, 1.000f };
-            pendantJog.increment = pendantMachine.inInches ? inInc[i] : mmInc[i];
-            redrawJogIncrementButtons();
+    // Axis selection — also exits speed dial mode
+    for (int i = 0; i < numAx; i++) {
+        if (isTouchInBounds(x, y, 5 + i * btnW, 173, btnW - 4, 38)) {
+            pendantJog.speedDialMode = false;
+            pendantJog.selectedAxis  = i;
+            redrawJogAxisButtons();
+            redrawJogSpeedButton();
             return;
+        }
+    }
+
+    // Increment selection — triple-tap button 3 (rightmost) toggles fine/coarse set
+    {
+        static int           incTapCount = 0;
+        static unsigned long incTapMs    = 0;
+
+        for (int i = 0; i < 4; i++) {
+            if (isTouchInBounds(x, y, 5 + i * 56, 231, 52, 38)) {
+                if (i == 3) {
+                    unsigned long now = millis();
+                    if (now - incTapMs < 600) {
+                        incTapCount++;
+                    } else {
+                        incTapCount = 1;
+                    }
+                    incTapMs = now;
+
+                    if (incTapCount >= 3) {
+                        incTapCount = 0;
+                        pendantJog.fineIncrements = !pendantJog.fineIncrements;
+                        IncrementSet incs = currentIncrements();
+                        pendantJog.increment = incs.values[pendantJog.selectedIncrement];
+                        saveJogPrefs();
+                        drawJogHomingScreen();  // full redraw to update label
+                        return;
+                    }
+                } else {
+                    incTapCount = 0;  // reset triple-tap if another button tapped
+                }
+
+                // Normal: select this increment
+                pendantJog.selectedIncrement = i;
+                IncrementSet incs = currentIncrements();
+                pendantJog.increment = incs.values[i];
+                saveJogPrefs();
+                redrawJogIncrementButtons();
+                return;
+            }
         }
     }
 

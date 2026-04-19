@@ -6,9 +6,16 @@
 **2026-04-16**
 
 v1.5.2
-* SD Card screen: file confirmation buttons changed from "CANCEL / RUN FILE" to "Load / Run"
+* SD Card screen: file confirmation buttons changed to "Load" and "Run"
 * Run sends the file to the controller immediately and navigates to the Status screen
 * Load queues the file on the pendant and navigates to the Status screen — the Status screen shows "READY — press green to run" with the filename highlighted in green; pressing the physical green button sends the run command
+* Jog & Homing screen: Home buttons moved above Jog Axis buttons for quicker access
+* Jog & Homing screen: two increment sets now available — fine (default) and coarse; triple-tap the rightmost increment button to switch between them
+  * Fine metric: 0.01 / 0.1 / 1 / 10 mm
+  * Coarse metric: 0.1 / 1 / 10 / 100 mm
+  * Fine imperial: .0001 / .001 / .010 / .100 in
+  * Coarse imperial: .001 / .010 / .100 / 1.00 in
+* Increment set selection and active increment index are saved to flash and restored on reboot
 
 v1.5.1
 * Jog & Homing screen: default jog speed reduced to 100 mm/min (10 ipm) for safer initial movement
