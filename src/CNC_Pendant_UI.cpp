@@ -388,6 +388,7 @@ public:
             pendantMachine.feedOverride  = (int)myFro;
             pendantMachine.spindleOverride = (int)mySro;
             pendantMachine.currentFile = (myFile && *myFile) ? myFile : "";
+            pendantMachine.jobPercent  = (int)myPercent;
             xSemaphoreGive(stateMutex);
         }
         if (hwEventQueue) {

@@ -42,6 +42,7 @@ struct HwEvent {
 struct MachineState {
     String status        = "N/C";
     String currentFile   = "";
+    int    jobPercent    = 0;     // 0-100, valid only while currentFile is non-empty
     float  posX          = 0.0f;
     float  posY          = 0.0f;
     float  posZ          = 0.0f;

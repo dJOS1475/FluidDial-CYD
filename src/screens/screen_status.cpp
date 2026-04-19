@@ -62,15 +62,23 @@ void updateStatusMachineStatus() {
     spriteStatusBar.fillSprite(COLOR_DARKER_BG);
 
     String statusStr;
+    String fileStr;
+    int    pct = 0;
     if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
         statusStr = pendantMachine.status;
+        fileStr   = pendantMachine.currentFile;
+        pct       = pendantMachine.jobPercent;
         xSemaphoreGive(stateMutex);
     } else {
         statusStr = pendantMachine.status;
+        fileStr   = pendantMachine.currentFile;
+        pct       = pendantMachine.jobPercent;
     }
 
+    bool jobRunning = fileStr.length() > 0;
+
     if (statusStr.startsWith("Alarm")) {
-        // Alarm: show description on label line, "ALARM" in red on status line
+        // Alarm: full-width, description on top line, "ALARM" in red below
         String desc = alarmDescription(statusStr);
         spriteStatusBar.setTextColor(TFT_RED);
         spriteStatusBar.setTextSize(1);
@@ -81,7 +89,40 @@ void updateStatusMachineStatus() {
         int16_t sw = spriteStatusBar.textWidth("ALARM");
         spriteStatusBar.setCursor(115 - sw / 2, 22);
         spriteStatusBar.print("ALARM");
+
+    } else if (jobRunning) {
+        // Two-column layout: left = machine status, right = job progress %
+        // Left column: x=0..111
+        spriteStatusBar.setTextColor(COLOR_GRAY_TEXT);
+        spriteStatusBar.setTextSize(1);
+        spriteStatusBar.setCursor(5, 5);
+        spriteStatusBar.print("MACHINE STATUS");
+        spriteStatusBar.setTextColor(COLOR_CYAN);
+        spriteStatusBar.setTextSize(3);
+        int16_t sw = spriteStatusBar.textWidth(statusStr.c_str());
+        int16_t cx = 56 - sw / 2;  // centre of left column (56 = 112/2)
+        if (cx < 0) cx = 0;
+        spriteStatusBar.setCursor(cx, 22);
+        spriteStatusBar.print(statusStr);
+
+        // Divider
+        spriteStatusBar.drawLine(115, 2, 115, 47, COLOR_BUTTON_GRAY);
+
+        // Right column: x=118..229
+        String pctStr = String(pct) + "%";
+        spriteStatusBar.setTextColor(COLOR_GRAY_TEXT);
+        spriteStatusBar.setTextSize(1);
+        int16_t lw = spriteStatusBar.textWidth("PROGRESS");
+        spriteStatusBar.setCursor(174 - lw / 2, 5);  // centre of right col (174 = 118+56)
+        spriteStatusBar.print("PROGRESS");
+        spriteStatusBar.setTextColor(COLOR_GREEN);
+        spriteStatusBar.setTextSize(3);
+        int16_t pw = spriteStatusBar.textWidth(pctStr.c_str());
+        spriteStatusBar.setCursor(174 - pw / 2, 22);
+        spriteStatusBar.print(pctStr);
+
     } else {
+        // Full-width single column
         spriteStatusBar.setTextColor(COLOR_GRAY_TEXT);
         spriteStatusBar.setTextSize(1);
         int16_t lw = spriteStatusBar.textWidth("MACHINE STATUS");
