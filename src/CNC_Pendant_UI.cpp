@@ -650,6 +650,16 @@ void setup_pendant() {
 }
 
 void loop_pendant() {
+    // Execute any action deferred by schedule_action() in FileParser / Scene code.
+    // In the original FluidDial this runs inside dispatch_events(); we replicate
+    // just that one step here so macro file requests (and their fallbacks) fire.
+    extern ActionHandler action;  // Scene.cpp
+    if (action) {
+        ActionHandler a = action;
+        action          = nullptr;
+        a();
+    }
+
     // Process hardware events from Core 0
     HwEvent ev;
     while (xQueueReceive(hwEventQueue, &ev, 0) == pdTRUE) {
