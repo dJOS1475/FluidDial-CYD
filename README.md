@@ -31,7 +31,7 @@ The 3 physical buttons always perform the same function regardless of the active
 
 **Main Menu** — touch navigation to all screens. Shows live machine status; alarm states display a human-readable description in red (e.g. "Hard limit triggered").
 
-**Status** — live DRO showing machine position, feed rate, spindle RPM, active file, and machine state. Axis count is detected automatically from the connected controller. Alarm states show a human-readable description in red.
+**Status** — live DRO showing machine position, feed rate, spindle RPM, active file, and machine state. Axis count is detected automatically from the connected controller. Alarm states show a human-readable description in red. When an SD job is running, the status row splits into two columns — left shows machine state (Run / Hold / etc.), right shows live job progress as a percentage in green. When a file has been queued via the SD Card Load button, the screen shows "READY — press green to run" with the filename highlighted in green until the job starts.
 
 **Jog & Homing**
 * Jog dial moves the selected axis by the chosen increment
@@ -43,10 +43,13 @@ The 3 physical buttons always perform the same function regardless of the active
 * Home buttons for each detected axis, plus an "ALL" home button on 3-axis machines
 * Only axes present on the connected machine are shown
 * Alarm state (e.g. from a limit switch) is displayed in red where the unit label normally appears
-* **Speed button** (bottom row, between Main Menu and Work Area) — tap to set jog speed with the dial: 100 mm/min steps (metric) or 10 ipm steps (imperial), range 100–5000 mm/min / 10–500 ipm; button highlights green when active; tap any axis to return to jogging
+* **Speed button** (bottom row, between Main Menu and Work Area) — tap to set jog speed with the dial: 100 mm/min steps (metric) or 10 ipm steps (imperial); button highlights green when active; tap any axis to return to jogging
+* Velocity scaling — turning the dial faster proportionally increases the jog feed rate up to 8× the base speed, giving a natural acceleration feel
+* Jog feed rate is capped at the controller's X-axis maximum (`$110`), read automatically on entry to the screen
 
 **Work Area (Probing Work)**
 * Coordinate system selection (G54–G57)
+* Displays Machine Position (absolute machine coordinates) and Work Position (DRO / work coordinate values); Work Position updates live as the machine moves
 * Zero individual axes or all at once for the selected coordinate system
 
 **Probing**
