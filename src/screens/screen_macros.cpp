@@ -1,6 +1,10 @@
 #include "pendant_shared.h"
 #include "screen_macros.h"
 
+// Sprite covers the file-list area: x=5..234, y=40..239 (230 x 200 px).
+// Rendering into it and pushing atomically prevents the fillScreen flicker that
+// would otherwise occur on every DRO STATE_UPDATE (~200 ms).
+
 void enterMacros() {
     spriteAxisDisplay.deleteSprite();
     spriteValueDisplay.deleteSprite();
@@ -8,16 +12,36 @@ void enterMacros() {
     spriteFileDisplay.deleteSprite();
     spritesInitialized = false;
 
-    pendantMacros.loading    = true;
-    pendantMacros.count      = 0;
     pendantMacros.scrollOffset = 0;
-    pendantMacros.selected   = -1;
-    pendantMacros.pendingRun = false;
+    pendantMacros.selected     = -1;
+    pendantMacros.pendingRun   = false;
 
-    if (pendantConnected) requestMacros();
+    if (pendantMacros.cacheValid) {
+        // Cached list is still good — show it immediately without a UART fetch.
+        pendantMacros.loading = false;
+    } else {
+        // First visit, or cache explicitly invalidated (Refresh button / disconnect).
+        pendantMacros.loading = true;
+        pendantMacros.count   = 0;
+        if (pendantConnected) requestMacros();
+    }
+
+    // Allocate sprite for the file list area.  Check heap first to avoid crash.
+    if (ESP.getFreeHeap() >= 50000) {
+        spriteFileDisplay.createSprite(230, 200);
+        if (spriteFileDisplay.getBuffer()) {
+            spriteFileDisplay.setColorDepth(16);
+            spritesInitialized = true;
+        } else {
+            spriteFileDisplay.deleteSprite();
+        }
+    }
 }
 
-void exitMacros() {}
+void exitMacros() {
+    spriteFileDisplay.deleteSprite();
+    spritesInitialized = false;
+}
 
 // Truncate macro name to fit one button-width line at textSize 1 (~36 chars)
 static String macroLabel(int displayIndex) {
@@ -26,22 +50,26 @@ static String macroLabel(int displayIndex) {
     return label;
 }
 
-void drawMacrosScreen() {
-    display.fillScreen(COLOR_BACKGROUND);
-    drawTitle("MACROS");
+// Renders the dynamic file-list area into spriteFileDisplay and pushes it.
+// Coordinates are relative to the sprite origin (sprite is pushed at x=5, y=40).
+void updateMacrosFileList() {
+    if (!spritesInitialized || currentPendantScreen != PSCREEN_MACROS) return;
+    if (!spriteFileDisplay.getBuffer()) return;
+
+    spriteFileDisplay.fillSprite(COLOR_BACKGROUND);
 
     if (pendantMacros.loading) {
-        display.setTextColor(COLOR_GRAY_TEXT);
-        display.setTextSize(2);
-        display.setCursor(50, 140);
-        display.print(pendantConnected ? "Loading..." : "Not connected.");
+        spriteFileDisplay.setTextColor(COLOR_GRAY_TEXT);
+        spriteFileDisplay.setTextSize(2);
+        spriteFileDisplay.setCursor(45, 100);   // abs y=140 → rel y=100
+        spriteFileDisplay.print(pendantConnected ? "Loading..." : "Not connected.");
     } else if (pendantMacros.count == 0) {
-        display.setTextColor(COLOR_GRAY_TEXT);
-        display.setTextSize(1);
-        display.setCursor(20, 130);
-        display.print("No macros found.");
-        display.setCursor(20, 148);
-        display.print("Add macros in FluidNC preferences.");
+        spriteFileDisplay.setTextColor(COLOR_GRAY_TEXT);
+        spriteFileDisplay.setTextSize(1);
+        spriteFileDisplay.setCursor(15, 90);    // abs y=130 → rel y=90
+        spriteFileDisplay.print("No macros found.");
+        spriteFileDisplay.setCursor(15, 108);   // abs y=148 → rel y=108
+        spriteFileDisplay.print("Add macros in FluidNC preferences.");
     } else {
         for (int i = 0; i < 5 && i < pendantMacros.count; i++) {
             int displayIndex = i + pendantMacros.scrollOffset;
@@ -55,15 +83,26 @@ void drawMacrosScreen() {
             } else {
                 bg = COLOR_BUTTON_GRAY;
             }
-            display.fillRoundRect(5, 40 + i * 40, 230, 36, 8, bg);
-            display.setTextColor(COLOR_WHITE);
-            display.setTextSize(1);
-            display.setCursor(10, 52 + i * 40);
-            display.print(macroLabel(displayIndex));
+            // Row at sprite-relative y = i*40 (abs y = 40 + i*40, minus push offset 40)
+            spriteFileDisplay.fillRoundRect(0, i * 40, 230, 36, 8, bg);
+            spriteFileDisplay.setTextColor(COLOR_WHITE);
+            spriteFileDisplay.setTextSize(1);
+            spriteFileDisplay.setCursor(5, 12 + i * 40);   // abs y=52+i*40 → rel y=12+i*40
+            spriteFileDisplay.print(macroLabel(displayIndex));
         }
     }
 
-    // Scroll + Refresh row
+    spriteFileDisplay.pushSprite(5, 40);
+}
+
+void drawMacrosScreen() {
+    display.fillScreen(COLOR_BACKGROUND);
+    drawTitle("MACROS");
+
+    // File list area — sprite render (no flicker on repeated STATE_UPDATE calls)
+    updateMacrosFileList();
+
+    // Static bottom rows — drawn once; only redrawn when touch changes pendingRun state
     drawButton(5,   242, 72, 36, "<<",      COLOR_BUTTON_GRAY, COLOR_WHITE, 2);
     drawButton(83,  242, 72, 36, "Refresh", COLOR_DARK_GREEN,  COLOR_WHITE, 1);
     drawButton(161, 242, 72, 36, ">>",      COLOR_BUTTON_GRAY, COLOR_WHITE, 2);
@@ -94,14 +133,15 @@ void handleMacrosTouch(int x, int y) {
     if (isTouchInBounds(x, y, 5, 242, 72, 36)) {
         if (pendantMacros.scrollOffset > 0) {
             pendantMacros.scrollOffset--;
-            drawMacrosScreen();
+            updateMacrosFileList();
         }
         return;
     }
 
-    // Refresh — re-query all macros from controller
+    // Refresh — bust the cache and re-query all macros from controller
     if (isTouchInBounds(x, y, 83, 242, 72, 36)) {
         if (pendantConnected) {
+            pendantMacros.cacheValid = false;  // force a fresh UART fetch
             pendantMacros.selected   = -1;
             pendantMacros.pendingRun = false;
             enterMacros();
@@ -114,7 +154,7 @@ void handleMacrosTouch(int x, int y) {
     if (isTouchInBounds(x, y, 161, 242, 72, 36)) {
         if (pendantMacros.scrollOffset + 5 < pendantMacros.count) {
             pendantMacros.scrollOffset++;
-            drawMacrosScreen();
+            updateMacrosFileList();
         }
         return;
     }

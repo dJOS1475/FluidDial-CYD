@@ -244,6 +244,11 @@ extern "C" void show_state(const char* state_string) {
 }
 
 extern "C" void handle_other(char* line) {
+    // Multi-line JSON responses from $File/SendJSON: only the first line is wrapped in
+    // [JSON:...]; subsequent content lines arrive here as bare text.  Route them back
+    // into the streaming JSON parser while accumulation is active.
+    if (json_continuation_line(line)) return;
+
     if (*line == '$') {
         parse_dollar(line);
         return;

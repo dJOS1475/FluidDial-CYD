@@ -109,8 +109,13 @@ void init_fnc_uart(int uart_num, int tx_pin, int rx_pin) {
         while (1) {}
         return;
     };
-    uart_driver_install(fnc_uart_port, 256, 0, 0, NULL, ESP_INTR_FLAG_IRAM);
-    uart_set_sw_flow_ctrl(fnc_uart_port, true, 64, 120);
+    // 4 KB RX buffer — large enough to absorb a full JSON burst without triggering
+    // XON/XOFF flow control mid-stream.  Old 256-byte buffer + 500 B/s poll rate
+    // caused preferences.json (10+ KB) to take 15-20 seconds to receive.
+    // XON/XOFF thresholds are uint8_t (max 255); use near-max values so XOFF
+    // fires rarely — the drain loop in pendant_hw_task empties the buffer every 2 ms.
+    uart_driver_install(fnc_uart_port, 4096, 0, 0, NULL, ESP_INTR_FLAG_IRAM);
+    uart_set_sw_flow_ctrl(fnc_uart_port, true, 128, 250);
     uint32_t baud;
     uart_get_baudrate(fnc_uart_port, &baud);
 }

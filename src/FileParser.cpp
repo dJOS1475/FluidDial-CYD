@@ -27,6 +27,11 @@ JsonStreamingParser parser;
 // that an endDocument has happened and do the reset later, when new data comes in.
 bool parser_needs_reset = true;
 
+// True while multi-line JSON continuation is in progress.
+// FluidNC wraps only the first line of a $File/SendJSON reply in [JSON:...]; subsequent
+// raw lines are routed back into the streaming parser via json_continuation_line().
+static bool g_json_accumulating = false;
+
 static bool fileinfoCompare(const fileinfo& f1, const fileinfo& f2) {
     // sort into filename order, with files first and folders second (same as on webUI)
     if (!f1.isDir() && f2.isDir()) {
@@ -83,6 +88,7 @@ public:
     void endArray() override {
         std::sort(fileVector.begin(), fileVector.end(), fileinfoCompare);
         current_scene->onFilesList();
+        g_json_accumulating = false;
         parser.setListener(pInitialListener);
     }
 
@@ -107,8 +113,7 @@ public:
 
 std::vector<Macro*> macros;
 
-// Forward declarations needed by the listener classes below
-static bool g_macro_accumulate = false;
+// Forward declaration needed by PreferencesListener::endObject()
 static void request_macro_list_wu3();
 
 class MacroListListener : public JsonListener {
@@ -175,72 +180,79 @@ public:
     }
 } macroLinesListener;
 
+// macrocfg.json result is a flat array of macro objects, e.g.:
+//   [{"name":"Home","filename":"/macros/home.nc","target":"SD",...}, ...]
+// Entries with empty name or filename are skipped.
 class MacrocfgListener : public JsonListener {
 private:
-    std::string* _valuep;
-
-    std::string _name;
-    std::string _filename;
-    std::string _target;
-
-    int _level = 0;
+    std::string* _valuep  = nullptr;
+    std::string  _name;
+    std::string  _filename;
+    std::string  _target;
+    int          _level   = 0;
 
 public:
     void whitespace(char c) override {}
-
     void startDocument() override {}
+
     void startArray() override {
+        _level = 0;
         macroMenu.removeAllItems();
         for (auto* m : macros) delete m;
         macros.clear();
     }
+
     void startObject() override {
-        if (++_level = 2) {
+        ++_level;
+        if (_level == 1) {
+            // Entering a macro entry (direct child of the result array) — reset fields
             _name.clear();
-            _target.clear();
             _filename.clear();
+            _target.clear();
+            _valuep = nullptr;
         }
     }
+
     void key(const char* key) override {
-        if (strcmp(key, "name") == 0) {
-            _valuep = &_name;
-            return;
-        }
-        if (strcmp(key, "filename") == 0) {
-            _valuep = &_filename;
-            return;
-        }
-        if (strcmp(key, "target") == 0) {
-            _valuep = &_target;
-            return;
-        }
-        _valuep = nullptr;
+        if (_level != 1) { _valuep = nullptr; return; }
+        if      (strcmp(key, "name")     == 0) _valuep = &_name;
+        else if (strcmp(key, "filename") == 0) _valuep = &_filename;
+        else if (strcmp(key, "target")   == 0) _valuep = &_target;
+        else                                   _valuep = nullptr;
     }
 
     void value(const char* value) override {
-        if (_valuep) {
-            *_valuep = value;
+        if (_valuep) { *_valuep = value; _valuep = nullptr; }
+    }
+
+    void endObject() override {
+        if (_level == 1 && !_name.empty() && !_filename.empty()) {
+            std::string path = _filename;
+            bool        ok   = false;
+            if (_target == "ESP") {
+                path.insert(0, "/localfs");
+                ok = true;
+            } else if (_target == "SD") {
+                path.insert(0, "/sd");
+                ok = true;
+            }
+            if (ok) {
+                macroMenu.addItem(new MacroItem { _name.c_str(), path });
+                macros.push_back(new Macro { _name, path, _target });
+            }
         }
+        --_level;
     }
 
     void endArray() override {
-        // macrocfg.json is the last file we check — deliver all accumulated macros
-        current_scene->onFilesList();
-        parser.setListener(pInitialListener);
-    }
-    void endObject() override {
-        if (--_level = 1) {
-            if (_target == "ESP") {
-                _filename.insert(0, "/localfs");
-            } else if (_target == "SD") {
-                _filename.insert(0, "/sd");
-            } else {
-                return;
-            }
-            macroMenu.addItem(new MacroItem { _name.c_str(), _filename });
-            macros.push_back(new Macro { _name, _filename, _target });
-            return;
+        if (macros.empty()) {
+            current_scene->onError("No Macros");
+        } else {
+            current_scene->onFilesList();
         }
+        g_json_accumulating = false;
+        parser_needs_reset  = true;  // same as preferencesListener — outer } will be discarded
+        parser.setListener(pInitialListener);
     }
 
     void endDocument() override {}
@@ -263,26 +275,30 @@ public:
 
     void startDocument() override {}
     void startArray() override {
-        if (_in_macros_section) {
-            if (!g_macro_accumulate) {
-                // First file — start fresh
-                macroMenu.removeAllItems();
-                for (auto* m : macros) delete m;
-                macros.clear();
-            }
-            g_macro_accumulate = false;  // consume the flag
-        }
+        // Nothing to do: macros list is cleared in startObject() at level 1.
     }
     void endArray() override {
         if (_in_macros_section) {
             _in_macros_section = false;
-            // Also check legacy macrocfg.json for additional macros, then deliver
-            g_macro_accumulate = true;
-            schedule_action(request_macro_list_wu3);
         }
     }
 
-    void startObject() override { ++_level; }
+    void startObject() override {
+        ++_level;
+        if (_level == 1) {
+            // Entering the root preferences.json object — start with a clean macros list
+            macroMenu.removeAllItems();
+            for (auto* m : macros) delete m;
+            macros.clear();
+        }
+        // Clear per-macro fields so a missing key can't bleed from the previous object
+        if (_in_macros_section) {
+            _name.clear();
+            _filename.clear();
+            _target.clear();
+            _valuep = nullptr;
+        }
+    }
     void key(const char* key) override {
         _key = key;
         if (_level < 2) {
@@ -337,6 +353,19 @@ public:
             return;
         }
         if (_level == 0) {
+            // preferences.json document fully parsed — deliver if we found macros,
+            // otherwise fall back to the legacy macrocfg.json file.
+            if (!macros.empty()) {
+                current_scene->onFilesList();
+            } else {
+                schedule_action(request_macro_list_wu3);
+            }
+            g_json_accumulating = false;
+            // Force parser reset on the next handle_json() call.  Without this,
+            // the outer closing } of the $File/SendJSON envelope is discarded
+            // (g_json_accumulating is now false) so initialListener.endObject()
+            // never fires and parser_needs_reset stays false, corrupting the next request.
+            parser_needs_reset = true;
             parser.setListener(pInitialListener);
         }
     }
@@ -361,8 +390,6 @@ void request_macro_list_wu3() {
 }
 
 void try_next_macro_file(JsonListener* listener) {
-    // We use schedule_action to avoid reentering the parser code.
-    g_macro_accumulate = false;  // reset on any error path
     if (!listener) {
         // Initial request — start with preferences.json (current FluidNC format)
         schedule_action(request_macro_list_wu2);
@@ -422,6 +449,7 @@ public:
         if (macro_parser) {
             delete macro_parser;
             macro_parser = nullptr;
+            g_json_accumulating = false;
             parser.setListener(pInitialListener);
         }
         // init_listener();
@@ -551,6 +579,7 @@ public:
         if (strcmp(key, "result") == 0) {
             if (_file_listener) {
                 parser.setListener(_file_listener);
+                g_json_accumulating = true;  // subsequent raw lines come via handle_other
             }
             return;
         }
@@ -582,6 +611,7 @@ public:
 JsonListener* pInitialListener = &initialListener;
 
 void init_listener() {
+    g_json_accumulating = false;
     parser.setListener(pInitialListener);
     parser_needs_reset = true;
 }
@@ -621,6 +651,17 @@ extern "C" void handle_json(const char* line) {
 
 #define Ack 0xB2
     fnc_realtime((realtime_cmd_t)Ack);
+}
+
+// Called from handle_other() for raw continuation lines of a multi-line JSON response.
+// FluidNC wraps only the first line of a $File/SendJSON reply in [JSON:...]; subsequent
+// lines arrive as bare text.  Returns true if the line was consumed (accumulation active),
+// false if the caller should handle it normally.
+bool json_continuation_line(const char* line) {
+    if (!g_json_accumulating) return false;
+    parser_parse_line(line);
+    fnc_realtime((realtime_cmd_t)Ack);  // ACK each continuation line for flow control
+    return true;
 }
 
 std::string wifi_mode;

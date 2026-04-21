@@ -3,6 +3,15 @@
 **ChangeLog:**
 
 
+**2026-04-21**
+
+v1.5.4
+* Macros screen: now reads macros directly from FluidNC preferences.json (WebUI v3) or macrocfg.json (WebUI v2) via UART JSON streaming — no SD card folder or localfs files required; both formats supported automatically with preferences.json taking priority
+* Macros screen: results cached after first successful load — navigating away and back shows the list instantly without a UART fetch; Refresh button forces a full re-fetch from the controller
+* Macros/SD Card screens: file list area now rendered via offscreen sprite and pushed atomically — eliminates the fillScreen flicker that previously occurred on every STATUS_UPDATE DRO poll (~200 ms cycle)
+* Performance: UART receive loop now drains the full hardware FIFO on every 2 ms tick instead of reading one byte per tick — throughput increased from ~500 B/s to ~50–80 KB/s; preferences.json now loads in under 2 seconds instead of 15+
+* UART RX buffer increased from 256 to 4096 bytes to absorb full JSON response bursts without dropping bytes or triggering premature XON/XOFF flow control
+
 **2026-04-19**
 
 v1.5.3

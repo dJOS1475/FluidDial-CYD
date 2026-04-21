@@ -106,6 +106,7 @@ struct MacroState {
     int    selected    = -1;  // display index of selected macro
     bool   loading     = true;
     bool   pendingRun  = false;
+    bool   cacheValid  = false; // true after first successful load; skip re-fetch on re-entry
 };
 
 struct SpindleState {

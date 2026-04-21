@@ -34,3 +34,7 @@ extern std::string wifi_mode, wifi_ip, wifi_connected, wifi_ssid;
 
 void init_listener();
 void init_file_list();
+
+// Route a bare continuation line from handle_other() into the JSON streaming parser.
+// Returns true if the line was consumed (a multi-line JSON response is in progress).
+bool json_continuation_line(const char* line);

@@ -331,6 +331,12 @@ static void updateCurrentScreenSprites() {
         case PSCREEN_FLUIDNC:
             updateFluidNCDisplay();
             break;
+        case PSCREEN_SD_CARD:
+            updateSDCardFileList();
+            break;
+        case PSCREEN_MACROS:
+            updateMacrosFileList();
+            break;
         default:
             break;
     }
@@ -414,8 +420,9 @@ public:
         if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
             if (currentPendantScreen == PSCREEN_MACROS) {
                 // Populate from the 'macros' vector filled by FileParser listeners
-                pendantMacros.count    = 0;
-                pendantMacros.loading  = false;
+                pendantMacros.count      = 0;
+                pendantMacros.loading    = false;
+                pendantMacros.cacheValid = true;  // mark cache warm for re-entry
                 for (auto* m : macros) {
                     if (pendantMacros.count >= 20) break;
                     if (m->name.empty()) continue;
@@ -507,8 +514,20 @@ void pendant_hw_task(void* /*pvParameters*/) {
     unsigned long lastPingMs = millis();
 
     for (;;) {
-        // Poll FluidNC UART — calls PendantScene callbacks when data arrives
-        fnc_poll();
+        // Drain ALL available UART bytes in one task cycle.
+        // The original fnc_poll() reads exactly 1 byte per call, so at 2ms/cycle
+        // the old single call gave only ~500 B/s — enough for normal status reports
+        // but far too slow for large JSON files (e.g. preferences.json can be 10+ KB,
+        // taking 20+ seconds to receive at 500 B/s).
+        // collect() and fnc_getchar() are both exported from GrblParserC.h.
+        // poll_extra() (debug serial forwarding) is called once after the drain.
+        {
+            int c;
+            while ((c = fnc_getchar()) >= 0) {
+                collect((uint8_t)c);
+            }
+            poll_extra();
+        }
 
         // Drive ping + connection state from Core 0.
         // Ping interval is adaptive: slow down to 1000ms while the machine is Running
@@ -681,13 +700,9 @@ void loop_pendant() {
                 }
                 break;
             case HwEvent::STATE_UPDATE:
-                if (currentPendantScreen == PSCREEN_FLUIDNC) {
-                    updateFluidNCDisplay();
-                } else if (currentPendantScreen == PSCREEN_SD_CARD) {
-                    drawSDCardScreen();
-                } else if (currentPendantScreen == PSCREEN_MACROS) {
-                    drawMacrosScreen();
-                }
+                // Use the sprite-only update path to avoid fillScreen flicker.
+                // Full drawXxxScreen() is only called on initial entry or user touch.
+                updateCurrentScreenSprites();
                 break;
         }
     }

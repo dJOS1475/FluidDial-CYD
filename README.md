@@ -65,9 +65,9 @@ The 3 physical buttons always perform the same function regardless of the active
 * **Dial mode** — tap the "Dial" button to enable jog-dial RPM selection: the encoder adjusts the target RPM in 1000 RPM steps, clamped to the controller's valid range
 * Start / Stop buttons send M3/M4/M5 with the selected RPM
 
-**Macros** — browses and runs macro files live from the controller's local filesystem. File list loads automatically on entry with scroll and Refresh navigation. Selecting a macro runs it immediately and navigates to the Status screen.
+**Macros** — reads macros directly from the FluidNC controller via UART JSON streaming. Supports both WebUI v3 (preferences.json) and WebUI v2 (macrocfg.json) formats automatically, with preferences.json taking priority. List loads on first entry and is cached — subsequent visits are instant. Refresh button fetches a fresh copy from the controller. Scroll and tap-to-confirm navigation; Run sends the command and navigates to the Status screen.
 
-**SD Card** — browse and run G-code files live from the controller's SD card. File list loads automatically on entry with a Refresh button to reload. Selecting a file starts it immediately and navigates to the Status screen.
+**SD Card** — browse and run G-code files live from the controller's SD card. File list loads automatically on entry with a Refresh button to reload. Tap a file to arm it (Load / Run buttons appear), then Load queues the file and navigates to the Status screen while Run sends the command immediately.
 
 **FluidNC** — shows live controller info: firmware version, WiFi SSID, IP address, connection status, free heap. Jog dial rotates the display 180°; rotation is saved across restarts.
 
