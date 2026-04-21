@@ -224,9 +224,8 @@ public:
     }
 
     void endArray() override {
-        // macrocfg.json parsed — also check preferences.json for additional macros
-        g_macro_accumulate = true;
-        schedule_action(request_macro_list_wu3);
+        // macrocfg.json is the last file we check — deliver all accumulated macros
+        current_scene->onFilesList();
         parser.setListener(pInitialListener);
     }
     void endObject() override {
@@ -277,7 +276,9 @@ public:
     void endArray() override {
         if (_in_macros_section) {
             _in_macros_section = false;
-            current_scene->onFilesList();
+            // Also check legacy macrocfg.json for additional macros, then deliver
+            g_macro_accumulate = true;
+            schedule_action(request_macro_list_wu3);
         }
     }
 
@@ -353,33 +354,32 @@ void request_json_file(const char* name) {
 }
 
 void request_macro_list_wu2() {
-    //    reading_macros = true;
-    request_json_file("macrocfg.json");
+    request_json_file("preferences.json");   // try current format first
 }
 void request_macro_list_wu3() {
-    request_json_file("preferences.json");
+    request_json_file("macrocfg.json");      // fall back to legacy format
 }
 
 void try_next_macro_file(JsonListener* listener) {
     // We use schedule_action to avoid reentering the parser code.
     g_macro_accumulate = false;  // reset on any error path
     if (!listener) {
-        // Initial request — start with macrocfg.json
+        // Initial request — start with preferences.json (current FluidNC format)
         schedule_action(request_macro_list_wu2);
         return;
     }
     if (listener == &preferencesListener) {
-        // preferences.json failed — if macrocfg.json already delivered macros, use them
+        // preferences.json failed — fall back to legacy macrocfg.json
+        schedule_action(request_macro_list_wu3);
+        return;
+    }
+    if (listener == &macrocfgListener) {
+        // macrocfg.json also failed — deliver what we have or report error
         if (!macros.empty()) {
             current_scene->onFilesList();
         } else {
             current_scene->onError("No Macros");
         }
-        return;
-    }
-    if (listener == &macrocfgListener) {
-        // macrocfg.json failed — try preferences.json
-        schedule_action(request_macro_list_wu3);
     }
 }
 void request_macros() {
