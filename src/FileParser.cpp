@@ -107,6 +107,10 @@ public:
 
 std::vector<Macro*> macros;
 
+// Forward declarations needed by the listener classes below
+static bool g_macro_accumulate = false;
+static void request_macro_list_wu3();
+
 class MacroListListener : public JsonListener {
 private:
     std::string* _valuep;
@@ -220,8 +224,9 @@ public:
     }
 
     void endArray() override {
-        // Otherwise this is the end
-        current_scene->onFilesList();
+        // macrocfg.json parsed — also check preferences.json for additional macros
+        g_macro_accumulate = true;
+        schedule_action(request_macro_list_wu3);
         parser.setListener(pInitialListener);
     }
     void endObject() override {
@@ -260,9 +265,13 @@ public:
     void startDocument() override {}
     void startArray() override {
         if (_in_macros_section) {
-            macroMenu.removeAllItems();
-            for (auto* m : macros) delete m;
-            macros.clear();
+            if (!g_macro_accumulate) {
+                // First file — start fresh
+                macroMenu.removeAllItems();
+                for (auto* m : macros) delete m;
+                macros.clear();
+            }
+            g_macro_accumulate = false;  // consume the flag
         }
     }
     void endArray() override {
@@ -352,17 +361,24 @@ void request_macro_list_wu3() {
 }
 
 void try_next_macro_file(JsonListener* listener) {
-    // We use schedule_action to avoid reentering
-    // the parser code.
+    // We use schedule_action to avoid reentering the parser code.
+    g_macro_accumulate = false;  // reset on any error path
     if (!listener) {
+        // Initial request — start with macrocfg.json
         schedule_action(request_macro_list_wu2);
         return;
     }
     if (listener == &preferencesListener) {
-        current_scene->onError("No Macros");
+        // preferences.json failed — if macrocfg.json already delivered macros, use them
+        if (!macros.empty()) {
+            current_scene->onFilesList();
+        } else {
+            current_scene->onError("No Macros");
+        }
         return;
     }
     if (listener == &macrocfgListener) {
+        // macrocfg.json failed — try preferences.json
         schedule_action(request_macro_list_wu3);
     }
 }
