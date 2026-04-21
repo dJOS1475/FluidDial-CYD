@@ -99,9 +99,9 @@ struct SDCardState {
 };
 
 struct MacroState {
-    String content[10];       // macro0..macro9 content from config.yaml (empty = not set)
-    int    indices[10] = {};  // original macro number for each visible entry
-    int    count       = 0;   // number of non-empty macros
+    String content[20];       // display name for each macro (from preferences.json / macrocfg.json)
+    String filename[20];      // run path: /sd/..., /localfs/..., or cmd:...
+    int    count       = 0;   // number of macros loaded
     int    scrollOffset= 0;
     int    selected    = -1;  // display index of selected macro
     bool   loading     = true;

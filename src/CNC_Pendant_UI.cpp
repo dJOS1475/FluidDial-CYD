@@ -347,16 +347,12 @@ void requestJogConfig() {
     jogMaxRateItem.init();
 }
 
-// ===== Macro config items — request $macros/macro0..macro9 from FluidNC =====
-static StringConfigItem macroItems[10] = {
-    "$macros/macro0", "$macros/macro1", "$macros/macro2", "$macros/macro3",
-    "$macros/macro4", "$macros/macro5", "$macros/macro6", "$macros/macro7",
-    "$macros/macro8", "$macros/macro9"
-};
-
+// ===== Macro request — reads preferences.json (then macrocfg.json fallback) via UART =====
 void requestMacros() {
-    pendantMacros.loading = true;
-    for (int i = 0; i < 10; i++) macroItems[i].init();
+    pendantMacros.loading  = true;
+    pendantMacros.count    = 0;
+    pendantMacros.selected = -1;
+    request_macros();  // FileParser.h — sends $File/SendJSON=/macrocfg.json, falls back to preferences.json
 }
 
 // Called from enterSpindleControl() on Core 1 — sends $30/$31 queries to FluidNC
@@ -413,15 +409,29 @@ public:
     }
 
     void onFilesList() override {
-        // Called from Core 0 (fnc_poll) when FluidNC responds to $Files/ListGCode
-        // Macros are now read from config.yaml via StringConfigItem, not file listing.
+        // Called from Core 0 when JSON/file-list parsing completes.
+        // Routes to macros or SD card depending on which screen requested data.
         if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-            pendantSdCard.fileCount    = 0;
-            pendantSdCard.scrollOffset = 0;
-            pendantSdCard.loading      = false;
-            for (auto& fi : fileVector) {
-                if (!fi.isDir() && pendantSdCard.fileCount < 20) {
-                    pendantSdCard.files[pendantSdCard.fileCount++] = String(fi.fileName.c_str());
+            if (currentPendantScreen == PSCREEN_MACROS) {
+                // Populate from the 'macros' vector filled by FileParser listeners
+                pendantMacros.count    = 0;
+                pendantMacros.loading  = false;
+                for (auto* m : macros) {
+                    if (pendantMacros.count >= 20) break;
+                    if (m->name.empty()) continue;
+                    pendantMacros.content[pendantMacros.count]  = String(m->name.c_str());
+                    pendantMacros.filename[pendantMacros.count] = String(m->filename.c_str());
+                    pendantMacros.count++;
+                }
+            } else {
+                // SD card file list from $Files/ListGCode
+                pendantSdCard.fileCount    = 0;
+                pendantSdCard.scrollOffset = 0;
+                pendantSdCard.loading      = false;
+                for (auto& fi : fileVector) {
+                    if (!fi.isDir() && pendantSdCard.fileCount < 20) {
+                        pendantSdCard.files[pendantSdCard.fileCount++] = String(fi.fileName.c_str());
+                    }
                 }
             }
             xSemaphoreGive(stateMutex);
@@ -429,6 +439,18 @@ public:
         if (hwEventQueue) {
             HwEvent ev = { HwEvent::STATE_UPDATE, 0 };
             xQueueSend(hwEventQueue, &ev, 0);
+        }
+    }
+
+    void onError(const char* /*errstr*/) override {
+        // Called when neither preferences.json nor macrocfg.json contain macros
+        if (currentPendantScreen == PSCREEN_MACROS) {
+            pendantMacros.loading = false;
+            pendantMacros.count   = 0;
+            if (hwEventQueue) {
+                HwEvent ev = { HwEvent::STATE_UPDATE, 0 };
+                xQueueSend(hwEventQueue, &ev, 0);
+            }
         }
     }
 
@@ -446,27 +468,7 @@ public:
             if (rate > 0) pendantJog.maxFeedRate = rate;
         }
 
-        // Rebuild visible macro list from any config items that have arrived
-        {
-            bool anyKnown = false;
-            for (int i = 0; i < 10; i++) {
-                if (macroItems[i].known()) { anyKnown = true; break; }
-            }
-            if (anyKnown) {
-                pendantMacros.count = 0;
-                for (int i = 0; i < 10; i++) {
-                    if (macroItems[i].known()) {
-                        std::string v = macroItems[i].get();
-                        if (!v.empty()) {
-                            pendantMacros.content[pendantMacros.count] = String(v.c_str());
-                            pendantMacros.indices[pendantMacros.count] = i;
-                            pendantMacros.count++;
-                        }
-                    }
-                }
-                pendantMacros.loading = false;
-            }
-        }
+        // Macro list is populated in onFilesList() when $File/SendJSON response arrives
         if (hwEventQueue) {
             HwEvent ev = { HwEvent::STATE_UPDATE, 0 };
             xQueueSend(hwEventQueue, &ev, 0);

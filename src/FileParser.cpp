@@ -119,7 +119,11 @@ public:
     void whitespace(char c) override {}
 
     void startDocument() override {}
-    void startArray() override { macroMenu.removeAllItems(); }
+    void startArray() override {
+        macroMenu.removeAllItems();
+        for (auto* m : macros) delete m;
+        macros.clear();
+    }
     void startObject() override {
         _name.clear();
         _target.clear();
@@ -158,6 +162,7 @@ public:
             return;
         }
         macroMenu.addItem(new MacroItem { _name.c_str(), _filename });
+        macros.push_back(new Macro { _name, _filename, _target });
     }
 
     void endDocument() override {
@@ -180,7 +185,11 @@ public:
     void whitespace(char c) override {}
 
     void startDocument() override {}
-    void startArray() override { macroMenu.removeAllItems(); }
+    void startArray() override {
+        macroMenu.removeAllItems();
+        for (auto* m : macros) delete m;
+        macros.clear();
+    }
     void startObject() override {
         if (++_level = 2) {
             _name.clear();
@@ -225,6 +234,7 @@ public:
                 return;
             }
             macroMenu.addItem(new MacroItem { _name.c_str(), _filename });
+            macros.push_back(new Macro { _name, _filename, _target });
             return;
         }
     }
@@ -251,6 +261,8 @@ public:
     void startArray() override {
         if (_in_macros_section) {
             macroMenu.removeAllItems();
+            for (auto* m : macros) delete m;
+            macros.clear();
         }
     }
     void endArray() override {
@@ -308,7 +320,10 @@ public:
             } else {
                 return;
             }
-            macroMenu.addItem(new MacroItem { _name.c_str(), _filename });
+            if (!_name.empty()) {
+                macroMenu.addItem(new MacroItem { _name.c_str(), _filename });
+                macros.push_back(new Macro { _name, _filename, _target });
+            }
             return;
         }
         if (_level == 0) {

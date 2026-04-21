@@ -19,10 +19,9 @@ void enterMacros() {
 
 void exitMacros() {}
 
-// Truncate a macro string to fit in one button-width line at textSize 1 (~36 chars)
+// Truncate macro name to fit one button-width line at textSize 1 (~36 chars)
 static String macroLabel(int displayIndex) {
-    int macroNum = pendantMacros.indices[displayIndex];
-    String label = "[" + String(macroNum) + "] " + pendantMacros.content[displayIndex];
+    String label = pendantMacros.content[displayIndex];
     if (label.length() > 36) label = label.substring(0, 33) + "...";
     return label;
 }
@@ -40,9 +39,9 @@ void drawMacrosScreen() {
         display.setTextColor(COLOR_GRAY_TEXT);
         display.setTextSize(1);
         display.setCursor(20, 130);
-        display.print("No macros defined in config.");
+        display.print("No macros found.");
         display.setCursor(20, 148);
-        display.print("Add macro0..macro9 to config.yaml");
+        display.print("Add macros in FluidNC preferences.");
     } else {
         for (int i = 0; i < 5 && i < pendantMacros.count; i++) {
             int displayIndex = i + pendantMacros.scrollOffset;
@@ -128,11 +127,24 @@ void handleMacrosTouch(int x, int y) {
             drawMacrosScreen();
             return;
         }
-        // Run — $Macro=N sends the macro defined in config.yaml
+        // Run — dispatch based on filename prefix set by FileParser
         if (isTouchInBounds(x, y, 121, 282, 114, 36)) {
             if (pendantConnected && pendantMacros.selected >= 0) {
-                char cmd[16];
-                snprintf(cmd, sizeof(cmd), "$Macro=%d", pendantMacros.indices[pendantMacros.selected]);
+                String fn = pendantMacros.filename[pendantMacros.selected];
+                char   cmd[128];
+                if (fn.startsWith("/sd/")) {
+                    // SD file: strip /sd/ prefix for $SD/Run
+                    snprintf(cmd, sizeof(cmd), "$SD/Run=%s", fn.c_str() + 4);
+                } else if (fn.startsWith("/localfs/")) {
+                    // Local flash file
+                    snprintf(cmd, sizeof(cmd), "$Localfs/Run=%s", fn.c_str() + 9);
+                } else if (fn.startsWith("cmd:")) {
+                    // Raw UART command
+                    snprintf(cmd, sizeof(cmd), "%s", fn.c_str() + 4);
+                } else {
+                    // Unknown — send as-is
+                    snprintf(cmd, sizeof(cmd), "%s", fn.c_str());
+                }
                 send_line(cmd);
                 pendantMacros.pendingRun = false;
                 navigateTo(PSCREEN_STATUS);
