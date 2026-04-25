@@ -19,5 +19,7 @@ void pendant_hw_task(void* pvParameters);
 
 // Request $30/$31 (spindle max/min RPM) from FluidNC — call from spindle screen entry
 void requestSpindleConfig();
+// Deferred version — fires in next loop_pendant() iteration, after screen is drawn
+void requestSpindleConfigDeferred();
 
 #endif  // CNC_PENDANT_UI_H

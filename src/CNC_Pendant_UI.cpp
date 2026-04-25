@@ -186,7 +186,13 @@ void navigateTo(PendantScreen next) {
 }
 
 // ===== Touch Dispatch (Core 1) =====
+static uint32_t lastNavMs = 0;  // timestamp of last screen navigation
+
 static void handlePendantTouch(int x, int y) {
+    // Ignore touch events for 350 ms after a navigation to prevent the same
+    // tap from registering on the newly-drawn screen (touch bounce).
+    if ((uint32_t)milliseconds() - lastNavMs < 350) return;
+
     PendantScreen before = currentPendantScreen;
 
     switch (currentPendantScreen) {
@@ -206,6 +212,7 @@ static void handlePendantTouch(int x, int y) {
         PendantScreen dest = currentPendantScreen;
         currentPendantScreen = before;   // restore so navigateTo sees correct previous
         navigateTo(dest);
+        lastNavMs = (uint32_t)milliseconds();  // start cooldown
     }
 }
 
@@ -365,6 +372,12 @@ void requestMacros() {
 void requestSpindleConfig() {
     spindleMaxItem.init();
     spindleMinItem.init();
+}
+
+// Deferred wrapper — schedules requestSpindleConfig() to fire in the next
+// loop_pendant() iteration so it runs after drawSpindleControlScreen() completes.
+void requestSpindleConfigDeferred() {
+    schedule_action(requestSpindleConfig);
 }
 
 // ===== PendantScene: bridges FluidNC callbacks → pendantMachine (Core 0) =====

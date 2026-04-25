@@ -24,8 +24,8 @@ void enterSpindleControl() {
     spriteFileDisplay.deleteSprite();
     spritesInitialized = false;
 
-    // Request $30/$31 from FluidNC to get actual spindle limits
-    requestSpindleConfig();
+    // Request $30/$31 from FluidNC after the screen is drawn (deferred to next loop tick)
+    requestSpindleConfigDeferred();
 
     // Initialise targetRPM from selected preset on first entry
     if (pendantSpindle.targetRPM == 0) {
@@ -145,10 +145,12 @@ void handleSpindleControlTouch(int x, int y) {
         pendantSpindle.directionFwd = true;
         pendantMachine.spindleDir   = "Fwd";
         redrawSpindleDirectionButtons();
+        return;
     } else if (isTouchInBounds(x, y, 123, 110, 112, 38)) {
         pendantSpindle.directionFwd = false;
         pendantMachine.spindleDir   = "Rev";
         redrawSpindleDirectionButtons();
+        return;
     }
 
     int presets[3];
@@ -177,8 +179,6 @@ void handleSpindleControlTouch(int x, int y) {
 
     if (isTouchInBounds(x, y, 5, 218, 112, 40)) {
         drawButton(5, 218, 112, 40, "Start", COLOR_WHITE, COLOR_DARK_GREEN, 2);
-        delay_ms(150);
-        drawButton(5, 218, 112, 40, "Start", COLOR_DARK_GREEN, COLOR_WHITE, 2);
         if (pendantConnected) {
             char cmd[32];
             // M3 = clockwise (Fwd), M4 = counterclockwise (Rev)
@@ -186,15 +186,23 @@ void handleSpindleControlTouch(int x, int y) {
             send_line(cmd);
         }
         pendantMachine.spindleRunning = true;
-    } else if (isTouchInBounds(x, y, 123, 218, 112, 40)) {
-        drawButton(123, 218, 112, 40, "Stop", COLOR_WHITE, COLOR_RED, 2);
         delay_ms(150);
-        drawButton(123, 218, 112, 40, "Stop", COLOR_RED, COLOR_WHITE, 2);
-        if (pendantConnected) send_line("M5");
-        pendantMachine.spindleRunning = false;
+        drawButton(5, 218, 112, 40, "Start", COLOR_DARK_GREEN, COLOR_WHITE, 2);
+        return;
     }
 
-    if (isTouchInBounds(x, y, 5, 268, 230, 37)) {
+    if (isTouchInBounds(x, y, 123, 218, 112, 40)) {
+        drawButton(123, 218, 112, 40, "Stop", COLOR_WHITE, COLOR_RED, 2);
+        if (pendantConnected) send_line("M5");
+        pendantMachine.spindleRunning = false;
+        delay_ms(150);
+        drawButton(123, 218, 112, 40, "Stop", COLOR_RED, COLOR_WHITE, 2);
+        return;
+    }
+
+    // Any tap below the Start/Stop row (y > 258) navigates to Main Menu.
+    // Full screen width and no bottom limit so edge taps always register.
+    if (y > 258) {
         currentPendantScreen = PSCREEN_MAIN_MENU;
     }
 }
