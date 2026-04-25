@@ -64,17 +64,17 @@ The 3 physical buttons always perform the same function regardless of the active
 
 **Spindle Control**
 * Direction selection (Forward / Reverse → M3 / M4)
-* RPM presets at 25%, 50% and 100% of the controller's maximum RPM (read live from `$30`)
-* Preset labels shown in short format (e.g. 6k, 12k, 24k)
+* Live RPM display panel — left column shows current spindle RPM reported by the controller; right column shows the **Target RPM** (the speed that will be sent on Start), highlighted in green
+* RPM presets at 25%, 50% and 100% of the controller's maximum RPM (read live from `$30`); preset labels shown in short format (e.g. 6k, 12k, 24k)
 * Minimum and maximum RPM values displayed, read directly from the controller (`$30` / `$31`)
-* **Dial mode** — tap the "Dial" button to enable jog-dial RPM selection: the encoder adjusts the target RPM in 1000 RPM steps, clamped to the controller's valid range
-* Start / Stop buttons send M3/M4/M5 with the selected RPM
+* **Dial mode** — tap the "Dial" button to set Target RPM with the encoder in 1000 RPM steps, clamped to the controller's valid range
+* Start / Stop buttons send M3/M4/M5 with the Target RPM
 
 **Macros** — reads macros directly from the FluidNC controller via UART JSON streaming. Supports both WebUI v3 (preferences.json) and WebUI v2 (macrocfg.json) formats automatically, with preferences.json taking priority. List loads on first entry and is cached — subsequent visits are instant. Refresh button fetches a fresh copy from the controller. Scroll and tap-to-confirm navigation; Run sends the command and navigates to the Status screen.
 
 **SD Card** — browse and run G-code files live from the controller's SD card. File list loads automatically on entry with a Refresh button to reload. Tap a file to arm it (Load / Run buttons appear), then Load queues the file and navigates to the Status screen while Run sends the command immediately.
 
-**FluidNC** — shows live controller info: firmware version, WiFi SSID, IP address, connection status, free heap. Jog dial rotates the display 180°; rotation is saved across restarts.
+**FluidNC** — shows live controller info: firmware version, WiFi SSID, IP address, connection status, free heap. Jog dial rotates the display 180°; rotation is saved across restarts. Bottom row has two navigation buttons — Main Menu and Status.
 
 Wiki pages for more information: CYD Dial Pendant (http://wiki.fluidnc.com/en/hardware/official/CYD_Dial_Pendant).
 

@@ -3,6 +3,13 @@
 **ChangeLog:**
 
 
+**2026-04-25**
+
+v1.5.5
+* Spindle Control screen: replaced "Direction" label with a two-column RPM display — left column shows live spindle RPM from the controller ("RPM"), right column shows the user-selected target RPM ("Target RPM") in green; target RPM is set independently via preset buttons or Dial mode and is what gets sent to the controller on Start
+* Spindle Control screen: Start command now uses the target RPM value rather than the live RPM readback, preventing unintended speed changes
+* FluidNC screen: bottom row split into two buttons — "Main Menu" (left) and "Status" (right) for quicker navigation
+
 **2026-04-21**
 
 v1.5.4

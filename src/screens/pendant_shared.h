@@ -59,7 +59,7 @@ struct MachineState {
     int    spindleOverride = 100;
     int    spindleMaxRPM   = 24000;
     int    spindleMinRPM   = 0;
-    String fluidDialVersion = "v1.5.4";
+    String fluidDialVersion = "v1.5.5";
     String fluidNCVersion   = "v3.7.16";
     String baudRate         = "1000000";
     String port             = "UART0";
@@ -110,9 +110,10 @@ struct MacroState {
 };
 
 struct SpindleState {
-    int  selectedPreset = 1;   // 0=25%, 1=50%, 2=100% of max
+    int  selectedPreset = 1;     // 0=25%, 1=50%, 2=100% of max
     bool directionFwd   = true;
     bool dialMode       = false; // true = encoder adjusts RPM in 1000 RPM steps
+    int  targetRPM      = 0;     // RPM selected by user via preset or dial (sent on Start)
 };
 
 struct FeedsState {

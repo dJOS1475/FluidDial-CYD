@@ -113,14 +113,17 @@ void drawFluidNCScreen() {
     display.setTextColor(COLOR_CYAN); display.setTextSize(1);
     display.setCursor(10, 160); display.print(pendantMachine.port);
 
-    drawButton(5, 264, 230, 40, "Main Menu", COLOR_BLUE, COLOR_WHITE, 2);
+    drawButton(5,   272, 112, 40, "Main Menu", COLOR_BLUE,        COLOR_WHITE, 2);
+    drawButton(123, 272, 112, 40, "Status",    COLOR_BLUE,        COLOR_WHITE, 2);
 
     // Dynamic panels drawn via sprites (no flicker)
     updateFluidNCDisplay();
 }
 
 void handleFluidNCTouch(int x, int y) {
-    if (isTouchInBounds(x, y, 5, 264, 230, 40)) {
-        currentPendantScreen = PSCREEN_MAIN_MENU;
+    if (isTouchInBounds(x, y, 5, 272, 112, 40)) {
+        navigateTo(PSCREEN_MAIN_MENU);
+    } else if (isTouchInBounds(x, y, 123, 272, 112, 40)) {
+        navigateTo(PSCREEN_STATUS);
     }
 }

@@ -214,7 +214,7 @@ static void handleEncoderDelta(int32_t delta) {
     if (currentPendantScreen == PSCREEN_SPINDLE_CONTROL && pendantSpindle.dialMode) {
         int maxRPM = pendantMachine.spindleMaxRPM > 0 ? pendantMachine.spindleMaxRPM : 24000;
         int minRPM = pendantMachine.spindleMinRPM;
-        pendantMachine.spindleRPM = constrain(pendantMachine.spindleRPM + delta * 1000, minRPM, maxRPM);
+        pendantSpindle.targetRPM = constrain(pendantSpindle.targetRPM + delta * 1000, minRPM, maxRPM);
         updateSpindleRPMDisplay();
         return;
     } else if (currentPendantScreen == PSCREEN_JOG_HOMING) {
