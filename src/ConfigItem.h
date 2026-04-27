@@ -19,6 +19,16 @@ public:
     bool         known() { return _known; }
     void         init() {
         _known = false;
+        // Avoid stacking duplicate pointers if init() is called more than once
+        // before a response arrives (e.g. connect-edge fetch + on-entry refetch
+        // for the same item). parse_dollar() only erases the first match per
+        // response, so duplicates would otherwise leak in the vector.
+        for (auto* item : configRequests) {
+            if (item == this) {
+                send_line(_name);
+                return;
+            }
+        }
         configRequests.push_back(this);
         send_line(_name);
     }

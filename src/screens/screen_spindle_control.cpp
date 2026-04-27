@@ -24,7 +24,13 @@ void enterSpindleControl() {
     spriteFileDisplay.deleteSprite();
     spritesInitialized = false;
 
-    // $30/$31 (spindle max/min RPM) are cached on connect — no UART query here.
+    // Defensive re-fetch of $30/$31 on entry. The connect-edge fetch is the
+    // primary source, but if it was dropped (UART contention at connect time)
+    // we'd silently fall back to default 24000/0 — observable as preset
+    // buttons reverting to defaults after a Start/Stop cycle. Re-querying
+    // here costs two short bytes and guarantees current values.
+    requestSpindleConfig();
+
     // Initialise targetRPM from selected preset on first entry
     if (pendantSpindle.targetRPM == 0) {
         int presets[3];

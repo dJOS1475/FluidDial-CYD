@@ -398,6 +398,16 @@ static void requestControllerConfig() {
     jogMaxTravelA.init();
 }
 
+// Called from enterSpindleControl() — defensive re-fetch of $30/$31. Restores
+// the v1.5.5 behaviour where the spindle screen always sees fresh values, in
+// case the connect-edge fetch was dropped (the user reported max/min reverting
+// to defaults after Start/Stop). Cheap: just two short UART queries on entry.
+void requestSpindleConfig() {
+    if (!pendantConnected) return;
+    spindleMaxItem.init();
+    spindleMinItem.init();
+}
+
 // ===== Macro request — reads preferences.json (then macrocfg.json fallback) via UART =====
 // Macros are NOT static config — they can change as the user edits FluidNC's
 // preferences. Loaded on macros-screen entry, with a Refresh button to re-fetch.

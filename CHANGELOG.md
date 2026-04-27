@@ -6,12 +6,13 @@
 **2026-04-25**
 
 v1.5.6
-* Architecture: all static controller information ($30/$31 spindle min/max RPM, $110 jog feed cap, $130-$133 per-axis travel limits, FluidNC version, IP address, WiFi SSID) is now fetched once on the connection edge and cached in pendant memory — no per-screen UART round-trip on Spindle Control, Jog & Homing, or FluidNC entry; reconnects auto-refresh
+* Architecture: all static controller information ($30/$31 spindle min/max RPM, $110 jog feed cap, $130-$133 per-axis travel limits, FluidNC version, IP address, WiFi SSID) is now fetched once on the connection edge and cached in pendant memory — no per-screen UART round-trip on Jog & Homing or FluidNC entry; reconnects auto-refresh
+* Reliability: Spindle Control screen still re-queries $30/$31 on entry as a defensive measure — guarantees Min/Max RPM and preset values are current even if the connect-edge fetch was dropped (UART contention at connect time would otherwise leave them at compiled defaults of 0/24000)
 * Safety: jog distance per encoder tick is now clamped to half the corresponding axis travel ($130-$133) — prevents a fast wheel turn at a coarse increment from queueing a $J move that would crash into a hard stop or trip soft limits; falls back to a hard-coded 100 mm / 4 in cap until the controller reports its limits
 * Reliability: navigation handlers across Macros, Feeds & Speeds, SD Card, FluidNC, and Jog & Homing screens reworked to assign currentPendantScreen instead of calling navigateTo() directly — the central dispatcher now performs the screen exit/enter exactly once, eliminating the rare double-cycle that could leave a partially-drawn screen
 * Reliability: cross-core writes to pendantMachine fields (spindle direction, spindle running, feed/spindle overrides, display rotation) from Core 1 touch handlers now take the stateMutex — closes the last few unsynchronised gaps with the Core 0 DRO callback
 * Reliability: the FluidNC screen rotation toggle no longer hammers NVS flash on every encoder detent — the new value is held in memory during the spin and written to flash exactly once when leaving the screen
-* Boot: pendant now reads the saved display rotation from NVS before drawing the boot logo, eliminating the brief upside-down logo flash on pendants flipped 180° in the enclosure
+* Reliability: ConfigItem.init() now deduplicates the configRequests vector — repeated init() calls on the same item (e.g. connect-edge fetch + Spindle Control on-entry refetch) no longer leak duplicate pointers
 * Polish: triple-tap state on the rightmost jog increment button is now reset on screen entry, so a stale partial sequence from a prior visit doesn't count toward the next fine/coarse toggle
 * Polish: saved jog increment index is constrained to the valid range on load — guards against a corrupted NVS entry indexing past the 4-element increment table
 * Polish: periodic 100 ms sprite refresh is suppressed for one tick after a STATE_UPDATE-driven redraw — prevents the rare back-to-back redraw when DRO updates and the timer happen to overlap

@@ -11,9 +11,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <freertos/queue.h>
-#include <Preferences.h>
 #include "screens/pendant_shared.h"
-extern Preferences preferences;
 #endif
 
 extern void base_display();
@@ -29,15 +27,7 @@ void setup() {
     display.setBrightness(aboutScene.getBrightness());
 
 #ifdef USE_NEW_UI
-    // Apply the saved rotation BEFORE the boot logo so it never appears
-    // upside down on a pendant flipped 180° in the enclosure. setup_pendant()
-    // re-reads the same key later — both calls return the identical value.
-    {
-        preferences.begin("pendant", true);  // read-only
-        int bootRotation = preferences.getInt("rotation", 2);
-        preferences.end();
-        display.setRotation(bootRotation);
-    }
+    display.setRotation(2);  // Boot screen rotation (overridden by saved preference in setup_pendant)
 #endif
     show_logo();
     delay_ms(2000);  // view the logo and wait for the debug port to connect
