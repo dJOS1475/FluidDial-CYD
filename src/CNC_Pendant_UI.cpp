@@ -569,6 +569,15 @@ void pendant_hw_task(void* /*pvParameters*/) {
     fnc_is_connected();
     unsigned long lastPingMs = millis();
 
+    // Demo-mode guard: only declare "connected" (and fire CONNECTED events) once at
+    // least one UART byte has arrived from the controller.  fnc_is_connected() is
+    // time-based and returns true ~200 ms after boot even with no controller attached.
+    // Without this flag every boot triggers requestControllerConfig() on Core 1, which
+    // calls fnc_send_line() 7 times — each one busy-waits up to 2 s for an ack that
+    // never arrives, blocking the UI loop for 10–16 s and making the device appear
+    // completely unresponsive to touch.
+    bool rxEverSeen = false;
+
     for (;;) {
         // Drain ALL available UART bytes in one task cycle.
         // The original fnc_poll() reads exactly 1 byte per call, so at 2ms/cycle
@@ -581,6 +590,7 @@ void pendant_hw_task(void* /*pvParameters*/) {
             int c;
             while ((c = fnc_getchar()) >= 0) {
                 collect((uint8_t)c);
+                rxEverSeen = true;  // real controller data observed
             }
             poll_extra();
         }
@@ -594,7 +604,12 @@ void pendant_hw_task(void* /*pvParameters*/) {
         unsigned long pingInterval = running ? 1000UL : 200UL;
         if (nowMs - lastPingMs >= pingInterval) {
             bool connected = fnc_is_connected();
-            if (connected != pendantConnected) {
+            // Gate pendantConnected on rxEverSeen: suppress the spurious "connected"
+            // transition that fnc_is_connected() produces at startup with no controller.
+            // A real controller sends bytes within ms of boot; no bytes = demo mode.
+            // Allow the false→false and true→false (disconnect) paths through always
+            // so a live connection loss is never masked.
+            if (connected != pendantConnected && (rxEverSeen || !connected)) {
                 pendantConnected = connected;
                 if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
                     pendantMachine.connectionStatus = connected ? "Connected" : "N/C";
