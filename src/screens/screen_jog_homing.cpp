@@ -313,9 +313,6 @@ void handleJogHomingTouch(int x, int y) {
 
     // Increment selection — triple-tap button 3 (rightmost) toggles fine/coarse set
     {
-        static int           incTapCount = 0;
-        static unsigned long incTapMs    = 0;
-
         for (int i = 0; i < 4; i++) {
             if (isTouchInBounds(x, y, 5 + i * 56, 231, 52, 38)) {
                 if (i == 3) {
