@@ -224,7 +224,10 @@ void handleFeedsSpeedsTouch(int x, int y) {
         if (isTouchInBounds(x, y, 5 + i * 78, 95, 72, 37)) {
             pendantFeeds.dialMode             = 0;
             pendantFeeds.selectedFeedOverride = i;
-            pendantMachine.feedOverride       = pcts[i];
+            if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+                pendantMachine.feedOverride = pcts[i];
+                xSemaphoreGive(stateMutex);
+            }
             applyFeedOverride(pcts[i]);
             redrawFeedOverrideButtons();
             updateSpindleOverrideDisplay();  // deactivate spindle dial visual
@@ -234,7 +237,10 @@ void handleFeedsSpeedsTouch(int x, int y) {
     if (isTouchInBounds(x, y, 5, 137, 72, 37)) {
         pendantFeeds.dialMode             = 0;
         pendantFeeds.selectedFeedOverride = 3;
-        pendantMachine.feedOverride       = 125;
+        if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+            pendantMachine.feedOverride = 125;
+            xSemaphoreGive(stateMutex);
+        }
         applyFeedOverride(125);
         redrawFeedOverrideButtons();
         updateSpindleOverrideDisplay();
@@ -252,7 +258,10 @@ void handleFeedsSpeedsTouch(int x, int y) {
     if (isTouchInBounds(x, y, 161, 137, 72, 37)) {
         pendantFeeds.dialMode             = 0;
         pendantFeeds.selectedFeedOverride = 4;
-        pendantMachine.feedOverride       = 150;
+        if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+            pendantMachine.feedOverride = 150;
+            xSemaphoreGive(stateMutex);
+        }
         applyFeedOverride(150);
         redrawFeedOverrideButtons();
         updateSpindleOverrideDisplay();
@@ -264,7 +273,10 @@ void handleFeedsSpeedsTouch(int x, int y) {
         if (isTouchInBounds(x, y, 5 + i * 78, 194, 72, 37)) {
             pendantFeeds.dialMode                = 0;
             pendantFeeds.selectedSpindleOverride = i;
-            pendantMachine.spindleOverride       = pcts[i];
+            if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+                pendantMachine.spindleOverride = pcts[i];
+                xSemaphoreGive(stateMutex);
+            }
             applySpindleOverride(pcts[i]);
             redrawSpindleOverrideButtons();
             updateFeedOverrideDisplay();  // deactivate feed dial visual
@@ -274,7 +286,10 @@ void handleFeedsSpeedsTouch(int x, int y) {
     if (isTouchInBounds(x, y, 5, 236, 72, 37)) {
         pendantFeeds.dialMode                = 0;
         pendantFeeds.selectedSpindleOverride = 3;
-        pendantMachine.spindleOverride       = 125;
+        if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+            pendantMachine.spindleOverride = 125;
+            xSemaphoreGive(stateMutex);
+        }
         applySpindleOverride(125);
         redrawSpindleOverrideButtons();
         updateFeedOverrideDisplay();
@@ -292,7 +307,10 @@ void handleFeedsSpeedsTouch(int x, int y) {
     if (isTouchInBounds(x, y, 161, 236, 72, 37)) {
         pendantFeeds.dialMode                = 0;
         pendantFeeds.selectedSpindleOverride = 4;
-        pendantMachine.spindleOverride       = 150;
+        if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+            pendantMachine.spindleOverride = 150;
+            xSemaphoreGive(stateMutex);
+        }
         applySpindleOverride(150);
         redrawSpindleOverrideButtons();
         updateFeedOverrideDisplay();
@@ -300,6 +318,6 @@ void handleFeedsSpeedsTouch(int x, int y) {
     }
 
     if (isTouchInBounds(x, y, 5, 280, 230, 40)) {
-        navigateTo(PSCREEN_MAIN_MENU);
+        currentPendantScreen = PSCREEN_MAIN_MENU;
     }
 }

@@ -155,7 +155,7 @@ void handleSDCardTouch(int x, int y) {
         if (isTouchInBounds(x, y, 5, 282, 110, 36)) {
             pendantSdCard.loadedFile = pendantSdCard.files[pendantSdCard.selectedFile];
             pendantSdCard.pendingRun = false;
-            navigateTo(PSCREEN_STATUS);
+            currentPendantScreen = PSCREEN_STATUS;
             return;
         }
         // RUN — send command immediately
@@ -165,13 +165,13 @@ void handleSDCardTouch(int x, int y) {
                 send_line(cmd.c_str());
                 pendantSdCard.loadedFile = "";
                 pendantSdCard.pendingRun = false;
-                navigateTo(PSCREEN_STATUS);
+                currentPendantScreen = PSCREEN_STATUS;
             }
             return;
         }
     } else {
         if (isTouchInBounds(x, y, 5, 282, 230, 36)) {
-            navigateTo(PSCREEN_MAIN_MENU);
+            currentPendantScreen = PSCREEN_MAIN_MENU;
         }
     }
 }

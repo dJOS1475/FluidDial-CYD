@@ -43,6 +43,19 @@ void exitMacros() {
     spritesInitialized = false;
 }
 
+// Re-fetch the macro list from the controller without re-allocating sprites.
+// Called by the Refresh button — enterMacros() would needlessly delete and
+// re-create the file-list sprite on every refresh.
+static void refreshMacros() {
+    pendantMacros.cacheValid   = false;  // force a fresh UART fetch
+    pendantMacros.scrollOffset = 0;
+    pendantMacros.selected     = -1;
+    pendantMacros.pendingRun   = false;
+    pendantMacros.loading      = true;
+    pendantMacros.count        = 0;
+    if (pendantConnected) requestMacros();
+}
+
 // Truncate macro name to fit one button-width line at textSize 1 (~36 chars)
 static String macroLabel(int displayIndex) {
     String label = pendantMacros.content[displayIndex];
@@ -141,10 +154,7 @@ void handleMacrosTouch(int x, int y) {
     // Refresh — bust the cache and re-query all macros from controller
     if (isTouchInBounds(x, y, 83, 242, 72, 36)) {
         if (pendantConnected) {
-            pendantMacros.cacheValid = false;  // force a fresh UART fetch
-            pendantMacros.selected   = -1;
-            pendantMacros.pendingRun = false;
-            enterMacros();
+            refreshMacros();
             drawMacrosScreen();
         }
         return;
@@ -187,13 +197,13 @@ void handleMacrosTouch(int x, int y) {
                 }
                 send_line(cmd);
                 pendantMacros.pendingRun = false;
-                navigateTo(PSCREEN_STATUS);
+                currentPendantScreen = PSCREEN_STATUS;
             }
             return;
         }
     } else {
         if (isTouchInBounds(x, y, 5, 282, 230, 36)) {
-            navigateTo(PSCREEN_MAIN_MENU);
+            currentPendantScreen = PSCREEN_MAIN_MENU;
         }
     }
 }

@@ -63,6 +63,8 @@
 #define COLOR_WHITE 0xFFFF           // White
 #define COLOR_BUTTON_GRAY 0x31A6     // Dark button gray
 #define COLOR_BUTTON_ACTIVE 0x5AEB   // Active button gray
+#define COLOR_TEAL 0x032C            // 565 of (0,100,100) — Spindle Dial idle
+#define COLOR_TEAL_BRIGHT 0x05B6     // 565 of (0,180,180) — Spindle Dial active
 
 // ===== Serial Configuration =====
 #define SERIAL_BAUD 115200

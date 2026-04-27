@@ -17,9 +17,8 @@ void drawCurrentPendantScreen();
 // Core 0 hardware task — created by ardmain.cpp after setup_pendant()
 void pendant_hw_task(void* pvParameters);
 
-// Request $30/$31 (spindle max/min RPM) from FluidNC — call from spindle screen entry
-void requestSpindleConfig();
-// Deferred version — fires in next loop_pendant() iteration, after screen is drawn
-void requestSpindleConfigDeferred();
+// Static controller config ($30, $31, $110, $130-$133, FluidNC version, IP, SSID)
+// is fetched automatically on the connection edge via HwEvent::CONNECTED — no
+// per-screen request calls required.
 
 #endif  // CNC_PENDANT_UI_H

@@ -33,7 +33,8 @@ struct HwEvent {
         BUTTON_YELLOW,
         BUTTON_GREEN,
         ENCODER_DELTA,
-        STATE_UPDATE
+        STATE_UPDATE,
+        CONNECTED       // edge: pendant transitioned to connected — fetch static config
     } type;
     int32_t value;
 };
@@ -59,7 +60,7 @@ struct MachineState {
     int    spindleOverride = 100;
     int    spindleMaxRPM   = 24000;
     int    spindleMinRPM   = 0;
-    String fluidDialVersion = "v1.5.5";
+    String fluidDialVersion = "v1.5.6";
     String fluidNCVersion   = "v3.7.16";
     String baudRate         = "1000000";
     String port             = "UART0";
@@ -72,6 +73,10 @@ struct MachineState {
     String wifiSSID         = "---";
     String displayRotation  = "Normal";
     int    rotation         = 2;
+    // Set true when display rotation is changed via the FluidNC screen encoder.
+    // exitFluidNC() observes this flag and writes the new value to NVS once on
+    // exit instead of every encoder detent (avoids hammering flash).
+    bool   rotationDirty    = false;
 };
 
 struct JogState {
@@ -83,6 +88,11 @@ struct JogState {
     int          jogSpeedMm        = 5000;  // mm/min cap, step 100 (used to limit $J feed rate)
     int          jogSpeedIn        = 200;   // ipm cap,    step  10
     int          maxFeedRate       = 10000; // mm/min cap, updated from $110 on entry
+    // Per-axis max travel in mm, updated from $130/$131/$132/$133 on entry.
+    // 0 = unknown (not yet reported by controller) → fall back to hard-coded jog cap.
+    // Used to clamp per-tick jog distance so a fast wheel turn at a coarse increment
+    // can't request a move larger than half the axis travel range.
+    int          maxTravel[4]      = { 0, 0, 0, 0 };
 };
 
 // Save jog preferences (fineIncrements + selectedIncrement) to NVS — defined in CNC_Pendant_UI.cpp
@@ -147,7 +157,6 @@ extern ProbingState  pendantProbing;
 extern ProbeState    pendantProbe;
 
 extern PendantScreen currentPendantScreen;
-extern PendantScreen previousPendantScreen;
 
 // ===== Extern Sprites (defined in CNC_Pendant_UI.cpp, reused across screens) =====
 extern LGFX_Sprite spriteAxisDisplay;

@@ -24,9 +24,7 @@ void enterSpindleControl() {
     spriteFileDisplay.deleteSprite();
     spritesInitialized = false;
 
-    // Request $30/$31 from FluidNC after the screen is drawn (deferred to next loop tick)
-    requestSpindleConfigDeferred();
-
+    // $30/$31 (spindle max/min RPM) are cached on connect — no UART query here.
     // Initialise targetRPM from selected preset on first entry
     if (pendantSpindle.targetRPM == 0) {
         int presets[3];
@@ -71,7 +69,7 @@ void drawSpindleControlScreen() {
         drawButton(5 + i * 58, 163, 56, 37, fmtRPM(presets[i]), bg, COLOR_WHITE, 2);
     }
     // Dial button — teal background, highlighted when dial mode active
-    uint16_t dialBg = pendantSpindle.dialMode ? display.color565(0, 180, 180) : display.color565(0, 100, 100);
+    uint16_t dialBg = pendantSpindle.dialMode ? COLOR_TEAL_BRIGHT : COLOR_TEAL;
     drawButton(179, 163, 56, 37, "Dial", dialBg, COLOR_WHITE, 2);
 
     drawButton(5,   218, 112, 40, "Start", COLOR_DARK_GREEN, COLOR_WHITE, 2);
@@ -143,12 +141,18 @@ void redrawSpindlePresetButtons() {
 void handleSpindleControlTouch(int x, int y) {
     if (isTouchInBounds(x, y, 5, 110, 112, 38)) {
         pendantSpindle.directionFwd = true;
-        pendantMachine.spindleDir   = "Fwd";
+        if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+            pendantMachine.spindleDir = "Fwd";
+            xSemaphoreGive(stateMutex);
+        }
         redrawSpindleDirectionButtons();
         return;
     } else if (isTouchInBounds(x, y, 123, 110, 112, 38)) {
         pendantSpindle.directionFwd = false;
-        pendantMachine.spindleDir   = "Rev";
+        if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+            pendantMachine.spindleDir = "Rev";
+            xSemaphoreGive(stateMutex);
+        }
         redrawSpindleDirectionButtons();
         return;
     }
@@ -185,7 +189,10 @@ void handleSpindleControlTouch(int x, int y) {
             snprintf(cmd, sizeof(cmd), "%s S%d", pendantSpindle.directionFwd ? "M3" : "M4", pendantSpindle.targetRPM);
             send_line(cmd);
         }
-        pendantMachine.spindleRunning = true;
+        if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+            pendantMachine.spindleRunning = true;
+            xSemaphoreGive(stateMutex);
+        }
         delay_ms(150);
         drawButton(5, 218, 112, 40, "Start", COLOR_DARK_GREEN, COLOR_WHITE, 2);
         return;
@@ -194,7 +201,10 @@ void handleSpindleControlTouch(int x, int y) {
     if (isTouchInBounds(x, y, 123, 218, 112, 40)) {
         drawButton(123, 218, 112, 40, "Stop", COLOR_WHITE, COLOR_RED, 2);
         if (pendantConnected) send_line("M5");
-        pendantMachine.spindleRunning = false;
+        if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+            pendantMachine.spindleRunning = false;
+            xSemaphoreGive(stateMutex);
+        }
         delay_ms(150);
         drawButton(123, 218, 112, 40, "Stop", COLOR_RED, COLOR_WHITE, 2);
         return;

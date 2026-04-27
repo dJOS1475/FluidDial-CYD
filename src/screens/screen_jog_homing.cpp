@@ -41,6 +41,12 @@ static const int SPD_W = 80;
 static const int SPD_Y = 277;
 static const int SPD_H = 40;
 
+// Triple-tap state for the rightmost increment button — toggles fine/coarse.
+// Kept at file scope so enterJogHoming() can reset between visits (a stale tap
+// count from a previous session would otherwise count toward the next toggle).
+static int           incTapCount = 0;
+static unsigned long incTapMs    = 0;
+
 // ===== Helpers =====
 
 static String speedLabel() {
@@ -68,14 +74,17 @@ void enterJogHoming() {
         pendantJog.increment = incs.values[pendantJog.selectedIncrement];
     }
 
+    // Reset triple-tap state so a partial sequence from a prior visit doesn't carry over.
+    incTapCount = 0;
+    incTapMs    = 0;
+
     // Ensure a valid axis is selected on entry — exit speed dial mode if active
     if (pendantJog.speedDialMode || pendantJog.selectedAxis < 0) {
         pendantJog.speedDialMode = false;
         pendantJog.selectedAxis  = 0;
     }
 
-    // Request per-axis max rate from controller ($110) to set jog speed cap
-    if (pendantConnected) requestJogConfig();
+    // $110/$130-$133 are cached on connect — no UART query here.
 
     if (ESP.getFreeHeap() < 50000) return;
 
@@ -352,6 +361,6 @@ void handleJogHomingTouch(int x, int y) {
         return;
     }
 
-    if (isTouchInBounds(x, y, 5,   SPD_Y, 73, SPD_H)) navigateTo(PSCREEN_MAIN_MENU);
-    if (isTouchInBounds(x, y, 162, SPD_Y, 73, SPD_H)) navigateTo(PSCREEN_PROBING_WORK);
+    if (isTouchInBounds(x, y, 5,   SPD_Y, 73, SPD_H)) { currentPendantScreen = PSCREEN_MAIN_MENU;    return; }
+    if (isTouchInBounds(x, y, 162, SPD_Y, 73, SPD_H)) { currentPendantScreen = PSCREEN_PROBING_WORK; return; }
 }

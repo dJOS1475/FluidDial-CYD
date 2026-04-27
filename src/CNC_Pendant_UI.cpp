@@ -54,8 +54,7 @@ QueueHandle_t     hwEventQueue = nullptr;
 volatile bool pendantConnected = false;
 
 // ===== Screen State =====
-PendantScreen currentPendantScreen  = PSCREEN_MAIN_MENU;
-PendantScreen previousPendantScreen = PSCREEN_MAIN_MENU;
+PendantScreen currentPendantScreen = PSCREEN_MAIN_MENU;
 
 // ===== Machine & UI State Variables =====
 MachineState  pendantMachine;
@@ -179,8 +178,7 @@ void drawCurrentPendantScreen() {
 void navigateTo(PendantScreen next) {
     if (next == currentPendantScreen) return;
     callScreenExit(currentPendantScreen);
-    previousPendantScreen = currentPendantScreen;
-    currentPendantScreen  = next;
+    currentPendantScreen = next;
     callScreenEnter(next);
     drawCurrentPendantScreen();
 }
@@ -252,6 +250,23 @@ static void handleEncoderDelta(int32_t delta) {
 
             String axisNames[] = { "X", "Y", "Z", "A" };
             float  distance    = (float)delta * velFactor * pendantJog.increment;
+
+            // Safety clamp: never request more than half the axis travel range in a
+            // single jog tick. Prevents a fast wheel turn at a coarse increment from
+            // queueing a move that would crash into a hard stop or trip soft limits.
+            // $13x is reported in mm regardless of G20/G21 — convert to inches if needed.
+            // Falls back to a hard-coded cap (100 mm / 4 in) if the controller hasn't
+            // reported $13x yet (e.g. immediately after connect).
+            {
+                int   axis  = pendantJog.selectedAxis;
+                float capMm = (pendantJog.maxTravel[axis] > 0)
+                                ? pendantJog.maxTravel[axis] * 0.5f
+                                : 100.0f;
+                float cap   = pendantMachine.inInches ? (capMm / 25.4f) : capMm;
+                if (distance >  cap) distance =  cap;
+                if (distance < -cap) distance = -cap;
+            }
+
             char   cmd[64];
             if (pendantMachine.inInches) {
                 int maxIn = constrain((int)(pendantJog.maxFeedRate / 25.4f), 40, 400);
@@ -282,14 +297,20 @@ static void handleEncoderDelta(int32_t delta) {
         }
         return;
     } else if (currentPendantScreen == PSCREEN_FLUIDNC) {
+        // Toggle display rotation. NVS write is deferred to exitFluidNC() —
+        // a rapid spin would otherwise hammer flash with redundant writes.
+        // The pending flag tells exitFluidNC() that the rotation differs from
+        // what's stored on flash and a putInt() is required.
         static unsigned long lastRotationMs = 0;
         if (millis() - lastRotationMs > 300) {
-            pendantMachine.rotation        = (pendantMachine.rotation == 2) ? 0 : 2;
-            pendantMachine.displayRotation = (pendantMachine.rotation == 2) ? "Normal" : "Upside Down";
-            display.setRotation(pendantMachine.rotation);
-            preferences.begin("pendant", false);
-            preferences.putInt("rotation", pendantMachine.rotation);
-            preferences.end();
+            int newRot = (pendantMachine.rotation == 2) ? 0 : 2;
+            if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+                pendantMachine.rotation        = newRot;
+                pendantMachine.displayRotation = (newRot == 2) ? "Normal" : "Upside Down";
+                xSemaphoreGive(stateMutex);
+            }
+            display.setRotation(newRot);
+            pendantMachine.rotationDirty = true;
             drawCurrentPendantScreen();
             lastRotationMs = millis();
         }
@@ -349,35 +370,42 @@ static void updateCurrentScreenSprites() {
     }
 }
 
-// ===== Spindle config items — request $30 (max RPM) and $31 (min RPM) from FluidNC =====
-static IntConfigItem spindleMaxItem("$30");
-static IntConfigItem spindleMinItem("$31");
+// ===== Static controller config items =====
+// All read once on the connection edge (HwEvent::CONNECTED) and cached.
+// Screens read the cached values directly — no per-screen UART round-trips.
+//   $30, $31      — spindle max / min RPM
+//   $110          — X-axis max rate (jog feed cap)
+//   $130-$133     — per-axis max travel (used to clamp per-tick jog distance)
+// Values land in pendantMachine / pendantJog via PendantScene::reDisplay() callbacks.
+static IntConfigItem spindleMaxItem ("$30");
+static IntConfigItem spindleMinItem ("$31");
+static IntConfigItem jogMaxRateItem ("$110");
+static IntConfigItem jogMaxTravelX  ("$130");
+static IntConfigItem jogMaxTravelY  ("$131");
+static IntConfigItem jogMaxTravelZ  ("$132");
+static IntConfigItem jogMaxTravelA  ("$133");
 
-// ===== Jog config item — request $110 (X-axis max rate) from FluidNC =====
-static IntConfigItem jogMaxRateItem("$110");
-
-void requestJogConfig() {
+// Called from loop_pendant() when HwEvent::CONNECTED arrives.
+// FluidNC version, IP address, WiFi SSID arrive automatically via [VER:] / status
+// callbacks once a connection is established — no explicit query required.
+static void requestControllerConfig() {
+    spindleMaxItem.init();
+    spindleMinItem.init();
     jogMaxRateItem.init();
+    jogMaxTravelX.init();
+    jogMaxTravelY.init();
+    jogMaxTravelZ.init();
+    jogMaxTravelA.init();
 }
 
 // ===== Macro request — reads preferences.json (then macrocfg.json fallback) via UART =====
+// Macros are NOT static config — they can change as the user edits FluidNC's
+// preferences. Loaded on macros-screen entry, with a Refresh button to re-fetch.
 void requestMacros() {
     pendantMacros.loading  = true;
     pendantMacros.count    = 0;
     pendantMacros.selected = -1;
     request_macros();  // FileParser.h — sends $File/SendJSON=/macrocfg.json, falls back to preferences.json
-}
-
-// Called from enterSpindleControl() on Core 1 — sends $30/$31 queries to FluidNC
-void requestSpindleConfig() {
-    spindleMaxItem.init();
-    spindleMinItem.init();
-}
-
-// Deferred wrapper — schedules requestSpindleConfig() to fire in the next
-// loop_pendant() iteration so it runs after drawSpindleControlScreen() completes.
-void requestSpindleConfigDeferred() {
-    schedule_action(requestSpindleConfig);
 }
 
 // ===== PendantScene: bridges FluidNC callbacks → pendantMachine (Core 0) =====
@@ -487,6 +515,11 @@ public:
             int rate = jogMaxRateItem.get();
             if (rate > 0) pendantJog.maxFeedRate = rate;
         }
+        // $130-$133: per-axis max travel (mm), used as a per-tick distance clamp
+        if (jogMaxTravelX.known()) { int v = jogMaxTravelX.get(); if (v > 0) pendantJog.maxTravel[0] = v; }
+        if (jogMaxTravelY.known()) { int v = jogMaxTravelY.get(); if (v > 0) pendantJog.maxTravel[1] = v; }
+        if (jogMaxTravelZ.known()) { int v = jogMaxTravelZ.get(); if (v > 0) pendantJog.maxTravel[2] = v; }
+        if (jogMaxTravelA.known()) { int v = jogMaxTravelA.get(); if (v > 0) pendantJog.maxTravel[3] = v; }
 
         // Macro list is populated in onFilesList() when $File/SendJSON response arrives
         if (hwEventQueue) {
@@ -556,6 +589,12 @@ void pendant_hw_task(void* /*pvParameters*/) {
                 if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
                     pendantMachine.connectionStatus = connected ? "Connected" : "N/C";
                     xSemaphoreGive(stateMutex);
+                }
+                // On connect edge, ask Core 1 to fetch all static controller config.
+                // Reconnects auto-refresh because the edge fires again on each transition.
+                if (connected && hwEventQueue) {
+                    HwEvent ev = { HwEvent::CONNECTED, 0 };
+                    xQueueSend(hwEventQueue, &ev, 0);
                 }
             }
             lastPingMs = nowMs;
@@ -658,7 +697,9 @@ void setup_pendant() {
     preferences.end();
 
     pendantJog.fineIncrements    = savedFineInc;
-    pendantJog.selectedIncrement = savedSelInc;
+    // Clamp saved index to a valid increment slot — guards against a corrupted
+    // NVS entry indexing past the 4-element increment table.
+    pendantJog.selectedIncrement = constrain(savedSelInc, 0, 3);
 
     pendantMachine.rotation        = savedRotation;
     pendantMachine.displayRotation = (savedRotation == 2) ? "Normal" : "Upside Down";
@@ -692,6 +733,12 @@ void loop_pendant() {
         a();
     }
 
+    // Periodic sprite-refresh timestamp. Declared here so the STATE_UPDATE
+    // queue handler can reset it after a queue-driven sprite refresh — that
+    // coalesces the periodic 100 ms tick with the event-driven update so we
+    // don't redraw twice in quick succession when DRO updates arrive.
+    static unsigned long lastSpriteUpdate = 0;
+
     // Process hardware events from Core 0
     HwEvent ev;
     while (xQueueReceive(hwEventQueue, &ev, 0) == pdTRUE) {
@@ -716,12 +763,17 @@ void loop_pendant() {
                 // Use the sprite-only update path to avoid fillScreen flicker.
                 // Full drawXxxScreen() is only called on initial entry or user touch.
                 updateCurrentScreenSprites();
+                lastSpriteUpdate = millis();   // suppress duplicate periodic tick
+                break;
+            case HwEvent::CONNECTED:
+                // Connection edge: snapshot all static controller config so screens
+                // never have to round-trip the UART on entry.
+                requestControllerConfig();
                 break;
         }
     }
 
-    // Periodic sprite refresh (100ms)
-    static unsigned long lastSpriteUpdate = 0;
+    // Periodic sprite refresh (100ms) — only fires if STATE_UPDATE didn't already redraw
     if (millis() - lastSpriteUpdate >= 100) {
         updateCurrentScreenSprites();
         lastSpriteUpdate = millis();

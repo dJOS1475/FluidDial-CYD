@@ -9,6 +9,7 @@ void enterFluidNC() {
     spriteAxisDisplay.deleteSprite();
     spriteValueDisplay.deleteSprite();
     spriteFileDisplay.deleteSprite();
+    spritesInitialized = false;
 
     if (ESP.getFreeHeap() > 60000) {
         spriteStatusBar.createSprite(230, 60);   // version / network panel
@@ -21,6 +22,16 @@ void exitFluidNC() {
     spriteStatusBar.deleteSprite();
     spriteAxisDisplay.deleteSprite();
     spritesInitialized = false;
+
+    // Persist rotation to NVS only on screen exit. Writing on every encoder
+    // detent during a fast spin would otherwise hammer flash; coalescing into
+    // a single write per visit eliminates that risk.
+    if (pendantMachine.rotationDirty) {
+        preferences.begin("pendant", false);
+        preferences.putInt("rotation", pendantMachine.rotation);
+        preferences.end();
+        pendantMachine.rotationDirty = false;
+    }
 }
 
 // Redraws both dynamic panels via sprites — no fillScreen, no flicker
@@ -121,9 +132,11 @@ void drawFluidNCScreen() {
 }
 
 void handleFluidNCTouch(int x, int y) {
+    // Just assign — handlePendantTouch() observes the change and runs navigateTo() once.
+    // Calling navigateTo() here would cause a double exit/enter cycle.
     if (isTouchInBounds(x, y, 5, 272, 112, 40)) {
-        navigateTo(PSCREEN_MAIN_MENU);
+        currentPendantScreen = PSCREEN_MAIN_MENU;
     } else if (isTouchInBounds(x, y, 123, 272, 112, 40)) {
-        navigateTo(PSCREEN_STATUS);
+        currentPendantScreen = PSCREEN_STATUS;
     }
 }
