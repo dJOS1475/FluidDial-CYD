@@ -71,7 +71,6 @@ LGFX_Sprite spriteAxisDisplay(&display);
 LGFX_Sprite spriteValueDisplay(&display);
 LGFX_Sprite spriteStatusBar(&display);
 LGFX_Sprite spriteFileDisplay(&display);
-bool        spritesInitialized = false;
 
 // ===== Helper Functions =====
 bool isTouchInBounds(int tx, int ty, int x, int y, int w, int h) {
@@ -327,7 +326,6 @@ void saveJogPrefs() {
 
 // ===== Sprite Periodic Update (Core 1, 100ms cadence) =====
 static void updateCurrentScreenSprites() {
-    if (!spritesInitialized) return;
     switch (currentPendantScreen) {
         case PSCREEN_MAIN_MENU:
             updateMainMenuDisplay();

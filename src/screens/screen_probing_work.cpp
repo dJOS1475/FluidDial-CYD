@@ -6,7 +6,6 @@ void enterProbingWork() {
     spriteValueDisplay.deleteSprite();
     spriteStatusBar.deleteSprite();
     spriteFileDisplay.deleteSprite();
-    spritesInitialized = false;
 
     if (ESP.getFreeHeap() < 50000) return;
 
@@ -14,13 +13,11 @@ void enterProbingWork() {
     spriteAxisDisplay.setColorDepth(16);
     spriteValueDisplay.createSprite(230, 45);
     spriteValueDisplay.setColorDepth(16);
-    spritesInitialized = true;
 }
 
 void exitProbingWork() {
     spriteAxisDisplay.deleteSprite();
     spriteValueDisplay.deleteSprite();
-    spritesInitialized = false;
 }
 
 void drawProbingWorkScreen() {
@@ -66,7 +63,7 @@ void drawProbingWorkScreen() {
 }
 
 void updateWorkMachinePos() {
-    if (!spritesInitialized || currentPendantScreen != PSCREEN_PROBING_WORK) return;
+    if (currentPendantScreen != PSCREEN_PROBING_WORK) return;
     if (!spriteAxisDisplay.getBuffer()) return;
 
     float px, py, pz, pa;
@@ -92,7 +89,7 @@ void updateWorkMachinePos() {
 }
 
 void updateWorkAreaPos() {
-    if (!spritesInitialized || currentPendantScreen != PSCREEN_PROBING_WORK) return;
+    if (currentPendantScreen != PSCREEN_PROBING_WORK) return;
     if (!spriteValueDisplay.getBuffer()) return;
 
     float wx, wy, wz, wa;

@@ -6,7 +6,6 @@ void enterStatus() {
     spriteValueDisplay.deleteSprite();
     spriteStatusBar.deleteSprite();
     spriteFileDisplay.deleteSprite();
-    spritesInitialized = false;
 
     uint32_t freeHeap = ESP.getFreeHeap();
     if (freeHeap < 50000) {
@@ -30,7 +29,6 @@ void enterStatus() {
     if (!spriteFileDisplay.getBuffer()) { spriteFileDisplay.deleteSprite(); }
     else spriteFileDisplay.setColorDepth(16);
 
-    spritesInitialized = true;
     dbg_printf("Status sprites allocated. Free heap: %u\n", ESP.getFreeHeap());
 }
 
@@ -39,7 +37,6 @@ void exitStatus() {
     spriteAxisDisplay.deleteSprite();
     spriteValueDisplay.deleteSprite();
     spriteFileDisplay.deleteSprite();
-    spritesInitialized = false;
 }
 
 void drawStatusScreen() {
@@ -56,7 +53,7 @@ void drawStatusScreen() {
 }
 
 void updateStatusMachineStatus() {
-    if (!spritesInitialized || currentPendantScreen != PSCREEN_STATUS) return;
+    if (currentPendantScreen != PSCREEN_STATUS) return;
     if (!spriteStatusBar.getBuffer()) return;
 
     spriteStatusBar.fillSprite(COLOR_DARKER_BG);
@@ -139,7 +136,7 @@ void updateStatusMachineStatus() {
 }
 
 void updateStatusCurrentFile() {
-    if (!spritesInitialized || currentPendantScreen != PSCREEN_STATUS) return;
+    if (currentPendantScreen != PSCREEN_STATUS) return;
     if (!spriteFileDisplay.getBuffer()) return;
 
     spriteFileDisplay.fillRoundRect(0, 0, 230, 40, 5, COLOR_DARKER_BG);
@@ -175,7 +172,7 @@ void updateStatusCurrentFile() {
 }
 
 void updateStatusAxisPositions() {
-    if (!spritesInitialized || currentPendantScreen != PSCREEN_STATUS) return;
+    if (currentPendantScreen != PSCREEN_STATUS) return;
     if (!spriteAxisDisplay.getBuffer()) return;
 
     float px, py, pz, pa;
@@ -212,7 +209,7 @@ void updateStatusAxisPositions() {
 }
 
 void updateStatusFeedSpindle() {
-    if (!spritesInitialized || currentPendantScreen != PSCREEN_STATUS) return;
+    if (currentPendantScreen != PSCREEN_STATUS) return;
     if (!spriteValueDisplay.getBuffer()) return;
 
     int feedRate, spindleRPM;

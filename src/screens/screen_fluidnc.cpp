@@ -9,19 +9,16 @@ void enterFluidNC() {
     spriteAxisDisplay.deleteSprite();
     spriteValueDisplay.deleteSprite();
     spriteFileDisplay.deleteSprite();
-    spritesInitialized = false;
 
     if (ESP.getFreeHeap() > 60000) {
         spriteStatusBar.createSprite(230, 60);   // version / network panel
         spriteAxisDisplay.createSprite(230, 70);  // resources panel
-        spritesInitialized = true;
     }
 }
 
 void exitFluidNC() {
     spriteStatusBar.deleteSprite();
     spriteAxisDisplay.deleteSprite();
-    spritesInitialized = false;
 
     // Persist rotation to NVS only on screen exit. Writing on every encoder
     // detent during a fast spin would otherwise hammer flash; coalescing into
@@ -36,7 +33,7 @@ void exitFluidNC() {
 
 // Redraws both dynamic panels via sprites — no fillScreen, no flicker
 void updateFluidNCDisplay() {
-    if (!spritesInitialized) return;
+    if (!spriteStatusBar.getBuffer() || !spriteAxisDisplay.getBuffer()) return;
 
     // Snapshot dynamic values under mutex
     String fluidDialVer, fluidNCVer, connStatus, dispRotation, baudRate, ip, ssid;

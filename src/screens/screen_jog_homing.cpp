@@ -66,7 +66,6 @@ void enterJogHoming() {
     spriteValueDisplay.deleteSprite();
     spriteStatusBar.deleteSprite();
     spriteFileDisplay.deleteSprite();
-    spritesInitialized = false;
 
     // Re-apply the current increment in case units or fine/coarse mode changed since last visit
     {
@@ -92,13 +91,11 @@ void enterJogHoming() {
     spriteAxisDisplay.setColorDepth(16);
     spriteValueDisplay.createSprite(230, 40);
     spriteValueDisplay.setColorDepth(16);
-    spritesInitialized = true;
 }
 
 void exitJogHoming() {
     spriteAxisDisplay.deleteSprite();
     spriteValueDisplay.deleteSprite();
-    spritesInitialized = false;
 }
 
 // ===== Draw =====
@@ -168,7 +165,7 @@ void drawJogHomingScreen() {
 // ===== Sprite update =====
 
 void updateJogAxisDisplay() {
-    if (!spritesInitialized || currentPendantScreen != PSCREEN_JOG_HOMING) return;
+    if (currentPendantScreen != PSCREEN_JOG_HOMING) return;
     if (!spriteAxisDisplay.getBuffer()) return;
 
     float px, py, pz, pa;

@@ -10,7 +10,6 @@ void enterMacros() {
     spriteValueDisplay.deleteSprite();
     spriteStatusBar.deleteSprite();
     spriteFileDisplay.deleteSprite();
-    spritesInitialized = false;
 
     pendantMacros.scrollOffset = 0;
     pendantMacros.selected     = -1;
@@ -31,7 +30,6 @@ void enterMacros() {
         spriteFileDisplay.createSprite(230, 200);
         if (spriteFileDisplay.getBuffer()) {
             spriteFileDisplay.setColorDepth(16);
-            spritesInitialized = true;
         } else {
             spriteFileDisplay.deleteSprite();
         }
@@ -40,7 +38,6 @@ void enterMacros() {
 
 void exitMacros() {
     spriteFileDisplay.deleteSprite();
-    spritesInitialized = false;
 }
 
 // Re-fetch the macro list from the controller without re-allocating sprites.
@@ -66,7 +63,7 @@ static String macroLabel(int displayIndex) {
 // Renders the dynamic file-list area into spriteFileDisplay and pushes it.
 // Coordinates are relative to the sprite origin (sprite is pushed at x=5, y=40).
 void updateMacrosFileList() {
-    if (!spritesInitialized || currentPendantScreen != PSCREEN_MACROS) return;
+    if (currentPendantScreen != PSCREEN_MACROS) return;
     if (!spriteFileDisplay.getBuffer()) return;
 
     spriteFileDisplay.fillSprite(COLOR_BACKGROUND);

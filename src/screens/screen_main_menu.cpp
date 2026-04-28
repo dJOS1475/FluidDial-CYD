@@ -7,18 +7,15 @@ void enterMainMenu() {
     spriteAxisDisplay.deleteSprite();
     spriteValueDisplay.deleteSprite();
     spriteFileDisplay.deleteSprite();
-    spritesInitialized = false;
 
     if (ESP.getFreeHeap() >= 50000) {
         spriteStatusBar.createSprite(230, 65);
         spriteStatusBar.setColorDepth(16);
-        spritesInitialized = true;
     }
 }
 
 void exitMainMenu() {
     spriteStatusBar.deleteSprite();
-    spritesInitialized = false;
 }
 
 void drawMainMenu() {
@@ -44,7 +41,7 @@ void drawMainMenu() {
 }
 
 void updateMainMenuDisplay() {
-    if (!spritesInitialized || currentPendantScreen != PSCREEN_MAIN_MENU) return;
+    if (currentPendantScreen != PSCREEN_MAIN_MENU) return;
     if (!spriteStatusBar.getBuffer()) return;
 
     spriteStatusBar.fillSprite(COLOR_DARKER_BG);

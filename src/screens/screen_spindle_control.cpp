@@ -22,7 +22,6 @@ void enterSpindleControl() {
     spriteValueDisplay.deleteSprite();
     spriteStatusBar.deleteSprite();
     spriteFileDisplay.deleteSprite();
-    spritesInitialized = false;
 
     // Defensive re-fetch of $30/$31 on entry. The connect-edge fetch is the
     // primary source, but if it was dropped (UART contention at connect time)
@@ -42,12 +41,10 @@ void enterSpindleControl() {
 
     spriteValueDisplay.createSprite(230, 60);
     spriteValueDisplay.setColorDepth(16);
-    spritesInitialized = true;
 }
 
 void exitSpindleControl() {
     spriteValueDisplay.deleteSprite();
-    spritesInitialized = false;
 }
 
 void drawSpindleControlScreen() {
@@ -84,7 +81,7 @@ void drawSpindleControlScreen() {
 }
 
 void updateSpindleRPMDisplay() {
-    if (!spritesInitialized || currentPendantScreen != PSCREEN_SPINDLE_CONTROL) return;
+    if (currentPendantScreen != PSCREEN_SPINDLE_CONTROL) return;
     if (!spriteValueDisplay.getBuffer()) return;
 
     int spindleRPM;

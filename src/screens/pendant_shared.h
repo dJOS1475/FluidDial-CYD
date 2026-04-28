@@ -172,7 +172,6 @@ extern LGFX_Sprite spriteAxisDisplay;
 extern LGFX_Sprite spriteValueDisplay;
 extern LGFX_Sprite spriteStatusBar;
 extern LGFX_Sprite spriteFileDisplay;
-extern bool        spritesInitialized;
 
 // ===== FreeRTOS Sync Objects (defined in CNC_Pendant_UI.cpp) =====
 extern SemaphoreHandle_t stateMutex;

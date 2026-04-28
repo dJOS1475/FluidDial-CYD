@@ -10,7 +10,6 @@ void enterSDCard() {
     spriteValueDisplay.deleteSprite();
     spriteStatusBar.deleteSprite();
     spriteFileDisplay.deleteSprite();
-    spritesInitialized = false;
 
     pendantSdCard.pendingRun = false;
 
@@ -28,7 +27,6 @@ void enterSDCard() {
         spriteFileDisplay.createSprite(230, 200);
         if (spriteFileDisplay.getBuffer()) {
             spriteFileDisplay.setColorDepth(16);
-            spritesInitialized = true;
         } else {
             spriteFileDisplay.deleteSprite();
         }
@@ -37,12 +35,11 @@ void enterSDCard() {
 
 void exitSDCard() {
     spriteFileDisplay.deleteSprite();
-    spritesInitialized = false;
 }
 
 // Renders the dynamic file-list area into spriteFileDisplay and pushes it.
 void updateSDCardFileList() {
-    if (!spritesInitialized || currentPendantScreen != PSCREEN_SD_CARD) return;
+    if (currentPendantScreen != PSCREEN_SD_CARD) return;
     if (!spriteFileDisplay.getBuffer()) return;
 
     spriteFileDisplay.fillSprite(COLOR_BACKGROUND);

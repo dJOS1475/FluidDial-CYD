@@ -6,7 +6,6 @@ void enterProbing() {
     spriteValueDisplay.deleteSprite();
     spriteStatusBar.deleteSprite();
     spriteFileDisplay.deleteSprite();
-    spritesInitialized = false;
 
     if (ESP.getFreeHeap() < 50000) return;
 
@@ -14,13 +13,11 @@ void enterProbing() {
     spriteAxisDisplay.setColorDepth(16);
     spriteValueDisplay.createSprite(230, 40);
     spriteValueDisplay.setColorDepth(16);
-    spritesInitialized = true;
 }
 
 void exitProbing() {
     spriteAxisDisplay.deleteSprite();
     spriteValueDisplay.deleteSprite();
-    spritesInitialized = false;
 }
 
 void drawProbingScreen() {
@@ -54,7 +51,7 @@ void drawProbingScreen() {
 }
 
 void updateProbePositionDisplay() {
-    if (!spritesInitialized || currentPendantScreen != PSCREEN_PROBING) return;
+    if (currentPendantScreen != PSCREEN_PROBING) return;
     if (!spriteAxisDisplay.getBuffer()) return;
 
     float px, py, pz, pa;
@@ -81,7 +78,7 @@ void updateProbePositionDisplay() {
 }
 
 void updateProbeSettingsDisplay() {
-    if (!spritesInitialized || currentPendantScreen != PSCREEN_PROBING) return;
+    if (currentPendantScreen != PSCREEN_PROBING) return;
     if (!spriteValueDisplay.getBuffer()) return;
 
     spriteValueDisplay.fillSprite(COLOR_BACKGROUND);

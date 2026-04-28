@@ -6,7 +6,6 @@ void enterFeedsSpeeds() {
     spriteValueDisplay.deleteSprite();
     spriteStatusBar.deleteSprite();
     spriteFileDisplay.deleteSprite();
-    spritesInitialized = false;
 
     if (ESP.getFreeHeap() < 50000) return;
 
@@ -16,7 +15,6 @@ void enterFeedsSpeeds() {
     spriteAxisDisplay.setColorDepth(16);
     spriteValueDisplay.createSprite(72, 37);
     spriteValueDisplay.setColorDepth(16);
-    spritesInitialized = true;
 }
 
 void exitFeedsSpeeds() {
@@ -24,7 +22,6 @@ void exitFeedsSpeeds() {
     spriteStatusBar.deleteSprite();
     spriteAxisDisplay.deleteSprite();
     spriteValueDisplay.deleteSprite();
-    spritesInitialized = false;
 }
 
 void drawFeedsSpeedsScreen() {
@@ -70,7 +67,7 @@ void drawFeedsSpeedsScreen() {
 }
 
 void updateFeedsSpeedsTopDisplay() {
-    if (!spritesInitialized || currentPendantScreen != PSCREEN_FEEDS_SPEEDS) return;
+    if (currentPendantScreen != PSCREEN_FEEDS_SPEEDS) return;
     if (!spriteStatusBar.getBuffer()) return;
 
     int feedRate, spindleRPM;
@@ -111,7 +108,7 @@ void updateFeedsSpeedsTopDisplay() {
 }
 
 void updateFeedOverrideDisplay() {
-    if (!spritesInitialized || currentPendantScreen != PSCREEN_FEEDS_SPEEDS) return;
+    if (currentPendantScreen != PSCREEN_FEEDS_SPEEDS) return;
     if (!spriteAxisDisplay.getBuffer()) return;
 
     int fro;
@@ -141,7 +138,7 @@ void updateFeedOverrideDisplay() {
 }
 
 void updateSpindleOverrideDisplay() {
-    if (!spritesInitialized || currentPendantScreen != PSCREEN_FEEDS_SPEEDS) return;
+    if (currentPendantScreen != PSCREEN_FEEDS_SPEEDS) return;
     if (!spriteValueDisplay.getBuffer()) return;
 
     int sro;
