@@ -54,10 +54,21 @@ struct MachineState {
     float  workA         = 0.0f;
     int    feedRate      = 0;
     int    spindleRPM    = 0;
-    String spindleDir    = "Fwd";
-    bool   spindleRunning = false;
+
+    // Core 0 writes these inside stateMutex (via onDROChange); Core 1 reads inside stateMutex.
+    // Core 1 also writes them directly in touch handlers — safe because int is 32-bit atomic
+    // on Xtensa LX6, so no torn read is possible. The value self-corrects within ~200 ms when
+    // the next DRO update arrives from Core 0.
     int    feedOverride    = 100;
     int    spindleOverride = 100;
+
+    // Core 1 owned — Core 0 never reads or writes these.
+    // No mutex required; reads and writes happen only on the UI core.
+    String spindleDir     = "Fwd";
+    bool   spindleRunning = false;
+    String displayRotation  = "Normal";
+    int    rotation         = 2;
+
     int    spindleMaxRPM   = 24000;
     int    spindleMinRPM   = 0;
     String fluidDialVersion = "v1.5.6";
@@ -71,8 +82,6 @@ struct MachineState {
     String workCoordSystem  = "G54";
     String ipAddress        = "---";
     String wifiSSID         = "---";
-    String displayRotation  = "Normal";
-    int    rotation         = 2;
     // Set true when display rotation is changed via the FluidNC screen encoder.
     // exitFluidNC() observes this flag and writes the new value to NVS once on
     // exit instead of every encoder detent (avoids hammering flash).
