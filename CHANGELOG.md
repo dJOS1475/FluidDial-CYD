@@ -3,6 +3,14 @@
 **ChangeLog:**
 
 
+**2026-04-28**
+
+v1.5.6 (additional fixes)
+* Fix: demo mode (pendant not connected to a controller) now responds to touch immediately — eliminated a 10–16 second UI freeze caused by `fnc_send_line()` busy-waiting for UART acks that never arrive; a new `rxEverSeen` flag in the hardware task prevents the CONNECTED event from firing until at least one real UART byte is received from the controller
+* Fix: triple-tap fine/coarse increment toggle on the Jog & Homing screen now resets reliably on screen exit — removed inner `static` variable shadows that were hiding the file-scope counters the reset code actually wrote to
+* Feature: Spindle Control dial uses 100 RPM steps per encoder detent when the controller's max spindle RPM ($30) is 10 000 or below — larger spindles (> 10 k RPM) keep the existing 1 000 RPM step
+* Internal: replaced the single global `spritesInitialized` flag with per-sprite `getBuffer()` guards in every update function — a failed sprite allocation on one buffer can no longer cause a different buffer to be used without being checked
+
 **2026-04-25**
 
 v1.5.6
