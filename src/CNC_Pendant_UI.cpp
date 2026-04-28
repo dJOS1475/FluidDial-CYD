@@ -217,9 +217,10 @@ static void handlePendantTouch(int x, int y) {
 // ===== Encoder Delta Handler (Core 1) =====
 static void handleEncoderDelta(int32_t delta) {
     if (currentPendantScreen == PSCREEN_SPINDLE_CONTROL && pendantSpindle.dialMode) {
-        int maxRPM = pendantMachine.spindleMaxRPM > 0 ? pendantMachine.spindleMaxRPM : 24000;
-        int minRPM = pendantMachine.spindleMinRPM;
-        pendantSpindle.targetRPM = constrain(pendantSpindle.targetRPM + delta * 1000, minRPM, maxRPM);
+        int maxRPM  = pendantMachine.spindleMaxRPM > 0 ? pendantMachine.spindleMaxRPM : 24000;
+        int minRPM  = pendantMachine.spindleMinRPM;
+        int rpmStep = (maxRPM <= 10000) ? 100 : 1000;
+        pendantSpindle.targetRPM = constrain(pendantSpindle.targetRPM + delta * rpmStep, minRPM, maxRPM);
         updateSpindleRPMDisplay();
         return;
     } else if (currentPendantScreen == PSCREEN_JOG_HOMING) {
