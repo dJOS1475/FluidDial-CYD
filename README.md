@@ -15,7 +15,7 @@ https://djos1475.github.io/FluidDial-CYD/
 
 If you have problems with the Web Installer, close VS Code / PlatformIO first — if the serial monitor is open it will block the installer from accessing the COM port. Also try an InPrivate/Incognito browser tab. The precompiled binary images can be downloaded from the [Releases section](https://github.com/dJOS1475/FluidDial-CYD/releases) .  They can be installed with any “esptool” ESP32 firmware download program. The **merged-flash.bin** image should be downloaded to FLASH at address 0x0000.  One such download program is this [web installer](https://espressif.github.io/esptool-js/); there are many others.
 
-**Design Goals:**
+## 🎯 Design Goals
 
 All menu navigation and as many features as possible are managed via the touch screen. The physical jog dial context-switches depending on the active screen — it only moves the CNC machine on the Jog & Homing screen (a safety feature), and serves other purposes elsewhere.
 
@@ -25,9 +25,10 @@ The 3 physical buttons always perform the same function regardless of the active
 * Green: Start / Resume — starts a new job or resumes after a Yellow pause.
 
 <img src="https://raw.githubusercontent.com/dJOS1475/FluidDial-CYD/refs/heads/main/new_ui/Pendant3.jpeg" alt="CYD Dial Pendant With Buttons and Jog Dial" height="400">
+
 ---
 
-**Screens & Features:**
+## 🖥️ Screens & Features
 
 **Main Menu** — touch navigation to all screens. Shows live machine status; alarm states display a human-readable description in red (e.g. "Hard limit triggered").
 
@@ -67,7 +68,7 @@ The 3 physical buttons always perform the same function regardless of the active
 * Live RPM display panel — left column shows current spindle RPM reported by the controller; right column shows the **Target RPM** (the speed that will be sent on Start), highlighted in green
 * RPM presets at 25%, 50% and 100% of the controller's maximum RPM (read live from `$30`); preset labels shown in short format (e.g. 6k, 12k, 24k)
 * Minimum and maximum RPM values displayed, read directly from the controller (`$30` / `$31`)
-* **Dial mode** — tap the "Dial" button to set Target RPM with the encoder in 1000 RPM steps, clamped to the controller's valid range
+* **Dial mode** — tap the "Dial" button to set Target RPM with the encoder; steps in 100 RPM increments for spindles ≤ 10 000 RPM, or 1 000 RPM increments for larger spindles; clamped to the controller's valid range
 * Start / Stop buttons send M3/M4/M5 with the Target RPM
 
 **Macros** — reads macros directly from the FluidNC controller via UART JSON streaming. Supports both WebUI v3 (preferences.json) and WebUI v2 (macrocfg.json) formats automatically, with preferences.json taking priority. List loads on first entry and is cached — subsequent visits are instant. Refresh button fetches a fresh copy from the controller. Scroll and tap-to-confirm navigation; Run sends the command and navigates to the Status screen.
@@ -75,6 +76,8 @@ The 3 physical buttons always perform the same function regardless of the active
 **SD Card** — browse and run G-code files live from the controller's SD card. File list loads automatically on entry with a Refresh button to reload. Tap a file to arm it (Load / Run buttons appear), then Load queues the file and navigates to the Status screen while Run sends the command immediately.
 
 **FluidNC** — shows live controller info: firmware version, WiFi SSID, IP address, connection status, free heap. Jog dial rotates the display 180°; rotation is saved across restarts. Bottom row has two navigation buttons — Main Menu and Status.
+
+---
 
 Wiki pages for more information: CYD Dial Pendant (http://wiki.fluidnc.com/en/hardware/official/CYD_Dial_Pendant).
 
