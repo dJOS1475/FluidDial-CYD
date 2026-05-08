@@ -82,6 +82,16 @@ See the **Compiling Firmware** section on how to test this version - use **cyd_n
 
 FluidNC Discord Topic: https://discord.com/channels/780079161460916227/1453176703009423514
 
+## 💛 Project Supporters
+
+A huge thank you to the following people who have supported this project:
+
+| Supporter | Platform |
+|---|---|
+| simrim1 | Discord |
+
+---
+
 Firmware in Action (v1.0): 
 [![Watch the video](https://img.youtube.com/vi/d5PogiUiiaw/maxresdefault.jpg)](https://youtu.be/d5PogiUiiaw)
 
