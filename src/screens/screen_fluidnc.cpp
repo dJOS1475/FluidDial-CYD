@@ -60,7 +60,7 @@ void updateFluidNCDisplay() {
     spriteStatusBar.setCursor(5, 17); spriteStatusBar.print(fluidDialVer);
 
     spriteStatusBar.setTextColor(COLOR_GRAY_TEXT); spriteStatusBar.setTextSize(1);
-    spriteStatusBar.setCursor(5, 35);  spriteStatusBar.print("FLUIDNC");
+    spriteStatusBar.setCursor(5, 35);  spriteStatusBar.print("FluidNC");
     spriteStatusBar.setTextColor(COLOR_GREEN);
     spriteStatusBar.setCursor(5, 47); spriteStatusBar.print(fluidNCVer);
 
