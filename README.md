@@ -83,7 +83,7 @@ The 3 physical buttons always perform the same function regardless of the active
 
 Wiki pages for more information: CYD Dial Pendant (http://wiki.fluidnc.com/en/hardware/official/CYD_Dial_Pendant).
 
-See the **Compiling Firmware** section on how to test this version - use **cyd_new_ui**: (http://wiki.fluidnc.com/en/hardware/official/CYD_Dial_Pendant)
+See the **Compiling Firmware** section on how to test this version - use **cyd_new_ui_combined**: (http://wiki.fluidnc.com/en/hardware/official/CYD_Dial_Pendant)
 
 FluidNC Discord Topic: https://discord.com/channels/780079161460916227/1453176703009423514
 
