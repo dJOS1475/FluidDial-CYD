@@ -77,7 +77,7 @@ The 3 physical buttons always perform the same function regardless of the active
 
 **SD Card** — browse and run G-code files live from the controller's SD card. File list loads automatically on entry with a Refresh button to reload. Tap a file to arm it (Load / Run buttons appear), then Load queues the file and navigates to the Status screen while Run sends the command immediately.
 
-**FluidNC** — shows live controller info: firmware version, WiFi SSID, IP address, connection status, free heap. Jog dial rotates the display 180°; rotation is saved across restarts. Bottom row has two navigation buttons — Main Menu and Status.
+**FluidNC** — shows live info in two panels: pendant firmware (FluidDial-CYD version), FluidNC controller firmware version, IP address, WiFi SSID, free heap, connection status, and display rotation. Jog dial rotates the display 180°; rotation is saved across restarts. Bottom row has two navigation buttons — Main Menu and Status.
 
 ---
 
