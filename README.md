@@ -1,5 +1,5 @@
 # FluidDial-CYD: 
-FluidDial-CYD is a custom firmware for capacitive CYD-equipped FluidDial CNC pendants. The UI has been rebuilt from the ground up for devices with 3 physical buttons and a jog dial. 
+FluidDial-CYD is a custom firmware for CYD-equipped FluidDial CNC pendants. The UI has been rebuilt from the ground up for devices with 3 physical buttons and a jog dial. Supports both **resistive (XPT2046)** and **capacitive (CST816S)** CYD screen variants — a single binary works on either; the screen type is auto-detected on first boot.
 
 Feedback is welcome - If you find an issue or have a request for improvements, please log an [Issue](https://github.com/dJOS1475/FluidDial-CYD/issues) and I'll investigate.
 
@@ -11,7 +11,9 @@ https://djos1475.github.io/FluidDial-CYD/
 
 * Unplug the RJ12 connection between the CYD and the FluidNC controller
 * Connect the CYD USB port to your computer
-* Click "Connect & Install"
+* Click “Connect & Install”
+
+**First boot after installing:** the pendant will display “Capacitive — Tap the Screen” followed by “Resistive — Tap the Screen”. Tap the screen when your screen type is shown — the result is saved to flash and the pendant reboots into normal operation. This detection only runs once; subsequent boots go straight to the main menu. To re-detect (e.g. after swapping the CYD board), hold the **BOOT** button during the first second of startup.
 
 If you have problems with the Web Installer, close VS Code / PlatformIO first — if the serial monitor is open it will block the installer from accessing the COM port. Also try an InPrivate/Incognito browser tab. The precompiled binary images can be downloaded from the [Releases section](https://github.com/dJOS1475/FluidDial-CYD/releases) .  They can be installed with any “esptool” ESP32 firmware download program. The **merged-flash.bin** image should be downloaded to FLASH at address 0x0000.  One such download program is this [web installer](https://espressif.github.io/esptool-js/); there are many others.
 

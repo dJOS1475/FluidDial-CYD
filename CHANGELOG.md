@@ -3,6 +3,14 @@
 **ChangeLog:**
 
 
+**2026-05-09**
+
+v1.6.0
+* Feature: combined firmware now supports both resistive (XPT2046) and capacitive (CST816S) CYD screens in a single binary — no need to choose the correct image before flashing
+* Feature: first-boot screen-type detection — on initial power-up the pendant tests each touch controller in turn, displaying "Capacitive — Tap the Screen" then "Resistive — Tap the Screen"; whichever responds first is saved to flash and used on every subsequent boot without repeating the detection
+* Feature: to re-detect (e.g. after swapping the CYD board), hold the GPIO 0 / BOOT button during the 1-second window at startup; the saved screen type is cleared and the detection sequence runs again
+* Architecture: new `[env:cyd_new_ui_combined]` PlatformIO environment with both `-DRESISTIVE_CYD` and `-DCAPACITIVE_CYD` build flags; the `[env:cyd_new_ui]` capacitive-only environment is retained for development use; the combined binary is what the web installer and Releases page ship
+
 **2026-04-28**
 
 v1.5.6

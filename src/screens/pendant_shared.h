@@ -71,7 +71,7 @@ struct MachineState {
 
     int    spindleMaxRPM   = 24000;
     int    spindleMinRPM   = 0;
-    String fluidDialVersion = "v1.5.6";
+    String fluidDialVersion = "v1.6.0";
     String fluidNCVersion   = "v3.7.16";
     String baudRate         = "1000000";
     String port             = "UART0";
