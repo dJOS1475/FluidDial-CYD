@@ -1,5 +1,5 @@
 # FluidDial-CYD: 
-FluidDial-CYD is a custom firmware for CYD-equipped FluidDial CNC pendants. The UI has been rebuilt from the ground up for devices with 3 physical buttons and a jog dial. Supports both **resistive (XPT2046)** and **capacitive (CST816S)** CYD screen variants — a single binary works on either; the screen type is auto-detected on first boot.
+FluidDial-CYD is a custom firmware for CYD-equipped FluidDial CNC pendants. The UI has been rebuilt from the ground up for devices with 3 physical buttons and a jog dial. Supports both **resistive (XPT2046)** and **capacitive (CST816S)** CYD screen variants.
 
 Feedback is welcome - If you find an issue or have a request for improvements, please log an [Issue](https://github.com/dJOS1475/FluidDial-CYD/issues) and I'll investigate.
 
@@ -94,6 +94,7 @@ A huge thank you to the following people who have supported this project:
 | Supporter | Platform |
 |---|---|
 | simrim1 | Discord |
+| Janusz  | Discord |
 
 ---
 
