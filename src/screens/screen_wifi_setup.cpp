@@ -352,7 +352,10 @@ static void showRestartSplash(const char* line1, const char* line2 = nullptr,
 // Toggle the transport selection: UART ↔ WiFi.  Writes NVS and restarts so
 // the next boot picks up the new selection via comms_init().
 static void cycleTransportOverride() {
-    TransportForce next = (get_transport_force() == TFORCE_WIFI)
+    // Flip the CURRENTLY ACTIVE transport (which may have come from the
+    // hardware autodetect default, not just a stored override), so the toggle
+    // always points the opposite way from what's running right now.
+    TransportForce next = (comms_active_mode() == COMMS_MODE_WIFI)
                           ? TFORCE_UART
                           : TFORCE_WIFI;
     set_transport_force(next);

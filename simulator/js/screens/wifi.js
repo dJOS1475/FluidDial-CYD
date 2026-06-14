@@ -117,7 +117,9 @@ function updateWiFiSetupDisplay() {
 }
 
 function cycleTransportOverride() {
-  const next = get_transport_force() === TFORCE_WIFI ? TFORCE_UART : TFORCE_WIFI;
+  // Flip the currently ACTIVE transport (may have come from the autodetect
+  // default, not just a stored override).
+  const next = comms_active_mode() === COMMS_MODE_WIFI ? TFORCE_UART : TFORCE_WIFI;
   set_transport_force(next);
   // In the sim we apply the change immediately (no reboot) and redraw.
   pendantMachine.port = next === TFORCE_WIFI ? "WiFi:81" : "UART0";

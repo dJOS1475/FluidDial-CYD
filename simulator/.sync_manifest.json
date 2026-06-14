@@ -8,7 +8,7 @@
   "screens/screen_sd_card.cpp": "267f817c79a90d3d8badd081242e9ed2efc1820f",
   "screens/screen_macros.cpp": "f4df1e74e24043a535675e5e072ce90d67461f5a",
   "screens/screen_fluidnc.cpp": "aabf4830b49ab1a1300b61f62a79c51a83a27a8f",
-  "screens/screen_wifi_setup.cpp": "4219e9099dafa250cc3aac9bb6c592289ba42d0e",
+  "screens/screen_wifi_setup.cpp": "e0d6d996689b1fb5529d96d45d7fd75d694cfab3",
   "screens/screen_probe.cpp": "71119bd4f2fc9c9346879c266a576d53cc178fee",
   "screens/screen_probe_z.cpp": "5ebe52486a70880db03e478d2f8a197474219eb1",
   "screens/screen_probe_corner.cpp": "88eeb45864a640a2b42793fd994fe62005ebfb11",
@@ -16,6 +16,6 @@
   "screens/screen_probe_cfg.cpp": "876f4781a1e08b90f33dcda9d927d1bb3ab46167",
   "CNC_Pendant_UI.cpp": "7af8c59b7881b6d3db5a5a64f95e5c465408bb3c",
   "screens/pendant_shared.h": "1eade4c1dc1e906943d67720b04290be5d60925a",
-  "cnc_pendant_config.h": "5841012b22175a2e2d78331f6bb384d1cf7bf972",
+  "cnc_pendant_config.h": "0e36db9a286d23969ddc1a5a23b9de1577a78be6",
   "screens/screen_probe.h": "4cc34ffa4f8316eef81dd5615eceaab356ecc1e9"
 }

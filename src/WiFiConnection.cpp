@@ -895,11 +895,21 @@ void wifi_start_ap_setup() {
 
     WiFi.disconnect(true);
     delay(100);
-    WiFi.mode(WIFI_AP_STA);  // STA kept active for scanNetworks()
-    WiFi.softAP(WIFI_AP_SSID, (strlen(WIFI_AP_PASS) ? WIFI_AP_PASS : nullptr));
+    WiFi.mode(WIFI_AP_STA);  // STA kept active so the portal's "Scan" button works
 
+    // Configure the soft-AP IP/subnet BEFORE softAP() brings the AP up.  On the
+    // ESP32 Arduino core, calling softAPConfig() AFTER softAP() tears down and
+    // restarts the on-AP DHCP server and can leave it not serving leases — the
+    // client then self-assigns a 169.254.x.x (APIPA) address and can never reach
+    // 192.168.4.1, so the captive portal appears dead.  Configuring first lets
+    // softAP() start the DHCP server correctly on the chosen subnet.
     IPAddress apIP(192, 168, 4, 1);
-    WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
+    IPAddress subnet(255, 255, 255, 0);
+    if (!WiFi.softAPConfig(apIP, apIP, subnet)) {
+        dbg_println("WiFi: softAPConfig() failed");
+    }
+    WiFi.softAP(WIFI_AP_SSID, (strlen(WIFI_AP_PASS) ? WIFI_AP_PASS : nullptr));
+    delay(100);   // let the AP interface + DHCP server settle before clients join
 
     dnsServer.start(53, "*", apIP);
 

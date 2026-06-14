@@ -5,6 +5,10 @@
 
 **2026-06-14**
 
+v2.0.2
+* Fix: the WiFi **captive portal again starts on a clean build** — `comms_init()` was defaulting to UART whenever no transport override was stored in NVS (i.e. every fresh flash / factory reset), so a battery pendant silently picked UART and never raised the setup AP. It now autodetects from hardware when no override is stored (battery/IP5306 pendant → WiFi + captive portal, wired → UART); an explicit UART/WiFi choice from the WiFi Setup screen still overrides and persists. The transport toggle now flips the *active* transport so it points the right way after an autodetected default.
+* Fix: the captive-portal **soft-AP now hands out DHCP leases** — `softAPConfig()` was called *after* `softAP()`, which left the on-AP DHCP server not serving, so a connecting phone/PC got a `169.254.x.x` (APIPA) address and couldn't reach `192.168.4.1`. The AP IP/subnet is now configured before `softAP()` brings the AP up.
+
 v2.0.1
 * UX: the probe-type label on the Probe config screens ("3D Touch Probe" / "Z-Height Touch Plate" / "XYZ Touch Plate") is now green instead of dim grey, for better legibility
 * Fix: the web installer's **Update** path no longer silently wipes saved WiFi credentials — the manifest's `new_install_prompt_erase` was `false`, which (for a non-Improv device) makes ESP Web Tools full-chip-erase by default; set to `true` so Update routes to the erase prompt with the box unchecked, preserving NVS. The installer page and README now note to leave "Erase device" unchecked on an update
