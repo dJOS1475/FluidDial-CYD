@@ -165,25 +165,35 @@
   <div class="card">
     <h2>Install Firmware</h2>
     <div class="install-section">
-      <div class="version-badge">v1.6.0 — Latest Release</div>
+      <div class="version-badge">v2.0.0 — Latest Release</div>
       <p style="text-align:center;">
-        Connect your CYD to USB, then click the button below.<br />
+        Connect your CYD to USB, then click one of the buttons below.<br />
         Select the correct COM port when prompted.
       </p>
-      <esp-web-install-button manifest="manifest.json">
-        <button slot="activate">
-          <strong>Connect &amp; Install</strong>
-        </button>
-        <span slot="unsupported">
-          <p>
-            Your browser does not support Web Serial.<br />
-            Please use Chrome or Edge.
-          </p>
-        </span>
-      </esp-web-install-button>
+
+      <div style="display:flex; gap:16px; flex-wrap:wrap; justify-content:center;">
+        <esp-web-install-button manifest="manifest.json">
+          <button slot="activate">
+            <strong>Update</strong>
+          </button>
+          <span slot="unsupported">
+            <p>
+              Your browser does not support Web Serial.<br />
+              Please use Chrome or Edge.
+            </p>
+          </span>
+        </esp-web-install-button>
+
+        <esp-web-install-button manifest="manifest-factory.json">
+          <button slot="activate" style="background:#c63939;">
+            <strong>Factory Reset</strong>
+          </button>
+        </esp-web-install-button>
+      </div>
+
       <div class="note">
-        <strong>First install:</strong> You will be prompted to erase the device — select Yes to ensure a clean installation.<br /><br />
-        <strong>Update:</strong> If you have already installed FluidDial-CYD, you can update without erasing — your settings will be preserved.
+        <strong>Update</strong> — installs the latest firmware while preserving saved settings (WiFi credentials, screen-type detection, transport override, jog preferences, rotation). Use this for upgrading from a previous FluidDial-CYD install.<br /><br />
+        <strong>Factory Reset</strong> — wipes the entire device including all saved settings, then installs the firmware fresh. Use this for first-time installs, or to recover from a stuck WiFi configuration. After reset you'll re-run the touch-screen detection and re-enter WiFi credentials via the captive portal.
       </div>
     </div>
   </div>

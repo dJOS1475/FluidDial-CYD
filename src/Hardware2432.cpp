@@ -4,6 +4,7 @@
 // System interface routines for the Arduino framework
 
 #include "System.h"
+#include "CommsUart.h"   // init_fnc_uart()
 
 #define LGFX_USE_V1
 #include <LovyanGFX.hpp>
@@ -15,6 +16,7 @@
 
 #include <driver/uart.h>
 #include "hal/uart_hal.h"
+#include <driver/rtc_io.h>
 
 // This pin is connected to a photoresistor that is ostensibly used
 // for ambient light sensing.  It is possible to repurpose it as a UI
@@ -446,12 +448,14 @@ void init_hardware() {
 
     set_layout(layout_num);
 
-    touch.begin(&display);
+    touch.begin(&display);  // installs ESP-IDF I2C driver for I2C_NUM_0
 
     init_encoder(enc_a, enc_b);
     init_fnc_uart(FNC_UART_NUM, PND_TX_FNC_RX_PIN, PND_RX_FNC_TX_PIN);
 
     touch.setFlickThresh(10);
+
+    battery_init();  // after touch.begin(): display_num set + I2C_NUM_0 driver installed
 
 #ifdef LED_DEBUG
     // RGB LED pins
@@ -600,4 +604,179 @@ void update_events() {
 
 void ackBeep() {}
 
-void deep_sleep(int us) {}
+void deep_sleep(int us) {
+    // Wake source: red button (GPIO4, INPUT_PULLUP, LOW when pressed).
+    // GPIO4 = RTC_GPIO10 — one of only a handful of RTC-capable GPIOs on the classic
+    // ESP32.  GPIO16 (green) and GPIO17 (yellow) are NOT RTC GPIOs and cannot be used
+    // as ext0/ext1 wakeup sources; attempts to do so silently fail.
+    // On wakeup the chip performs a full reset and boots normally; the red button press
+    // is processed as a regular E-stop in pendant_hw_task once the UI is running.
+    rtc_gpio_init(GPIO_NUM_4);
+    rtc_gpio_set_direction(GPIO_NUM_4, RTC_GPIO_MODE_INPUT_ONLY);
+    rtc_gpio_pullup_en(GPIO_NUM_4);
+    rtc_gpio_pulldown_dis(GPIO_NUM_4);
+    esp_sleep_enable_ext0_wakeup(GPIO_NUM_4, 0);    // LOW = button pressed = wake
+    if (us > 0) {
+        esp_sleep_enable_timer_wakeup((uint64_t)us);
+    }
+    esp_deep_sleep_start();
+    // Never returns — ESP32 resets on wakeup and boots normally.
+}
+
+// ── Battery ADC ───────────────────────────────────────────────────────────────
+// GPIO39 reads the battery voltage through a resistor divider (×1.534 correction).
+// Only supported on capacitive CYD — on resistive boards GPIO39 is the XPT2046
+// MISO line and must not be reconfigured as an ADC input.
+// Compile-time enable: add -DCYD_BATTERY_ADC to the build flags.
+#ifdef CYD_BATTERY_ADC
+
+static bool  bat_ready      = false;
+static bool  ip5306_present = false;  // true when IP5306 PMIC is found on I2C bus
+static float bat_ema_mv     = 0.0f;  // exponential moving average, millivolts
+
+// 10-point LiPo discharge curve {voltage_mV, percent}, high→low order
+static const int16_t bat_curve[10][2] = {
+    { 4200, 100 }, { 4100, 91 }, { 4000, 79 }, { 3900, 65 },
+    { 3800, 52  }, { 3700, 38 }, { 3600, 23 }, { 3500, 11 },
+    { 3400,  4  }, { 3300,  0 }
+};
+
+// One-shot I2C register read on the LovyanGFX-owned I2C_NUM_0 bus (SDA=33, SCL=32).
+// Does NOT re-initialise the port — the touch driver already installed the ESP-IDF driver.
+static esp_err_t i2c_read_reg(uint8_t addr, uint8_t reg, uint8_t* out) {
+    return i2c_master_write_read_device(
+        I2C_NUM_0, addr, &reg, 1, out, 1, pdMS_TO_TICKS(10));
+}
+
+void battery_init() {
+    if (display_num == 1) return;  // resistive: GPIO39 = XPT2046 MISO — do not touch
+
+    // ADC channel for voltage measurement via the on-board resistor divider
+    analogSetPinAttenuation(GPIO_NUM_39, ADC_11db);
+    bat_ready = true;
+
+    // Probe IP5306 battery management IC at I2C address 0x75.
+    // It shares I2C_NUM_0 with the CST816S touch controller (different address: 0x15).
+    //
+    // The probe is retried up to 5 times because:
+    //   • Some IP5306 silicon needs ~30 ms after power-up before responding.
+    //   • Touch.begin() leaves transactions in flight; the first probe right
+    //     after it can collide on the bus and time out spuriously.
+    //   • The 10 ms i2c_master_write_read_device() timeout can be too tight
+    //     when the touch controller is mid-poll on the shared bus.
+    //
+    // We log every attempt so users diagnosing "battery pendant boots in UART
+    // mode" can see exactly what the bus reported.
+    ip5306_present = false;
+    uint8_t status = 0;
+    for (int attempt = 1; attempt <= 5 && !ip5306_present; ++attempt) {
+        esp_err_t err = i2c_read_reg(0x75, 0x70, &status);
+        dbg_printf("IP5306 probe %d/5: err=%d (%s) reg70=0x%02x\n",
+                   attempt, err, esp_err_to_name(err), status);
+        if (err == ESP_OK) {
+            ip5306_present = true;
+            break;
+        }
+        delay(20);  // give the chip / bus a moment before retrying
+    }
+    dbg_printf("IP5306 %s after retries (reg70=0x%02x)\n",
+               ip5306_present ? "found" : "NOT FOUND", status);
+}
+
+int battery_millivolts() {
+    if (!bat_ready) return 0;
+    int raw_mv = analogReadMilliVolts(GPIO_NUM_39);
+    int scaled = (int)((long)raw_mv * 1534 / 1000);  // resistor-divider correction
+    if (scaled < 3000 || scaled > 4400) return (int)bat_ema_mv;  // reject out-of-range
+    bat_ema_mv = (bat_ema_mv < 1.0f) ? (float)scaled
+                                      : bat_ema_mv * 0.75f + (float)scaled * 0.25f;
+    return (int)bat_ema_mv;
+}
+
+int battery_level() {
+    if (!bat_ready) return -1;
+    int mv = battery_millivolts();
+    if (mv <= 0) return -1;
+    // Linear interpolation between curve points
+    for (int i = 0; i < 9; i++) {
+        if (mv >= bat_curve[i][0]) return bat_curve[i][1];
+        if (mv >= bat_curve[i + 1][0]) {
+            int span_mv  = bat_curve[i][0]     - bat_curve[i + 1][0];
+            int span_pct = bat_curve[i][1]      - bat_curve[i + 1][1];
+            return bat_curve[i + 1][1] + (mv - bat_curve[i + 1][0]) * span_pct / span_mv;
+        }
+    }
+    return 0;  // below lowest curve point
+}
+
+// True iff the IP5306 PMIC was detected on the I2C bus at boot.  This is
+// the definitive signal that this hardware is a battery-equipped (i.e.
+// mobile / wireless) pendant.  The Comms layer uses it to decide whether
+// to bring up the WiFi stack — wired pendants without the PMIC always use
+// UART and never start WiFi.
+bool battery_hardware_present() { return ip5306_present; }
+
+// Reads IP5306 register 0x70 bit 3 = "charging in progress".
+// Called from Core 1 every 60 s (pendant_hw_task), so concurrent touch reads
+// on the same I2C_NUM_0 are infrequent; the 10 ms timeout inside
+// i2c_master_write_read_device() handles rare collisions gracefully.
+//
+// Late-binding probe: if the IP5306 wasn't detected at boot (eg. bus was
+// busy with touch init), we keep trying every call so that the charging
+// icon can come alive whenever the chip finally answers.  Once detected,
+// the flag latches true and we skip the probe path.
+// Returns true when the pendant is on external (USB) power — i.e. the outline
+// should light up.  Detection combines two IP5306 status bits:
+//
+//   REG_READ0 (0x70) bit 3  → charging in progress (battery not yet full)
+//   REG_READ1 (0x71) bit 3  → charge complete / "charge full" (plugged in,
+//                             battery topped off, charge current tapered off)
+//
+// We OR them because reading only 0x70 bit 3 misses the very common
+// "plugged in but already full" case: once the IP5306 finishes charging it
+// clears the in-progress bit and sets the full bit, so a 0x70-only check
+// would drop the outline back to grey even though USB is still connected.
+// On battery (no USB) both bits read 0.  This matches the M5Stack IP5306
+// convention (isCharging = 0x70.3, isChargeFull = 0x71.3).
+//
+// Logged once per second at most so a user diagnosing "outline never changes"
+// can see the raw register values over the serial console.
+bool battery_charging() {
+    if (display_num == 1) return false;  // resistive — IP5306 not present
+
+    if (!ip5306_present) {
+        // Late-binding probe: confirm the chip answers before trusting reads.
+        uint8_t probe = 0;
+        if (i2c_read_reg(0x75, 0x70, &probe) != ESP_OK) {
+            return false;
+        }
+        ip5306_present = true;
+        dbg_printf("IP5306 detected late (reg70=0x%02x)\n", probe);
+    }
+
+    uint8_t reg70 = 0, reg71 = 0;
+    if (i2c_read_reg(0x75, 0x70, &reg70) != ESP_OK) return false;
+    i2c_read_reg(0x75, 0x71, &reg71);  // best-effort; 0 on failure
+
+    bool charging   = (reg70 & 0x08) != 0;  // 0x70 bit 3 — charging in progress
+    bool chargeFull = (reg71 & 0x08) != 0;  // 0x71 bit 3 — charge complete
+    bool on_power   = charging || chargeFull;
+
+    static uint32_t last_log = 0;
+    if ((millis() - last_log) > 1000) {
+        last_log = millis();
+        dbg_printf("IP5306 reg70=0x%02x reg71=0x%02x  charging=%d full=%d → onPower=%d\n",
+                   reg70, reg71, charging, chargeFull, on_power);
+    }
+    return on_power;
+}
+
+#else  // ── stubs — compiles on all targets; returns "not available" values ──
+
+void battery_init()              {}
+int  battery_millivolts()        { return 0; }
+int  battery_level()             { return -1; }
+bool battery_charging()          { return false; }
+bool battery_hardware_present()  { return false; }   // no PMIC → wired pendant
+
+#endif  // CYD_BATTERY_ADC

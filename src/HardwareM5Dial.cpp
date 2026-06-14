@@ -4,6 +4,7 @@
 // System interface routines for the Arduino framework
 
 #include "System.h"
+#include "CommsUart.h"   // init_fnc_uart()
 #include "M5GFX.h"
 #include "Drawing.h"
 #include "HardwareM5Dial.hpp"

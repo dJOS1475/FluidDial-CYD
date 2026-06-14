@@ -11,7 +11,7 @@
 #    include <LittleFS.h>
 constexpr static const int UPDATE_RATE_MS = 30;  // minimum refresh rate in milliseconds
 extern Stream&             debugPort;
-void                       init_fnc_uart(int uart_num, int tx_pin, int rx_pin);
+// init_fnc_uart() now lives in CommsUart.h — include that where needed.
 #endif  // ARDUINO
 
 #ifdef USE_LOVYANGFX
@@ -69,6 +69,18 @@ bool screen_button_touched(bool pressed, int x, int y, int& button);
 bool switch_button_touched(bool& pressed, int& button);
 
 void deep_sleep(int us);
+
+// ── Battery monitoring ────────────────────────────────────────────────────────
+// Implemented in Hardware2432.cpp, enabled by -DCYD_BATTERY_ADC.
+// On unsupported hardware (resistive CYD or no flag) the stubs return -1 / 0.
+void battery_init();
+int  battery_millivolts();        // smoothed battery voltage in mV; 0 if unavailable
+int  battery_level();             // 0–100 %; -1 if hardware not present / not ready
+bool battery_charging();          // true if charge pin indicates charging
+bool battery_hardware_present();  // true iff IP5306 PMIC was detected at boot
+                                  // (used by the Comms layer to auto-select WiFi
+                                  // transport on battery-equipped pendants — wired
+                                  // pendants use UART and never start the WiFi stack)
 
 inline int display_short_side() {
     return (display.width() < display.height()) ? display.width() : display.height();

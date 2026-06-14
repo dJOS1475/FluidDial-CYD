@@ -1,5 +1,6 @@
 #include "pendant_shared.h"
 #include "screen_jog_homing.h"
+#include "screen_probe.h"   // probeDrawKVTouch — shared adjustable-field style
 
 // ===== Increment sets =====
 struct IncrementSet {
@@ -49,23 +50,22 @@ static unsigned long incTapMs    = 0;
 
 // ===== Helpers =====
 
-static String speedLabel() {
-    return pendantMachine.inInches ? String(pendantJog.jogSpeedIn)
-                                   : String(pendantJog.jogSpeedMm);
-}
-
 void redrawJogSpeedButton() {
-    uint16_t bg = pendantJog.speedDialMode ? COLOR_GREEN : COLOR_BUTTON_GRAY;
-    drawButton(SPD_X, SPD_Y, SPD_W, SPD_H, speedLabel(), bg, COLOR_WHITE, 2);
+    // Adjustable-field style, matching the tap-to-edit buttons on the Probe
+    // screens: a bordered box with a small label on top and the value below;
+    // the border + value highlight (yellow) while speed-dial mode is active.
+    bool        active = pendantJog.speedDialMode;
+    float       spd    = pendantMachine.inInches ? (float)pendantJog.jogSpeedIn
+                                                 : (float)pendantJog.jogSpeedMm;
+    const char* unit   = pendantMachine.inInches ? "ipm" : "mm/m";
+    probeDrawKVTouch(SPD_X, SPD_Y, SPD_W, SPD_H, "SPEED", spd, unit,
+                     COLOR_GREEN, active, 0);
 }
 
 // ===== Lifecycle =====
 
 void enterJogHoming() {
-    spriteAxisDisplay.deleteSprite();
-    spriteValueDisplay.deleteSprite();
-    spriteStatusBar.deleteSprite();
-    spriteFileDisplay.deleteSprite();
+    releasePanelSprites();
 
     // Re-apply the current increment in case units or fine/coarse mode changed since last visit
     {
@@ -85,17 +85,13 @@ void enterJogHoming() {
 
     // $110/$130-$133 are cached on connect — no UART query here.
 
-    if (ESP.getFreeHeap() < 50000) return;
-
-    spriteAxisDisplay.createSprite(230, 55);
-    spriteAxisDisplay.setColorDepth(16);
-    spriteValueDisplay.createSprite(230, 40);
-    spriteValueDisplay.setColorDepth(16);
+    // The big DRO uses a transient 16-bit panel (see updateJogAxisDisplay); the
+    // direct-draw fallback keeps it from ever being blank under heap pressure.
+    releasePanelSprites();
 }
 
 void exitJogHoming() {
-    spriteAxisDisplay.deleteSprite();
-    spriteValueDisplay.deleteSprite();
+    releasePanelSprites();
 }
 
 // ===== Draw =====
@@ -166,80 +162,85 @@ void drawJogHomingScreen() {
 
 void updateJogAxisDisplay() {
     if (currentPendantScreen != PSCREEN_JOG_HOMING) return;
-    if (!spriteAxisDisplay.getBuffer()) return;
 
+    // Snapshot under the lock; skip the frame if briefly held.  Panel is
+    // 230 x 55, pushed at (5, 40); shared 16-bit scratch, direct-draw fallback.
     float px, py, pz, pa;
-    if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
-        px = pendantMachine.posX; py = pendantMachine.posY;
-        pz = pendantMachine.posZ; pa = pendantMachine.posA;
-        xSemaphoreGive(stateMutex);
-    } else {
-        px = pendantMachine.posX; py = pendantMachine.posY;
-        pz = pendantMachine.posZ; pa = pendantMachine.posA;
-    }
+    if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) != pdTRUE) return;
+    px = pendantMachine.posX; py = pendantMachine.posY;
+    pz = pendantMachine.posZ; pa = pendantMachine.posA;
+    xSemaphoreGive(stateMutex);
 
-    spriteAxisDisplay.fillSprite(COLOR_DARKER_BG);
+    int ox, oy;
+    LovyanGFX* g = beginPanelSprite(230, 55, ox, oy, 5, 40);
+    g->fillRect(ox, oy, 230, 55, COLOR_DARKER_BG);
 
     if (pendantJog.speedDialMode) {
         // Speed dial mode — show jog speed prominently
-        spriteAxisDisplay.setTextColor(COLOR_GREEN);
-        spriteAxisDisplay.setTextSize(1);
-        int16_t lw = spriteAxisDisplay.textWidth("JOG SPEED");
-        spriteAxisDisplay.setCursor(115 - lw / 2, 5);
-        spriteAxisDisplay.print("JOG SPEED");
+        g->setTextColor(COLOR_GREEN);
+        g->setTextSize(1);
+        int16_t lw = g->textWidth("JOG SPEED");
+        g->setCursor(ox + 115 - lw / 2, oy + 5);
+        g->print("JOG SPEED");
 
         String speedStr = pendantMachine.inInches
             ? "F:" + String(pendantJog.jogSpeedIn) + " ipm"
             : "F:" + String(pendantJog.jogSpeedMm) + " mm/m";
-        spriteAxisDisplay.setTextSize(2);
-        int16_t sw = spriteAxisDisplay.textWidth(speedStr.c_str());
-        spriteAxisDisplay.setCursor(115 - sw / 2, 20);
-        spriteAxisDisplay.print(speedStr);
+        g->setTextSize(2);
+        int16_t sw = g->textWidth(speedStr.c_str());
+        g->setCursor(ox + 115 - sw / 2, oy + 20);
+        g->print(speedStr);
 
-        spriteAxisDisplay.setTextColor(COLOR_GRAY_TEXT);
-        spriteAxisDisplay.setTextSize(1);
-        int16_t hw = spriteAxisDisplay.textWidth("Select an axis to jog");
-        spriteAxisDisplay.setCursor(115 - hw / 2, 42);
-        spriteAxisDisplay.print("Select an axis to jog");
+        g->setTextColor(COLOR_GRAY_TEXT);
+        g->setTextSize(1);
+        int16_t hw = g->textWidth("Select an axis to jog");
+        g->setCursor(ox + 115 - hw / 2, oy + 42);
+        g->print("Select an axis to jog");
     } else {
         String axisNames[] = { "X", "Y", "Z", "A" };
         float  positions[] = { px, py, pz, pa };
         bool   inAlarm     = pendantMachine.status.startsWith("Alarm");
 
-        // Large selected axis + position on one line; unit replaced with alarm state when active
+        // While homing, the big DRO shows the axis being homed (pendantJog.homingAxis);
+        // otherwise it shows the user's jog-button selection (selectedAxis).  When
+        // homing ends, homingAxis goes back to -1 and the DRO returns to selectedAxis.
+        int dispAxis = (pendantJog.homingAxis >= 0) ? pendantJog.homingAxis
+                                                     : pendantJog.selectedAxis;
+
+        // Large display axis + position on one line; unit replaced with alarm state when active
         char posBuf[12];
         int  decPlaces = pendantMachine.inInches ? 4 : 2;
-        dtostrf(positions[pendantJog.selectedAxis], 1, decPlaces, posBuf);
+        dtostrf(positions[dispAxis], 1, decPlaces, posBuf);
         String unitOrAlarm = inAlarm ? pendantMachine.status
                                      : (pendantMachine.inInches ? "in" : "mm");
         char mainLine[32];
         snprintf(mainLine, sizeof(mainLine), "%s %s %s",
-                 axisNames[pendantJog.selectedAxis].c_str(), posBuf,
+                 axisNames[dispAxis].c_str(), posBuf,
                  unitOrAlarm.c_str());
-        spriteAxisDisplay.setTextColor(inAlarm ? TFT_RED : COLOR_GREEN);
-        spriteAxisDisplay.setTextSize(3);
-        spriteAxisDisplay.setCursor(5, 5);
-        spriteAxisDisplay.print(mainLine);
+        g->setTextColor(inAlarm ? TFT_RED : COLOR_GREEN);
+        g->setTextSize(3);
+        g->setCursor(ox + 5, oy + 5);
+        g->print(mainLine);
 
         // Non-selected axes in a small row underneath
-        spriteAxisDisplay.setTextColor(COLOR_GRAY_TEXT);
-        spriteAxisDisplay.setTextSize(1);
+        g->setTextColor(COLOR_GRAY_TEXT);
+        g->setTextSize(1);
         int numAx      = pendantMachine.numAxes;
         int colSpacing = (numAx > 1) ? 230 / (numAx - 1) : 230;
         int col        = 5;
         for (int i = 0; i < numAx; i++) {
-            if (i == pendantJog.selectedAxis) continue;
+            if (i == dispAxis) continue;  // already shown large above
             char valBuf[10];
             dtostrf(positions[i], 1, 2, valBuf);
             char buf[16];
             snprintf(buf, sizeof(buf), "%s:%s", axisNames[i].c_str(), valBuf);
-            spriteAxisDisplay.setCursor(col, 38);
-            spriteAxisDisplay.print(buf);
+            g->setCursor(ox + col, oy + 38);
+            g->print(buf);
             col += colSpacing;
         }
     }
 
-    spriteAxisDisplay.pushSprite(5, 40);
+    endPanelSprite(230, 55, 5, 40);
 }
 
 // ===== Partial redraws =====
@@ -287,11 +288,20 @@ void handleJogHomingTouch(int x, int y) {
                 char cmd[16];
                 if (i == numAx) {
                     send_line("$H");
+                    // Home-All: start the big DRO on X; onDROChange() then walks
+                    // it through whichever axis is actively homing.
+                    pendantJog.homingAxis = 0;
                 } else {
                     String axisNames[] = { "X", "Y", "Z", "A" };
                     snprintf(cmd, sizeof(cmd), "$H%s", axisNames[i].c_str());
                     send_line(cmd);
+                    // Show the axis being homed in the big DRO.  This uses the
+                    // transient homingAxis, NOT selectedAxis — so once homing
+                    // finishes the DRO reverts to the jog-button selection and
+                    // the user's manual axis choice is never disturbed.
+                    pendantJog.homingAxis = i;
                 }
+                updateJogAxisDisplay();   // refresh the big DRO only
                 return;
             }
         }
@@ -302,6 +312,7 @@ void handleJogHomingTouch(int x, int y) {
         if (isTouchInBounds(x, y, 5 + i * btnW, 173, btnW - 4, 38)) {
             pendantJog.speedDialMode = false;
             pendantJog.selectedAxis  = i;
+            pendantJog.homingAxis    = -1;   // manual selection cancels any homing DRO override
             redrawJogAxisButtons();
             redrawJogSpeedButton();
             return;

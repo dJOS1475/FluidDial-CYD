@@ -1,0 +1,16 @@
+# Custom partition layout for cyd_new_ui_combined.
+#
+# Drops the dual-OTA partitions (we don't do OTA — updates go via USB +
+# web installer) to give the application a single 2.5 MB partition.  The
+# WebSocket library + WiFi stack + LovyanGFX pushed us past the previous
+# 1.25 MB OTA partition limit.
+#
+# Crucially, LittleFS stays put at 0x290000 so existing pendants doing
+# an "Update" install keep their stored loadouts.  NVS stays at 0x9000
+# so WiFi credentials survive too.
+#
+# # Name,   Type, SubType, Offset,   Size,     Flags
+nvs,        data, nvs,     0x9000,   0x5000,
+otadata,    data, ota,     0xE000,   0x2000,
+app0,       app,  ota_0,   0x10000,  0x280000,
+spiffs,     data, spiffs,  0x290000, 0x170000,

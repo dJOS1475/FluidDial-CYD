@@ -2,20 +2,13 @@
 #include "screen_main_menu.h"
 
 void enterMainMenu() {
-    // Allocate sprite for status display
-    spriteStatusBar.deleteSprite();
-    spriteAxisDisplay.deleteSprite();
-    spriteValueDisplay.deleteSprite();
-    spriteFileDisplay.deleteSprite();
-
-    if (ESP.getFreeHeap() >= 50000) {
-        spriteStatusBar.createSprite(230, 65);
-        spriteStatusBar.setColorDepth(16);
-    }
+    // Status bar uses a TRANSIENT 16-bit panel (see updateMainMenuDisplay) so it
+    // renders true colour and only one buffer is live at a time.
+    releasePanelSprites();
 }
 
 void exitMainMenu() {
-    spriteStatusBar.deleteSprite();
+    releasePanelSprites();
 }
 
 void drawMainMenu() {
@@ -42,44 +35,63 @@ void drawMainMenu() {
 
 void updateMainMenuDisplay() {
     if (currentPendantScreen != PSCREEN_MAIN_MENU) return;
-    if (!spriteStatusBar.getBuffer()) return;
 
-    spriteStatusBar.fillSprite(COLOR_DARKER_BG);
-
+    // Snapshot under the lock first; skip the frame if it's briefly held rather
+    // than read the status String unlocked (a concurrent realloc on Core 0 would
+    // corrupt the heap).
     String statusStr;
-    if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
-        statusStr = pendantMachine.status;
-        xSemaphoreGive(stateMutex);
-    } else {
-        statusStr = pendantMachine.status;  // best-effort read
-    }
+    if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) != pdTRUE) return;
+    statusStr = pendantMachine.status;
+    xSemaphoreGive(stateMutex);
 
-    if (statusStr.startsWith("Alarm")) {
-        // Alarm: show description on label line, "ALARM" in red on status line
+    int ox, oy;
+    LovyanGFX* g = beginPanelSprite(230, 65, ox, oy, 5, 40);
+    g->fillRect(ox, oy, 230, 65, COLOR_DARKER_BG);
+
+    if (!pendantSynced || statusStr == "N/C" || statusStr.length() == 0) {
+        // Power-up / reconnect, two phases so the user knows what's happening:
+        //   "Connecting" — link not yet established (WiFi assoc / WS handshake
+        //                  or UART not yet responding)
+        //   "Syncing"    — link is up; fetching config + waiting for live state
+        // Size 3 so the 10-char "Connecting" fits the 230 px bar.  Same for
+        // WiFi and wired.
+        const char* phase = pendantConnected ? "Syncing" : "Connecting";
+        g->setTextColor(COLOR_GRAY_TEXT);
+        g->setTextSize(1);
+        int16_t lw = g->textWidth("STATUS");
+        g->setCursor(ox + 115 - lw / 2, oy + 8);
+        g->print("STATUS");
+        g->setTextColor(COLOR_ORANGE);
+        g->setTextSize(3);
+        int16_t cw = g->textWidth(phase);
+        g->setCursor(ox + 115 - cw / 2, oy + 30);
+        g->print(phase);
+    } else if (statusStr.startsWith("Alarm")) {
+        // Alarm: description on label line, "ALARM" in red on status line
         String desc = alarmDescription(statusStr);
-        spriteStatusBar.setTextColor(TFT_RED);
-        spriteStatusBar.setTextSize(1);
-        int16_t dw = spriteStatusBar.textWidth(desc.c_str());
-        spriteStatusBar.setCursor(115 - dw / 2, 8);
-        spriteStatusBar.print(desc);
-        spriteStatusBar.setTextSize(4);
-        int16_t sw = spriteStatusBar.textWidth("ALARM");
-        spriteStatusBar.setCursor(115 - sw / 2, 26);
-        spriteStatusBar.print("ALARM");
+        g->setTextColor(TFT_RED);
+        g->setTextSize(1);
+        int16_t dw = g->textWidth(desc.c_str());
+        g->setCursor(ox + 115 - dw / 2, oy + 8);
+        g->print(desc);
+        g->setTextSize(4);
+        int16_t sw = g->textWidth("ALARM");
+        g->setCursor(ox + 115 - sw / 2, oy + 26);
+        g->print("ALARM");
     } else {
-        spriteStatusBar.setTextColor(COLOR_GRAY_TEXT);
-        spriteStatusBar.setTextSize(1);
-        int16_t labelWidth = spriteStatusBar.textWidth("STATUS");
-        spriteStatusBar.setCursor(115 - labelWidth / 2, 8);
-        spriteStatusBar.print("STATUS");
-        spriteStatusBar.setTextColor(COLOR_CYAN);
-        spriteStatusBar.setTextSize(4);
-        int16_t statusWidth = spriteStatusBar.textWidth(statusStr.c_str());
-        spriteStatusBar.setCursor(115 - statusWidth / 2, 26);
-        spriteStatusBar.print(statusStr);
+        g->setTextColor(COLOR_GRAY_TEXT);
+        g->setTextSize(1);
+        int16_t labelWidth = g->textWidth("STATUS");
+        g->setCursor(ox + 115 - labelWidth / 2, oy + 8);
+        g->print("STATUS");
+        g->setTextColor(COLOR_CYAN);
+        g->setTextSize(4);
+        int16_t statusWidth = g->textWidth(statusStr.c_str());
+        g->setCursor(ox + 115 - statusWidth / 2, oy + 26);
+        g->print(statusStr);
     }
 
-    spriteStatusBar.pushSprite(5, 40);
+    endPanelSprite(230, 65, 5, 40);
 }
 
 void handleMainMenuTouch(int x, int y) {
@@ -93,6 +105,6 @@ void handleMainMenuTouch(int x, int y) {
     else if (isTouchInBounds(x, y, 123, btnY + btnGap,     112, btnH)) currentPendantScreen = PSCREEN_SPINDLE_CONTROL;
     else if (isTouchInBounds(x, y, 5,   btnY + btnGap * 2, 112, btnH)) currentPendantScreen = PSCREEN_MACROS;
     else if (isTouchInBounds(x, y, 123, btnY + btnGap * 2, 112, btnH)) currentPendantScreen = PSCREEN_SD_CARD;
-    else if (isTouchInBounds(x, y, 5,   btnY + btnGap * 3, 112, btnH)) currentPendantScreen = PSCREEN_PROBING;
+    else if (isTouchInBounds(x, y, 5,   btnY + btnGap * 3, 112, btnH)) currentPendantScreen = PSCREEN_PROBE;
     else if (isTouchInBounds(x, y, 123, btnY + btnGap * 3, 112, btnH)) currentPendantScreen = PSCREEN_STATUS;
 }

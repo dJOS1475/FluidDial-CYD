@@ -2,17 +2,14 @@
 #include "screen_probing_work.h"
 
 void enterProbingWork() {
-    spriteAxisDisplay.deleteSprite();
-    spriteValueDisplay.deleteSprite();
-    spriteStatusBar.deleteSprite();
-    spriteFileDisplay.deleteSprite();
-
-    if (ESP.getFreeHeap() < 50000) return;
-
-    spriteAxisDisplay.createSprite(230, 45);
-    spriteAxisDisplay.setColorDepth(16);
-    spriteValueDisplay.createSprite(230, 45);
-    spriteValueDisplay.setColorDepth(16);
+    releasePanelSprites();
+    // These panels fill with COLOR_BACKGROUND (black), which is identical in 8-
+    // and 16-bit — so they keep the cheaper persistent 8-bit allocation (no
+    // rgb332 colour tint to worry about, unlike the grey panels which use the
+    // 16-bit beginPanelSprite scratch).  update*() falls back to direct draw if
+    // allocation fails.
+    allocPanelSprite(spriteAxisDisplay,  230, 45, 40000);
+    allocPanelSprite(spriteValueDisplay, 230, 45);
 }
 
 void exitProbingWork() {
@@ -64,7 +61,11 @@ void drawProbingWorkScreen() {
 
 void updateWorkMachinePos() {
     if (currentPendantScreen != PSCREEN_PROBING_WORK) return;
-    if (!spriteAxisDisplay.getBuffer()) return;
+
+    const bool hasSprite = spriteAxisDisplay.getBuffer() != nullptr;  // pushed at (5, 108)
+    LovyanGFX*  g  = hasSprite ? (LovyanGFX*)&spriteAxisDisplay : (LovyanGFX*)&display;
+    const int   ox = hasSprite ? 0 : 5;
+    const int   oy = hasSprite ? 0 : 108;
 
     float px, py, pz, pa;
     if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
@@ -78,19 +79,24 @@ void updateWorkMachinePos() {
 
     const char* axisNames[] = { "X", "Y", "Z", "A" };
     float       positions[] = { px, py, pz, pa };
-    spriteAxisDisplay.fillSprite(COLOR_BACKGROUND);
-    spriteAxisDisplay.setTextColor(COLOR_ORANGE);
-    spriteAxisDisplay.setTextSize(2);
+    if (hasSprite) spriteAxisDisplay.fillSprite(COLOR_BACKGROUND);
+    else           display.fillRect(5, 108, 230, 45, COLOR_BACKGROUND);
+    g->setTextColor(COLOR_ORANGE);
+    g->setTextSize(2);
     for (int i = 0; i < pendantMachine.numAxes; i++) {
-        spriteAxisDisplay.setCursor((i % 2) ? 120 : 0, 5 + (i / 2) * 20);
-        spriteAxisDisplay.print(axisNames[i]); spriteAxisDisplay.print(":"); spriteAxisDisplay.print(positions[i], 1);
+        g->setCursor(ox + ((i % 2) ? 120 : 0), oy + 5 + (i / 2) * 20);
+        g->print(axisNames[i]); g->print(":"); g->print(positions[i], 1);
     }
-    spriteAxisDisplay.pushSprite(5, 108);
+    if (hasSprite) spriteAxisDisplay.pushSprite(5, 108);
 }
 
 void updateWorkAreaPos() {
     if (currentPendantScreen != PSCREEN_PROBING_WORK) return;
-    if (!spriteValueDisplay.getBuffer()) return;
+
+    const bool hasSprite = spriteValueDisplay.getBuffer() != nullptr;  // pushed at (5, 166)
+    LovyanGFX*  g  = hasSprite ? (LovyanGFX*)&spriteValueDisplay : (LovyanGFX*)&display;
+    const int   ox = hasSprite ? 0 : 5;
+    const int   oy = hasSprite ? 0 : 166;
 
     float wx, wy, wz, wa;
     if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
@@ -104,14 +110,15 @@ void updateWorkAreaPos() {
 
     const char* wAxisNames[] = { "X", "Y", "Z", "A" };
     float       workPos[]    = { wx, wy, wz, wa };
-    spriteValueDisplay.fillSprite(COLOR_BACKGROUND);
-    spriteValueDisplay.setTextColor(COLOR_CYAN);
-    spriteValueDisplay.setTextSize(2);
+    if (hasSprite) spriteValueDisplay.fillSprite(COLOR_BACKGROUND);
+    else           display.fillRect(5, 166, 230, 45, COLOR_BACKGROUND);
+    g->setTextColor(COLOR_CYAN);
+    g->setTextSize(2);
     for (int i = 0; i < pendantMachine.numAxes; i++) {
-        spriteValueDisplay.setCursor((i % 2) ? 120 : 0, 5 + (i / 2) * 20);
-        spriteValueDisplay.print(wAxisNames[i]); spriteValueDisplay.print(":"); spriteValueDisplay.print(workPos[i], 1);
+        g->setCursor(ox + ((i % 2) ? 120 : 0), oy + 5 + (i / 2) * 20);
+        g->print(wAxisNames[i]); g->print(":"); g->print(workPos[i], 1);
     }
-    spriteValueDisplay.pushSprite(5, 166);
+    if (hasSprite) spriteValueDisplay.pushSprite(5, 166);
 }
 
 void redrawWorkCoordButtons() {

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FluidDial-CYD Simulator</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">FluidDial&#8209;CYD&nbsp;<span>Simulator</span></div>
+    <div class="hint">Tap the screen &middot; drag/scroll the wheel &middot; arrow keys = encoder</div>
+  </header>
+
+  <div id="syncbanner" class="syncbanner" style="display:none"></div>
+
+  <main class="stage">
+    <!-- ===== Device ===== -->
+    <section class="device" aria-label="Pendant">
+      <div class="logo">Fluid<span class="spark">&#10625;</span>NC</div>
+
+      <div class="screen-area">
+        <canvas id="screen" width="240" height="320"></canvas>
+        <canvas id="overlay" width="300" height="400"></canvas>
+      </div>
+
+      <div class="buttons">
+        <button id="btn-red" class="hwbtn red" title="E-Stop / soft reset"></button>
+        <button id="btn-yellow" class="hwbtn yellow" title="Pause / feed hold"></button>
+        <button id="btn-green" class="hwbtn green" title="Cycle start"></button>
+      </div>
+
+      <div class="encoder">
+        <div id="knob" class="knob" title="Drag or scroll to turn the handwheel">
+          <div id="knob-mark" class="knob-mark"></div>
+          <div class="knob-cap"></div>
+        </div>
+        <div class="enc-steppers">
+          <button id="enc-minus" type="button">&minus;</button>
+          <button id="enc-plus" type="button">+</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Bench controls ===== -->
+    <section class="bench">
+      <div id="controls" class="controls"></div>
+    </section>
+
+    <!-- ===== Controller log ===== -->
+    <section class="console">
+      <h3>Controller Log <small>(G-code / events the UI emits)</small></h3>
+      <pre id="log" class="log"></pre>
+    </section>
+  </main>
+
+  <script src="js/colors.js"></script>
+  <script src="js/font.js"></script>
+  <script src="js/lgfx.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/stubs.js"></script>
+  <script src="js/helpers.js"></script>
+
+  <script src="js/screens/menu.js"></script>
+  <script src="js/screens/status.js"></script>
+  <script src="js/screens/jog.js"></script>
+  <script src="js/screens/work.js"></script>
+  <script src="js/screens/feeds.js"></script>
+  <script src="js/screens/spindle.js"></script>
+  <script src="js/screens/sdcard.js"></script>
+  <script src="js/screens/macros.js"></script>
+  <script src="js/screens/fluidnc.js"></script>
+  <script src="js/screens/wifi.js"></script>
+  <script src="js/screens/probe.js"></script>
+  <script src="js/screens/probe_z.js"></script>
+  <script src="js/screens/probe_corner.js"></script>
+  <script src="js/screens/probe_bore_boss.js"></script>
+  <script src="js/screens/probe_cfg.js"></script>
+
+  <script src="js/controls.js"></script>
+  <script src="js/sim.js"></script>
+  <script src="js/livereload.js"></script>
+  <script src="js/syncbanner.js"></script>
+</body>
+</html>

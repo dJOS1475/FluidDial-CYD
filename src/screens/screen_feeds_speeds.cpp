@@ -1,27 +1,46 @@
 #include "pendant_shared.h"
 #include "screen_feeds_speeds.h"
+#include "screen_probe.h"   // PROBE_* colours — shared adjustable-field style
+
+// Adjustable-field style matching probeDrawKVTouch(), rendered into a panel
+// sprite `g` (these readouts update live, so they composite off-screen to stay
+// flicker-free).  Label on top, large value + unit below; the border and value
+// highlight (yellow) while the dial is active.
+static void drawDialField(LovyanGFX* g, int ox, int oy, int w, int h,
+                          int value, uint16_t valColor, bool active) {
+    uint16_t bg  = active ? PROBE_SEL_BG   : PROBE_BG_SCREEN;
+    uint16_t bdr = active ? PROBE_C_YELLOW : PROBE_C_DIMBLUE;
+    g->fillRect(ox, oy, w, h, COLOR_BACKGROUND);   // clear corners to screen bg
+    g->fillRoundRect(ox, oy, w, h, 2, bg);
+    g->drawRoundRect(ox, oy, w, h, 2, bdr);
+
+    g->setTextSize(1);
+    g->setTextColor(active ? COLOR_WHITE : PROBE_C_LBLUE);
+    g->setCursor(ox + 3, oy + 2);
+    g->print("DIAL");
+
+    char vbuf[8];
+    snprintf(vbuf, sizeof(vbuf), "%d", value);
+    g->setTextSize(2);
+    g->setTextColor(active ? PROBE_C_YELLOW : valColor);
+    g->setCursor(ox + 3, oy + 11);
+    g->print(vbuf);
+
+    g->setTextSize(1);
+    g->setTextColor(PROBE_C_DIMBLUE);
+    int16_t vw = g->textWidth(vbuf) * 2;
+    g->setCursor(ox + 3 + vw + 1, oy + 14);
+    g->print("%");
+}
 
 void enterFeedsSpeeds() {
-    spriteAxisDisplay.deleteSprite();
-    spriteValueDisplay.deleteSprite();
-    spriteStatusBar.deleteSprite();
-    spriteFileDisplay.deleteSprite();
-
-    if (ESP.getFreeHeap() < 50000) return;
-
-    spriteStatusBar.createSprite(230, 35);
-    spriteStatusBar.setColorDepth(16);
-    spriteAxisDisplay.createSprite(72, 37);
-    spriteAxisDisplay.setColorDepth(16);
-    spriteValueDisplay.createSprite(72, 37);
-    spriteValueDisplay.setColorDepth(16);
+    // Each panel uses a transient 16-bit sprite (see the update*() functions).
+    releasePanelSprites();
 }
 
 void exitFeedsSpeeds() {
     pendantFeeds.dialMode = 0;
-    spriteStatusBar.deleteSprite();
-    spriteAxisDisplay.deleteSprite();
-    spriteValueDisplay.deleteSprite();
+    releasePanelSprites();
 }
 
 void drawFeedsSpeedsScreen() {
@@ -42,7 +61,7 @@ void drawFeedsSpeedsScreen() {
     }
     uint16_t bg3 = (3 == pendantFeeds.selectedFeedOverride) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
     drawButton(5, 137, 72, 37, pcts[3], bg3, COLOR_WHITE, 2);
-    display.fillRoundRect(83, 137, 72, 37, 5, COLOR_DARKER_BG);
+    display.fillRoundRect(83, 137, 72, 37, 2, COLOR_BACKGROUND);
     updateFeedOverrideDisplay();
     uint16_t bg4 = (4 == pendantFeeds.selectedFeedOverride) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
     drawButton(161, 137, 72, 37, pcts[4], bg4, COLOR_WHITE, 2);
@@ -58,7 +77,7 @@ void drawFeedsSpeedsScreen() {
     }
     uint16_t bg3s = (3 == pendantFeeds.selectedSpindleOverride) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
     drawButton(5, 236, 72, 37, pcts[3], bg3s, COLOR_WHITE, 2);
-    display.fillRoundRect(83, 236, 72, 37, 5, COLOR_DARKER_BG);
+    display.fillRoundRect(83, 236, 72, 37, 2, COLOR_BACKGROUND);
     updateSpindleOverrideDisplay();
     uint16_t bg4s = (4 == pendantFeeds.selectedSpindleOverride) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
     drawButton(161, 236, 72, 37, pcts[4], bg4s, COLOR_WHITE, 2);
@@ -68,103 +87,70 @@ void drawFeedsSpeedsScreen() {
 
 void updateFeedsSpeedsTopDisplay() {
     if (currentPendantScreen != PSCREEN_FEEDS_SPEEDS) return;
-    if (!spriteStatusBar.getBuffer()) return;
 
     int feedRate, spindleRPM;
-    if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
-        feedRate   = pendantMachine.feedRate;
-        spindleRPM = pendantMachine.spindleRPM;
-        xSemaphoreGive(stateMutex);
-    } else {
-        feedRate   = pendantMachine.feedRate;
-        spindleRPM = pendantMachine.spindleRPM;
-    }
+    if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) != pdTRUE) return;
+    feedRate   = pendantMachine.feedRate;
+    spindleRPM = pendantMachine.spindleRPM;
+    xSemaphoreGive(stateMutex);
 
-    spriteStatusBar.fillSprite(COLOR_BACKGROUND);
+    int ox, oy;
+    LovyanGFX* g = beginPanelSprite(230, 35, ox, oy, 5, 40);
+    g->fillRect(ox, oy, 230, 35, COLOR_BACKGROUND);
 
     // Feed box
-    spriteStatusBar.fillRoundRect(0, 0, 112, 35, 5, COLOR_DARKER_BG);
-    spriteStatusBar.setTextColor(COLOR_GRAY_TEXT);
-    spriteStatusBar.setTextSize(1);
-    spriteStatusBar.setCursor(5, 3);
-    spriteStatusBar.print("FEED");
-    spriteStatusBar.setTextColor(COLOR_ORANGE);
-    spriteStatusBar.setTextSize(2);
-    spriteStatusBar.setCursor(5, 13);
-    spriteStatusBar.print(feedRate);
+    g->fillRoundRect(ox + 0, oy + 0, 112, 35, 5, COLOR_DARKER_BG);
+    g->setTextColor(COLOR_GRAY_TEXT);
+    g->setTextSize(1);
+    g->setCursor(ox + 5, oy + 3);
+    g->print("FEED");
+    g->setTextColor(COLOR_ORANGE);
+    g->setTextSize(2);
+    g->setCursor(ox + 5, oy + 13);
+    g->print(feedRate);
 
     // Spindle box
-    spriteStatusBar.fillRoundRect(118, 0, 112, 35, 5, COLOR_DARKER_BG);
-    spriteStatusBar.setTextColor(COLOR_GRAY_TEXT);
-    spriteStatusBar.setTextSize(1);
-    spriteStatusBar.setCursor(123, 3);
-    spriteStatusBar.print("SPINDLE");
-    spriteStatusBar.setTextColor(COLOR_GREEN);
-    spriteStatusBar.setTextSize(2);
-    spriteStatusBar.setCursor(123, 13);
-    spriteStatusBar.print(spindleRPM);
+    g->fillRoundRect(ox + 118, oy + 0, 112, 35, 5, COLOR_DARKER_BG);
+    g->setTextColor(COLOR_GRAY_TEXT);
+    g->setTextSize(1);
+    g->setCursor(ox + 123, oy + 3);
+    g->print("SPINDLE");
+    g->setTextColor(COLOR_GREEN);
+    g->setTextSize(2);
+    g->setCursor(ox + 123, oy + 13);
+    g->print(spindleRPM);
 
-    spriteStatusBar.pushSprite(5, 40);
+    endPanelSprite(230, 35, 5, 40);
 }
 
 void updateFeedOverrideDisplay() {
     if (currentPendantScreen != PSCREEN_FEEDS_SPEEDS) return;
-    if (!spriteAxisDisplay.getBuffer()) return;
 
     int fro;
-    if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
-        fro = pendantMachine.feedOverride;
-        xSemaphoreGive(stateMutex);
-    } else {
-        fro = pendantMachine.feedOverride;
-    }
+    if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) != pdTRUE) return;
+    fro = pendantMachine.feedOverride;
+    xSemaphoreGive(stateMutex);
 
+    int ox, oy;
     bool active = (pendantFeeds.dialMode == 1);
-    spriteAxisDisplay.fillSprite(active ? COLOR_DARK_GREEN : COLOR_DARKER_BG);
-    spriteAxisDisplay.setTextColor(active ? COLOR_WHITE : COLOR_ORANGE);
-    spriteAxisDisplay.setTextSize(2);
-    String txt = String(fro) + "%";
-    int16_t tw = spriteAxisDisplay.textWidth(txt.c_str());
-    spriteAxisDisplay.setCursor(36 - tw / 2, active ? 5 : 11);
-    spriteAxisDisplay.print(txt);
-    if (active) {
-        spriteAxisDisplay.setTextColor(COLOR_WHITE);
-        spriteAxisDisplay.setTextSize(1);
-        int16_t hw = spriteAxisDisplay.textWidth("DIAL");
-        spriteAxisDisplay.setCursor(36 - hw / 2, 26);
-        spriteAxisDisplay.print("DIAL");
-    }
-    spriteAxisDisplay.pushSprite(83, 137);
+    LovyanGFX* g = beginPanelSprite(72, 37, ox, oy, 83, 137);
+    drawDialField(g, ox, oy, 72, 37, fro, COLOR_ORANGE, active);
+    endPanelSprite(72, 37, 83, 137);
 }
 
 void updateSpindleOverrideDisplay() {
     if (currentPendantScreen != PSCREEN_FEEDS_SPEEDS) return;
-    if (!spriteValueDisplay.getBuffer()) return;
 
     int sro;
-    if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
-        sro = pendantMachine.spindleOverride;
-        xSemaphoreGive(stateMutex);
-    } else {
-        sro = pendantMachine.spindleOverride;
-    }
+    if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) != pdTRUE) return;
+    sro = pendantMachine.spindleOverride;
+    xSemaphoreGive(stateMutex);
 
+    int ox, oy;
     bool active = (pendantFeeds.dialMode == 2);
-    spriteValueDisplay.fillSprite(active ? COLOR_DARK_GREEN : COLOR_DARKER_BG);
-    spriteValueDisplay.setTextColor(active ? COLOR_WHITE : COLOR_GREEN);
-    spriteValueDisplay.setTextSize(2);
-    String txt = String(sro) + "%";
-    int16_t tw = spriteValueDisplay.textWidth(txt.c_str());
-    spriteValueDisplay.setCursor(36 - tw / 2, active ? 5 : 11);
-    spriteValueDisplay.print(txt);
-    if (active) {
-        spriteValueDisplay.setTextColor(COLOR_WHITE);
-        spriteValueDisplay.setTextSize(1);
-        int16_t hw = spriteValueDisplay.textWidth("DIAL");
-        spriteValueDisplay.setCursor(36 - hw / 2, 26);
-        spriteValueDisplay.print("DIAL");
-    }
-    spriteValueDisplay.pushSprite(83, 236);
+    LovyanGFX* g = beginPanelSprite(72, 37, ox, oy, 83, 236);
+    drawDialField(g, ox, oy, 72, 37, sro, COLOR_GREEN, active);
+    endPanelSprite(72, 37, 83, 236);
 }
 
 void redrawFeedOverrideButtons() {

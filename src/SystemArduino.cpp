@@ -1,54 +1,66 @@
 // Copyright (c) 2023 Mitch Bradley
+// Copyright (c) 2026 — FluidDial-CYD modular comms refactor
 // Use of this source code is governed by a GPLv3 license that can be found in the LICENSE file.
 
-// System interface routines for the Arduino framework
+// System interface routines for the Arduino framework.
+//
+// All transport-specific code now lives in the Comms layer:
+//   • Comms.h / Comms.cpp        — facade (picks one backend at boot)
+//   • CommsUart.h / CommsUart.cpp — UART backend (ESP-IDF UART driver)
+//   • WiFiConnection.h / .cpp     — WiFi backend (WebSocket to FluidNC)
+//
+// fnc_putchar() and fnc_getchar() are GrblParserC's only byte-level hooks;
+// they now forward into the comms facade.  Nothing in this file knows
+// whether the active transport is UART or WiFi.
 
 #include "System.h"
 #include "FluidNCModel.h"
 #include "NVS.h"
+#include "Comms.h"
 
 #include <Esp.h>  // ESP.restart()
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
-#include <driver/uart.h>
-#include "hal/uart_hal.h"
-
-uart_port_t fnc_uart_port;
-
-// We use the ESP-IDF UART driver instead of the Arduino
-// HardwareSerial driver so we can use software (XON/XOFF)
-// flow control.  The ESP-IDF driver supports the ESP32's
-// hardware implementation of XON/XOFF, but Arduino does not.
+// ── GrblParserC byte hooks ───────────────────────────────────────────────────
 
 extern "C" void fnc_putchar(uint8_t c) {
-    uart_write_bytes(fnc_uart_port, (const char*)&c, 1);
-#ifdef ECHO_FNC_TO_DEBUG
-    dbg_write(c);
-#endif
+    comms_putchar(c);
+}
+
+// Byte consumption is owned by Core 0 (pendant_comms_task drains the ring
+// buffer into GrblParserC's collect()).  But the GrblParserC library's
+// fnc_send_line() spins waiting for the previous command's "ok" ack and
+// calls fnc_poll() -> fnc_getchar() -> collect() from whichever task it
+// was invoked on.  When called from Core 1 (touch handlers, button
+// handlers, etc.), that's a SECOND task calling collect() on the same
+// static _report buffer that Core 0 is writing into — a race that
+// corrupts the parser and causes file-list / DRO / ack messages to be
+// mis-parsed or silently lost.
+//
+// Solution: when called from Core 1, return -1 immediately (no byte
+// available) and yield 1 tick.  fnc_send_line's spin still sees
+// _ackwait clear when Core 0's drain processes "ok" — exactly the
+// behaviour we want — but Core 1 never touches collect()'s state.
+//
+// The equivalent path in UART mode is naturally safe because the
+// ESP-IDF UART driver serializes uart_read_bytes() internally; only
+// the WiFi ring buffer + collect() combination is vulnerable to this.
+extern "C" int fnc_getchar() {
+    if (xPortGetCoreID() != 0) {
+        // Not Core 0 — yield and report no byte.  The caller (almost
+        // always fnc_poll() inside fnc_send_line's _ackwait spin) re-loops
+        // and re-checks _ackwait, which Core 0's drain will have cleared.
+        vTaskDelay(1);
+        return -1;
+    }
+    return comms_getchar();
 }
 
 void ledcolor(int n) {
     digitalWrite(4, !(n & 1));
     digitalWrite(16, !(n & 2));
     digitalWrite(17, !(n & 4));
-}
-extern "C" int fnc_getchar() {
-    char c;
-    int  res = uart_read_bytes(fnc_uart_port, &c, 1, 0);
-    if (res == 1) {
-#ifdef LED_DEBUG
-        if (c == '\r' || c == '\n') {
-            ledcolor(0);
-        } else {
-            ledcolor(c & 7);
-        }
-#endif
-        update_rx_time();
-#ifdef ECHO_FNC_TO_DEBUG
-        dbg_write(c);
-#endif
-        return c;
-    }
-    return -1;
 }
 
 extern "C" void poll_extra() {
@@ -77,48 +89,7 @@ void drawPngFile(LGFX_Sprite* sprite, const char* filename, int x, int y) {
 
 #define FORMAT_LITTLEFS_IF_FAILED true
 
-// Baud rates up to 10M work
-#ifndef FNC_BAUD
-#    define FNC_BAUD 115200
-#endif
-
 extern void init_hardware();
-
-void init_fnc_uart(int uart_num, int tx_pin, int rx_pin) {
-    fnc_uart_port = (uart_port_t)uart_num;
-    int baudrate  = FNC_BAUD;
-    uart_driver_delete(fnc_uart_port);
-    uart_set_pin(fnc_uart_port, (gpio_num_t)tx_pin, (gpio_num_t)rx_pin, -1, -1);
-    uart_config_t conf;
-#if defined(CONFIG_IDF_TARGET_ESP32) || defined(CONFIG_IDF_TARGET_ESP32S2)
-    conf.source_clk = UART_SCLK_APB;  // ESP32, ESP32S2
-#endif
-#if defined(CONFIG_IDF_TARGET_ESP32S3) || defined(CONFIG_IDF_TARGET_ESP32C3)
-    // UART_SCLK_XTAL is independent of the APB frequency
-    conf.source_clk = UART_SCLK_XTAL;  // ESP32C3, ESP32S3
-#endif
-    conf.baud_rate = baudrate;
-
-    conf.data_bits           = UART_DATA_8_BITS;
-    conf.parity              = UART_PARITY_DISABLE;
-    conf.stop_bits           = UART_STOP_BITS_1;
-    conf.flow_ctrl           = UART_HW_FLOWCTRL_DISABLE;
-    conf.rx_flow_ctrl_thresh = 0;
-    if (uart_param_config(fnc_uart_port, &conf) != ESP_OK) {
-        dbg_println("UART config failed");
-        while (1) {}
-        return;
-    };
-    // 4 KB RX buffer — large enough to absorb a full JSON burst without triggering
-    // XON/XOFF flow control mid-stream.  Old 256-byte buffer + 500 B/s poll rate
-    // caused preferences.json (10+ KB) to take 15-20 seconds to receive.
-    // XON/XOFF thresholds are uint8_t (max 255); use near-max values so XOFF
-    // fires rarely — the drain loop in pendant_hw_task empties the buffer every 2 ms.
-    uart_driver_install(fnc_uart_port, 4096, 0, 0, NULL, ESP_INTR_FLAG_IRAM);
-    uart_set_sw_flow_ctrl(fnc_uart_port, true, 128, 250);
-    uint32_t baud;
-    uart_get_baudrate(fnc_uart_port, &baud);
-}
 
 void init_system() {
     init_hardware();
@@ -132,9 +103,19 @@ void init_system() {
     canvas.setColorDepth(8);
     canvas.createSprite(240, 240);  // display.width(), display.height());
 }
+
+// ── Flow-control reset ──────────────────────────────────────────────────────
+// Send a soft-XON byte through the active transport, then — if and only if
+// the active transport is UART — also force the UART hardware out of XOFF
+// state.  In WiFi mode the byte is dropped by ws_putchar() (which filters
+// XON/XOFF since TCP doesn't need them) and the hardware-XON call is
+// skipped entirely.
+#include "CommsUart.h"  // uart_backend_reset_flow_control()
 void resetFlowControl() {
-    fnc_putchar(0x11);
-    uart_ll_force_xon(fnc_uart_port);
+    comms_putchar(0x11);
+    if (comms_active_mode() == COMMS_MODE_UART) {
+        uart_backend_reset_flow_control();
+    }
 }
 
 extern "C" int milliseconds() {

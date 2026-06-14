@@ -1,0 +1,21 @@
+{
+  "screens/screen_main_menu.cpp": "baf34b3eeacaa9c0c06044cfa5e7ca5119d815ac",
+  "screens/screen_status.cpp": "c93e85910b91a0583223a91f5b592661ee715b2a",
+  "screens/screen_jog_homing.cpp": "7914d48b2939ad3dddc653a933ca20f1be08a1ad",
+  "screens/screen_probing_work.cpp": "19c0af5c3868ba581049ac7016606b2ba2891dc2",
+  "screens/screen_feeds_speeds.cpp": "4f6621b96e12617db34d264c9a5e0314feac3dde",
+  "screens/screen_spindle_control.cpp": "df79772078a8742b954a830d069346fc1a022cf5",
+  "screens/screen_sd_card.cpp": "267f817c79a90d3d8badd081242e9ed2efc1820f",
+  "screens/screen_macros.cpp": "f4df1e74e24043a535675e5e072ce90d67461f5a",
+  "screens/screen_fluidnc.cpp": "aabf4830b49ab1a1300b61f62a79c51a83a27a8f",
+  "screens/screen_wifi_setup.cpp": "4219e9099dafa250cc3aac9bb6c592289ba42d0e",
+  "screens/screen_probe.cpp": "71119bd4f2fc9c9346879c266a576d53cc178fee",
+  "screens/screen_probe_z.cpp": "5ebe52486a70880db03e478d2f8a197474219eb1",
+  "screens/screen_probe_corner.cpp": "88eeb45864a640a2b42793fd994fe62005ebfb11",
+  "screens/screen_probe_bore_boss.cpp": "79a2820732b42d055d129ccc128936ff127d115d",
+  "screens/screen_probe_cfg.cpp": "544419ed0d7d1f7dda0102777c9dca74ab95e78d",
+  "CNC_Pendant_UI.cpp": "7af8c59b7881b6d3db5a5a64f95e5c465408bb3c",
+  "screens/pendant_shared.h": "1eade4c1dc1e906943d67720b04290be5d60925a",
+  "cnc_pendant_config.h": "722f25618cb6587460a3d838d102a8178fc62475",
+  "screens/screen_probe.h": "4cc34ffa4f8316eef81dd5615eceaab356ecc1e9"
+}

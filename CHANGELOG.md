@@ -3,6 +3,57 @@
 **ChangeLog:**
 
 
+**2026-06-14**
+
+v2.0.0
+* Feature: **probing rebuilt around three probe types** — the Probe screen now opens on a hub with a segmented type selector: **Z-Height Touch Plate**, **XYZ Touch Plate**, and **3D Touch Probe**; the routines on offer are gated by the selected type — Z-Height Plate exposes Z Surface only, XYZ Plate adds XYZ Corner, and the 3D Probe adds Bore and Boss
+* Feature: probe routines now **generate their G-code on the pendant** (G38.2 straight-probe moves, with named-parameter arithmetic for circle centre-finding) instead of running pre-written `.nc` macro files from the controller; the trigger offset is computed per type — touch-plate thickness for plates, ball radius for the 3D probe — so the same routine zeroes correctly regardless of probe hardware
+* Feature: new routine screens — **Z Surface** (Z-only zero), **XYZ Corner** (with cycle selectors for which corner and which of X/Y/Z to set), **Bore** (inside-circle centre find) and **Boss** (outside-circle centre find), each with a live sequence outline and tap-to-edit settings
+* Feature: per-type **Configure** screen — 3D-probe stylus parameters (ball dia, stylus length, deflection, pre-travel) or touch-plate dimensions (thickness, plus width and XY offsets for the XYZ plate); a schematic illustration of the selected probe type is drawn on each config screen for reference
+* Feature: a **shared settings** panel on the hub (probe rate, seek rate, retract, max Z travel) applies to every routine
+* UX: probe routine screens share a consistent full-width **Back** button placement and drop the redundant "Probe" word from their titles; the hub's **Configure** button is teal so it stands apart from the blue navigation buttons; with the XYZ Plate type selected, the two routines are shown as full-width stacked buttons
+* UX: probe warnings are **type-aware** — a 3D probe is reminded to verify the probe is connected, a touch plate to verify the plate clip; the touch-plate config screens no longer carry the clip warning (it now lives on the routine screen, where it matters)
+* UX: **connection status is now staged** — the Main Menu and Status screens show "Connecting" while the link comes up, then "Syncing" while the controller's static configuration is fetched, then live machine state; previously the UI could sit on a bare "Connecting" indefinitely
+* Fix: **random WiFi alarms, garbled commands and ~20 s input lag** eliminated — the transmit drain was folding realtime bytes (`?` `!` `~`) into the middle of a pending line command when one was mid-flight, corrupting both; realtime bytes are now always extracted and sent immediately
+* Fix: **stuck "Connecting" when the controller was already idle** — sync completion was gated on a state-change report that never fires if the machine is already Idle; it now keys off DRO reports, which arrive on every status push
+* Fix: **false "N/C" (not-connected) flashes** — a `[MSG:RST]` from the controller cleared the cached state without refreshing the human-readable status string; the status line is now kept in step on every DRO update
+* Fix: **freeze / stuck connect on WiFi reconnect** — the post-reconnect setup block used blocking ack-waited sends; it now uses non-blocking sends so the UI never stalls on a flaky link
+* Fix: **macros and SD file lists load reliably after a sync** — the controller file fetch was rewritten as a raw HTTP GET with a hard-bounded connect timeout and explicit error codes, replacing the client that could hang the connect
+* Display: **panel backgrounds no longer have a green tint** — transient panels are now composited through a single 16-bit (rgb565) scratch sprite; the previous 8-bit (rgb332) path had only two bits of blue and crushed the near-neutral dark-gray panels toward green, and also tended to fail allocation on the heap-tight WiFi build (causing flicker)
+* Feature: **WiFi signal-strength icon** in the top-left of the title bar (battery pendants) — four ascending bars dimmed to the current RSSI level, with "AP" shown while the captive portal is active
+* UX: **battery charging indicator is now red** (was cyan) — a charging LiPo is far more obvious at a glance
+* Reliability: WiFi reconnect hardened against router rate-limiting and dropped flow-control ACKs; a TCP staleness watchdog with a post-connect grace period recovers a silently-dead socket; small realtime sends are retried so jog flow control isn't lost
+* UX: the adjustable on-screen controls now share one **consistent field style** — the Jog & Homing speed control, the Feeds & Speeds feed/spindle override dials, and the Spindle Control "Dial" toggle all use the same bordered tap-to-edit treatment as the Probe screens, highlighting yellow while their dial is active
+* Feature: the pendant firmware version shown on the FluidNC screen now tracks a single `FIRMWARE_VERSION` constant (bumped per release) instead of the latest git tag, so it updates correctly with every release
+* Internal: added a **browser-based UI simulator** (`simulator/`) that mirrors every screen's draw/touch code line-for-line for layout work without flashing hardware, plus a `sync.py` hash tracker that flags any firmware screen whose JS port has drifted
+
+**2026-05-27**
+
+v1.7.1
+* Architecture: **modular Comms layer** — transport-specific code split into three files: `Comms.h` / `Comms.cpp` (facade that picks one backend at boot), `CommsUart.h` / `CommsUart.cpp` (UART hardware only — ESP-IDF UART driver, XON/XOFF flow control), and `WiFiConnection.h` / `WiFiConnection.cpp` (TCP/Telnet only); the two backends share no symbols and have no awareness of each other; `Comms.cpp` is the only translation unit that includes both `CommsUart.h` and `WiFiConnection.h`
+* Architecture: `fnc_putchar` / `fnc_getchar` in `SystemArduino.cpp` reduced to one-line forwarders to `comms_putchar` / `comms_getchar`; per-character `wifi_use_uart_mode()` checks eliminated — the active backend is selected once by `comms_init()` and dispatched via a function pointer for the lifetime of the run; zero NVS reads, zero mode checks, zero branches in the hot path after init
+* Feature: **hardware-driven transport selection** — `comms_init()` picks the active backend by autodetecting battery hardware: IP5306 PMIC present → WiFi backend, absent → UART backend; battery presence is the definitive signal of a mobile/wireless pendant, so the firmware no longer asks the user (or relies on an NVS preference) to pick the right transport
+* Fix: SD card and macro loading no longer break on capacitive CYD builds where stale NVS held `uart_mode=false` — the new autodetect supersedes the NVS key entirely, eliminating the class of bug where a pendant could boot into WiFi mode without working credentials and silently swallow every UART-bound byte
+* UX: WiFi setup screen rewritten — no more UART/WiFi toggle row (there is nothing to toggle); shows the auto-detected transport at the top, then either WiFi status + a "Reconfigure WiFi" action (battery pendants) or a short note explaining UART is in use (wired pendants); the "Cancel AP Setup" action now just stops the captive portal in place rather than switching transport modes
+* UX: FluidNC screen's CONNECTION panel only shows the cyan tappable border and "WiFi >" affordance on battery pendants; wired pendants still see the panel as tappable for diagnostic info, but without the misleading WiFi hint
+* Removal: deprecated `wifi_use_uart_mode()`, `wifi_set_uart_mode()`, `wifi_is_first_boot()` and the NVS keys `uart_mode` / `setup_done` — none of them have a role in a hardware-detected design; saved WiFi credentials (`ssid` / `pass` / `ip`) remain the only persisted state in the `fluidwifi` namespace
+* Removal: `transport_init()` (introduced earlier this release) replaced by `comms_init()` which both decides the transport AND brings up the chosen backend in one call
+* Diagnostic: `pendant_hw_task` now prints `Comms: active transport = UART|WiFi` over the USB serial console on every boot so the active backend is unambiguous
+
+**2026-05-26**
+
+v1.7.0
+* Feature: **battery status icon** (capacitive CYD only) — a 25×13 pixel battery icon appears in the top-right corner of every screen title bar when a LiPo battery is connected via the GPIO 39 voltage divider; icon colour is green above 50 %, orange at 20–50 %, and red below 20 %; the icon is hidden on resistive CYDs or when no battery hardware is detected; uses sprite rendering for flicker-free updates
+* Feature: **IP5306 charging detection** — on boards with an IP5306 PMIC (I²C address 0x75, shared bus with the capacitive touch controller), the battery icon outline turns cyan while charging; charging status is sampled every 60 seconds (low-priority I²C read to minimise bus contention)
+* Feature: **power off via red button hold** — holding the red button for 5 seconds draws a "POWERING OFF" shutdown screen, dims the backlight, and enters ESP32 deep sleep; pressing red once wakes the device (full reboot — not a resume); short-press red still sends soft-reset as normal
+* Architecture: battery sampling runs on Core 0 (`pendant_hw_task`) every 5 seconds under `stateMutex`; Core 1 reads battery fields without a mutex (int/bool are 32-bit atomic on Xtensa LX6); `POWER_OFF` hardware event added to the Core 0 → Core 1 event queue
+* Feature: **WiFi transport layer** (capacitive CYD, opt-in) — raw TCP/Telnet connection to FluidNC on port 23 replaces the UART cable; default transport remains UART (no disruption to existing installs); enabled by `-DUSE_WIFI` in `cyd_new_ui` / `cyd_new_ui_combined` environments
+* Feature: **WiFi captive-portal setup** — on first WiFi-mode boot the pendant broadcasts an open WiFi network named "FluidDial"; connect a phone and browse to 192.168.4.1 to enter SSID, password, and FluidNC IP/hostname; saving restarts the pendant and connects automatically; captive portal includes a Scan button to list nearby networks
+* Feature: **WiFi mDNS support** — `hostname.local` addresses are resolved via ESP-IDF `mdns_query_a()`, bypassing misconfigured upstream DNS resolvers that can return wrong addresses for `.local` names
+* Architecture: WiFi polling (`wifi_poll()`) and all transport I/O (`fnc_putchar` / `fnc_getchar`) run on Core 0 — the TCP RX ring buffer is never accessed from two cores simultaneously; `wifi_init()` is called in `pendant_hw_task`'s preamble before the event loop starts
+* Architecture: transport routing in `SystemArduino.cpp` — `fnc_putchar` / `fnc_getchar` check `wifi_use_uart_mode()` (NVS-cached) and dispatch to either the UART driver or `ws_putchar` / `ws_getchar`; the GrblParser connection-detection and ping logic is transport-agnostic
+* Polish: `wifi_save_config()` sets `uart_mode = false` and clears the first-boot flag in one NVS write, so a captive-portal save immediately switches the pendant to WiFi mode on the next boot
+
 **2026-05-09**
 
 v1.6.0

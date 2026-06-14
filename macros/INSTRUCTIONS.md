@@ -1,6 +1,12 @@
 # Probe Macros — Setup & Usage
 
-These two macro files are triggered from the **Probe** screen on the FluidDial-CYD pendant.
+These two example macro files cover a tool-length-setter (ETS) workflow that the
+pendant's built-in **Probe** routines don't perform: `probe_work_z.nc` records an
+ETS offset for tool changes, and `probe_tool_height.nc` re-measures a new tool on
+`M6`. They run from the pendant's **Macros** screen (which lists macros stored on
+the controller) or automatically via FluidNC's `on_m6` hook — **not** from the
+Probe screen, whose routines (Z Surface / XYZ Corner / Bore / Boss) generate their
+own G-code on the pendant and need no controller-side macro files.
 
 > The example macros in this folder are sourced from the FluidNC wiki:
 > **http://wiki.fluidnc.com/en/config/probe**
@@ -31,9 +37,7 @@ Open each file and update the variables at the top to match your machine:
 | `#<chg_y_mpos_mm>` | Y machine position of your tool change location |
 
 ### 2. Upload the files to FluidNC
-Upload `probe_work_z.nc` and `probe_tool_height.nc` to the FluidNC controller's **local filesystem** using the FluidNC web UI (go to Files → Upload).
-
-> If you prefer to store them on the SD card, update `screen_probing.cpp` in the pendant firmware and change `$Localfs/Run=` to `$SD/Run=`.
+Upload `probe_work_z.nc` and `probe_tool_height.nc` to the FluidNC controller's **local filesystem** using the FluidNC web UI (go to Files → Upload). They then appear in the pendant's **Macros** screen, and `probe_tool_height.nc` can also be wired to `M6` (see below).
 
 ---
 
@@ -45,7 +49,7 @@ Upload `probe_work_z.nc` and `probe_tool_height.nc` to the FluidNC controller's 
 
 **Steps:**
 1. Move the probe tip over the workpiece manually
-2. On the pendant, go to **Probe → Z Surface**
+2. On the pendant, open **Macros** and run **probe_work_z**
 3. The machine will:
    - Probe down to find the work surface and set Z zero
    - Move to the ETS and measure it
@@ -60,7 +64,7 @@ Upload `probe_work_z.nc` and `probe_tool_height.nc` to the FluidNC controller's 
 
 **Requires:** `probe_work_z.nc` must have been run first in the current job to establish the G59 Z offset.
 
-**When to run:** When a tool change is required during a job (called automatically if configured as an M6 macro in FluidNC, or manually from the pendant Probe screen).
+**When to run:** When a tool change is required during a job (called automatically if configured as an M6 macro in FluidNC, or manually from the pendant **Macros** screen).
 
 **Steps:**
 1. Machine moves to safe Z, then to the tool change position

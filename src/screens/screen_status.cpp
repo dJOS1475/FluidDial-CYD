@@ -2,41 +2,16 @@
 #include "screen_status.h"
 
 void enterStatus() {
-    spriteAxisDisplay.deleteSprite();
-    spriteValueDisplay.deleteSprite();
-    spriteStatusBar.deleteSprite();
-    spriteFileDisplay.deleteSprite();
-
-    uint32_t freeHeap = ESP.getFreeHeap();
-    if (freeHeap < 50000) {
-        dbg_printf("Warning: Low heap (%u bytes), skipping sprite allocation for Status\n", freeHeap);
-        return;
-    }
-
-    spriteStatusBar.createSprite(230, 50);
-    if (!spriteStatusBar.getBuffer()) { spriteStatusBar.deleteSprite(); }
-    else spriteStatusBar.setColorDepth(16);
-
-    spriteAxisDisplay.createSprite(230, 65);
-    if (!spriteAxisDisplay.getBuffer()) { spriteAxisDisplay.deleteSprite(); }
-    else spriteAxisDisplay.setColorDepth(16);
-
-    spriteValueDisplay.createSprite(230, 65);
-    if (!spriteValueDisplay.getBuffer()) { spriteValueDisplay.deleteSprite(); }
-    else spriteValueDisplay.setColorDepth(16);
-
-    spriteFileDisplay.createSprite(230, 40);
-    if (!spriteFileDisplay.getBuffer()) { spriteFileDisplay.deleteSprite(); }
-    else spriteFileDisplay.setColorDepth(16);
-
-    dbg_printf("Status sprites allocated. Free heap: %u\n", ESP.getFreeHeap());
+    // The four status panels all render through the shared 16-bit scratch sprite
+    // (begin/endPanelSprite) — one buffer reused for every panel, grown to the
+    // largest and then held with no per-frame churn.  Holding four separate
+    // persistent buffers (~50 KB) failed on the WiFi build; the shared scratch
+    // keeps only ~one panel's RAM live.  Just clear any inherited buffer here.
+    releasePanelSprites();
 }
 
 void exitStatus() {
-    spriteStatusBar.deleteSprite();
-    spriteAxisDisplay.deleteSprite();
-    spriteValueDisplay.deleteSprite();
-    spriteFileDisplay.deleteSprite();
+    releasePanelSprites();
 }
 
 void drawStatusScreen() {
@@ -54,215 +29,216 @@ void drawStatusScreen() {
 
 void updateStatusMachineStatus() {
     if (currentPendantScreen != PSCREEN_STATUS) return;
-    if (!spriteStatusBar.getBuffer()) return;
 
-    spriteStatusBar.fillSprite(COLOR_DARKER_BG);
-
+    // Snapshot shared state under the lock FIRST.  Skip this frame if the lock
+    // is briefly unavailable rather than reading Strings unlocked (Core 0 may be
+    // mid-write, and a String realloc during the copy would corrupt the heap).
     String statusStr;
     String fileStr;
     int    pct = 0;
-    if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
-        statusStr = pendantMachine.status;
-        fileStr   = pendantMachine.currentFile;
-        pct       = pendantMachine.jobPercent;
-        xSemaphoreGive(stateMutex);
-    } else {
-        statusStr = pendantMachine.status;
-        fileStr   = pendantMachine.currentFile;
-        pct       = pendantMachine.jobPercent;
-    }
+    if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) != pdTRUE) return;
+    statusStr = pendantMachine.status;
+    fileStr   = pendantMachine.currentFile;
+    pct       = pendantMachine.jobPercent;
+    xSemaphoreGive(stateMutex);
 
     bool jobRunning = fileStr.length() > 0;
 
-    if (statusStr.startsWith("Alarm")) {
-        // Alarm: full-width, description on top line, "ALARM" in red below
+    int ox, oy;
+    LovyanGFX* g = beginPanelSprite(230, 50, ox, oy, 5, 40);
+    g->fillRect(ox, oy, 230, 50, COLOR_DARKER_BG);
+
+    if (!pendantSynced || statusStr == "N/C" || statusStr.length() == 0) {
+        // Two-phase power-up / reconnect indicator (matches the main menu):
+        //   "Connecting" — link not yet established
+        //   "Syncing"    — link up; fetching config + waiting for live state
+        const char* phase = pendantConnected ? "Syncing" : "Connecting";
+        g->setTextColor(COLOR_GRAY_TEXT);
+        g->setTextSize(1);
+        int16_t lw = g->textWidth("MACHINE STATUS");
+        g->setCursor(ox + 115 - lw / 2, oy + 5);
+        g->print("MACHINE STATUS");
+        g->setTextColor(COLOR_ORANGE);
+        g->setTextSize(3);
+        int16_t cw = g->textWidth(phase);
+        g->setCursor(ox + 115 - cw / 2, oy + 22);
+        g->print(phase);
+
+    } else if (statusStr.startsWith("Alarm")) {
         String desc = alarmDescription(statusStr);
-        spriteStatusBar.setTextColor(TFT_RED);
-        spriteStatusBar.setTextSize(1);
-        int16_t dw = spriteStatusBar.textWidth(desc.c_str());
-        spriteStatusBar.setCursor(115 - dw / 2, 5);
-        spriteStatusBar.print(desc);
-        spriteStatusBar.setTextSize(3);
-        int16_t sw = spriteStatusBar.textWidth("ALARM");
-        spriteStatusBar.setCursor(115 - sw / 2, 22);
-        spriteStatusBar.print("ALARM");
+        g->setTextColor(TFT_RED);
+        g->setTextSize(1);
+        int16_t dw = g->textWidth(desc.c_str());
+        g->setCursor(ox + 115 - dw / 2, oy + 5);
+        g->print(desc);
+        g->setTextSize(3);
+        int16_t sw = g->textWidth("ALARM");
+        g->setCursor(ox + 115 - sw / 2, oy + 22);
+        g->print("ALARM");
 
     } else if (jobRunning) {
-        // Two-column layout: left = machine status, right = job progress %
-        // Left column: x=0..111
-        spriteStatusBar.setTextColor(COLOR_GRAY_TEXT);
-        spriteStatusBar.setTextSize(1);
-        spriteStatusBar.setCursor(5, 5);
-        spriteStatusBar.print("MACHINE STATUS");
-        spriteStatusBar.setTextColor(COLOR_CYAN);
-        spriteStatusBar.setTextSize(3);
-        int16_t sw = spriteStatusBar.textWidth(statusStr.c_str());
-        int16_t cx = 56 - sw / 2;  // centre of left column (56 = 112/2)
+        // Two-column layout
+        g->setTextColor(COLOR_GRAY_TEXT);
+        g->setTextSize(1);
+        g->setCursor(ox + 5, oy + 5);
+        g->print("MACHINE STATUS");
+        g->setTextColor(COLOR_CYAN);
+        g->setTextSize(3);
+        int16_t sw = g->textWidth(statusStr.c_str());
+        int16_t cx = 56 - sw / 2;
         if (cx < 0) cx = 0;
-        spriteStatusBar.setCursor(cx, 22);
-        spriteStatusBar.print(statusStr);
+        g->setCursor(ox + cx, oy + 22);
+        g->print(statusStr);
 
-        // Divider
-        spriteStatusBar.drawLine(115, 2, 115, 47, COLOR_BUTTON_GRAY);
+        g->drawLine(ox + 115, oy + 2, ox + 115, oy + 47, COLOR_BUTTON_GRAY);
 
-        // Right column: x=118..229
         String pctStr = String(pct) + "%";
-        spriteStatusBar.setTextColor(COLOR_GRAY_TEXT);
-        spriteStatusBar.setTextSize(1);
-        int16_t lw = spriteStatusBar.textWidth("PROGRESS");
-        spriteStatusBar.setCursor(174 - lw / 2, 5);  // centre of right col (174 = 118+56)
-        spriteStatusBar.print("PROGRESS");
-        spriteStatusBar.setTextColor(COLOR_GREEN);
-        spriteStatusBar.setTextSize(3);
-        int16_t pw = spriteStatusBar.textWidth(pctStr.c_str());
-        spriteStatusBar.setCursor(174 - pw / 2, 22);
-        spriteStatusBar.print(pctStr);
+        g->setTextColor(COLOR_GRAY_TEXT);
+        g->setTextSize(1);
+        int16_t lw = g->textWidth("PROGRESS");
+        g->setCursor(ox + 174 - lw / 2, oy + 5);
+        g->print("PROGRESS");
+        g->setTextColor(COLOR_GREEN);
+        g->setTextSize(3);
+        int16_t pw = g->textWidth(pctStr.c_str());
+        g->setCursor(ox + 174 - pw / 2, oy + 22);
+        g->print(pctStr);
 
     } else {
-        // Full-width single column
-        spriteStatusBar.setTextColor(COLOR_GRAY_TEXT);
-        spriteStatusBar.setTextSize(1);
-        int16_t lw = spriteStatusBar.textWidth("MACHINE STATUS");
-        spriteStatusBar.setCursor(115 - lw / 2, 5);
-        spriteStatusBar.print("MACHINE STATUS");
-        spriteStatusBar.setTextColor(COLOR_CYAN);
-        spriteStatusBar.setTextSize(3);
-        int16_t sw = spriteStatusBar.textWidth(statusStr.c_str());
-        spriteStatusBar.setCursor(115 - sw / 2, 22);
-        spriteStatusBar.print(statusStr);
+        g->setTextColor(COLOR_GRAY_TEXT);
+        g->setTextSize(1);
+        int16_t lw = g->textWidth("MACHINE STATUS");
+        g->setCursor(ox + 115 - lw / 2, oy + 5);
+        g->print("MACHINE STATUS");
+        g->setTextColor(COLOR_CYAN);
+        g->setTextSize(3);
+        int16_t sw = g->textWidth(statusStr.c_str());
+        g->setCursor(ox + 115 - sw / 2, oy + 22);
+        g->print(statusStr);
     }
 
-    spriteStatusBar.pushSprite(5, 40);
+    endPanelSprite(230, 50, 5, 40);
 }
 
 void updateStatusCurrentFile() {
     if (currentPendantScreen != PSCREEN_STATUS) return;
-    if (!spriteFileDisplay.getBuffer()) return;
-
-    spriteFileDisplay.fillRoundRect(0, 0, 230, 40, 5, COLOR_DARKER_BG);
 
     String fileStr;
-    if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
-        fileStr = pendantMachine.currentFile;
-        xSemaphoreGive(stateMutex);
-    } else {
-        fileStr = pendantMachine.currentFile;
-    }
+    if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) != pdTRUE) return;
+    fileStr = pendantMachine.currentFile;
+    xSemaphoreGive(stateMutex);
+
+    int ox, oy;
+    LovyanGFX* g = beginPanelSprite(230, 40, ox, oy, 5, 95);
+    g->fillRoundRect(ox, oy, 230, 40, 5, COLOR_DARKER_BG);
 
     if (pendantSdCard.loadedFile.length() > 0 && fileStr.length() == 0) {
-        // File queued on pendant, not yet sent to controller
-        spriteFileDisplay.setTextColor(COLOR_GREEN);
-        spriteFileDisplay.setTextSize(1);
-        spriteFileDisplay.setCursor(5, 5);
-        spriteFileDisplay.print("READY — press green to run");
-        spriteFileDisplay.setTextColor(COLOR_GREEN);
-        spriteFileDisplay.setCursor(5, 20);
-        spriteFileDisplay.print(pendantSdCard.loadedFile);
+        g->setTextColor(COLOR_GREEN);
+        g->setTextSize(1);
+        g->setCursor(ox + 5, oy + 5);
+        g->print("READY — press green to run");
+        g->setCursor(ox + 5, oy + 20);
+        g->print(pendantSdCard.loadedFile);
     } else {
-        spriteFileDisplay.setTextColor(COLOR_GRAY_TEXT);
-        spriteFileDisplay.setTextSize(1);
-        spriteFileDisplay.setCursor(5, 5);
-        spriteFileDisplay.print("CURRENT FILE");
-        spriteFileDisplay.setTextColor(COLOR_CYAN);
-        spriteFileDisplay.setCursor(5, 20);
-        spriteFileDisplay.print(fileStr);
+        g->setTextColor(COLOR_GRAY_TEXT);
+        g->setTextSize(1);
+        g->setCursor(ox + 5, oy + 5);
+        g->print("CURRENT FILE");
+        g->setTextColor(COLOR_CYAN);
+        g->setCursor(ox + 5, oy + 20);
+        g->print(fileStr);
     }
 
-    spriteFileDisplay.pushSprite(5, 95);
+    endPanelSprite(230, 40, 5, 95);
 }
 
 void updateStatusAxisPositions() {
     if (currentPendantScreen != PSCREEN_STATUS) return;
-    if (!spriteAxisDisplay.getBuffer()) return;
 
     float px, py, pz, pa;
-    if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
-        px = pendantMachine.posX;
-        py = pendantMachine.posY;
-        pz = pendantMachine.posZ;
-        pa = pendantMachine.posA;
-        xSemaphoreGive(stateMutex);
-    } else {
-        px = pendantMachine.posX; py = pendantMachine.posY;
-        pz = pendantMachine.posZ; pa = pendantMachine.posA;
-    }
+    int   numAxes;
+    if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) != pdTRUE) return;
+    px = pendantMachine.posX;  py = pendantMachine.posY;
+    pz = pendantMachine.posZ;  pa = pendantMachine.posA;
+    numAxes = pendantMachine.numAxes;
+    xSemaphoreGive(stateMutex);
 
-    spriteAxisDisplay.fillRoundRect(0, 0, 230, 65, 5, COLOR_DARKER_BG);
+    int ox, oy;
+    LovyanGFX* g = beginPanelSprite(230, 65, ox, oy, 5, 140);
 
-    spriteAxisDisplay.setTextColor(COLOR_GRAY_TEXT);
-    spriteAxisDisplay.setTextSize(1);
-    spriteAxisDisplay.setCursor(5, 5);
-    spriteAxisDisplay.print("AXIS POSITIONS");
+    g->fillRoundRect(ox, oy, 230, 65, 5, COLOR_DARKER_BG);
+
+    g->setTextColor(COLOR_GRAY_TEXT);
+    g->setTextSize(1);
+    g->setCursor(ox + 5, oy + 5);
+    g->print("AXIS POSITIONS");
 
     const char* axisNames[] = { "X", "Y", "Z", "A" };
     float       positions[] = { px, py, pz, pa };
-    spriteAxisDisplay.setTextColor(COLOR_ORANGE);
-    spriteAxisDisplay.setTextSize(2);
-    for (int i = 0; i < pendantMachine.numAxes; i++) {
-        spriteAxisDisplay.setCursor((i % 2) ? 125 : 5, 20 + (i / 2) * 23);
-        spriteAxisDisplay.print(axisNames[i]);
-        spriteAxisDisplay.print(":");
-        spriteAxisDisplay.print(positions[i], 1);
+    g->setTextColor(COLOR_ORANGE);
+    g->setTextSize(2);
+    for (int i = 0; i < numAxes; i++) {
+        g->setCursor(ox + ((i % 2) ? 125 : 5), oy + 20 + (i / 2) * 23);
+        g->print(axisNames[i]);
+        g->print(":");
+        g->print(positions[i], 1);
     }
 
-    spriteAxisDisplay.pushSprite(5, 140);
+    endPanelSprite(230, 65, 5, 140);
 }
 
 void updateStatusFeedSpindle() {
     if (currentPendantScreen != PSCREEN_STATUS) return;
-    if (!spriteValueDisplay.getBuffer()) return;
 
     int feedRate, spindleRPM;
     String spindleDir;
-    if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
-        feedRate   = pendantMachine.feedRate;
-        spindleRPM = pendantMachine.spindleRPM;
-        spindleDir = pendantMachine.spindleDir;
-        xSemaphoreGive(stateMutex);
-    } else {
-        feedRate   = pendantMachine.feedRate;
-        spindleRPM = pendantMachine.spindleRPM;
-        spindleDir = pendantMachine.spindleDir;
-    }
+    if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) != pdTRUE) return;
+    feedRate   = pendantMachine.feedRate;
+    spindleRPM = pendantMachine.spindleRPM;
+    spindleDir = pendantMachine.spindleDir;
+    xSemaphoreGive(stateMutex);
 
-    spriteValueDisplay.fillSprite(COLOR_BACKGROUND);
+    int ox, oy;
+    LovyanGFX* g = beginPanelSprite(230, 65, ox, oy, 5, 210);
+
+    g->fillRect(ox, oy, 230, 65, COLOR_BACKGROUND);
 
     // Feed Rate box
-    spriteValueDisplay.fillRoundRect(0, 0, 112, 65, 5, COLOR_DARKER_BG);
-    spriteValueDisplay.setTextColor(COLOR_GRAY_TEXT);
-    spriteValueDisplay.setTextSize(1);
-    spriteValueDisplay.setCursor(5, 3);
-    spriteValueDisplay.print("FEED");
-    spriteValueDisplay.setTextColor(COLOR_ORANGE);
-    spriteValueDisplay.setTextSize(2);
-    spriteValueDisplay.setCursor(5, 25);
-    spriteValueDisplay.print(feedRate);
-    spriteValueDisplay.setTextColor(COLOR_GRAY_TEXT);
-    spriteValueDisplay.setTextSize(1);
-    int16_t mmW = spriteValueDisplay.textWidth("mm/min");
-    spriteValueDisplay.setCursor(112 - 5 - mmW, 50);
-    spriteValueDisplay.print("mm/min");
+    g->fillRoundRect(ox + 0, oy, 112, 65, 5, COLOR_DARKER_BG);
+    g->setTextColor(COLOR_GRAY_TEXT);
+    g->setTextSize(1);
+    g->setCursor(ox + 5, oy + 3);
+    g->print("FEED");
+    g->setTextColor(COLOR_ORANGE);
+    g->setTextSize(2);
+    g->setCursor(ox + 5, oy + 25);
+    g->print(feedRate);
+    g->setTextColor(COLOR_GRAY_TEXT);
+    g->setTextSize(1);
+    int16_t mmW = g->textWidth("mm/min");
+    g->setCursor(ox + 112 - 5 - mmW, oy + 50);
+    g->print("mm/min");
 
     // Spindle box
-    spriteValueDisplay.fillRoundRect(118, 0, 112, 65, 5, COLOR_DARKER_BG);
-    spriteValueDisplay.setTextColor(COLOR_GRAY_TEXT);
-    spriteValueDisplay.setTextSize(1);
-    spriteValueDisplay.setCursor(123, 3);
-    spriteValueDisplay.print("SPINDLE");
-    int16_t dirW = spriteValueDisplay.textWidth(spindleDir.c_str());
-    spriteValueDisplay.setCursor(230 - 5 - dirW, 3);
-    spriteValueDisplay.print(spindleDir);
-    spriteValueDisplay.setTextColor(COLOR_GREEN);
-    spriteValueDisplay.setTextSize(2);
-    spriteValueDisplay.setCursor(123, 25);
-    spriteValueDisplay.print(spindleRPM);
-    spriteValueDisplay.setTextColor(COLOR_GRAY_TEXT);
-    spriteValueDisplay.setTextSize(1);
-    int16_t rpmW = spriteValueDisplay.textWidth("RPM");
-    spriteValueDisplay.setCursor(230 - 5 - rpmW, 50);
-    spriteValueDisplay.print("RPM");
+    g->fillRoundRect(ox + 118, oy, 112, 65, 5, COLOR_DARKER_BG);
+    g->setTextColor(COLOR_GRAY_TEXT);
+    g->setTextSize(1);
+    g->setCursor(ox + 123, oy + 3);
+    g->print("SPINDLE");
+    int16_t dirW = g->textWidth(spindleDir.c_str());
+    g->setCursor(ox + 230 - 5 - dirW, oy + 3);
+    g->print(spindleDir);
+    g->setTextColor(COLOR_GREEN);
+    g->setTextSize(2);
+    g->setCursor(ox + 123, oy + 25);
+    g->print(spindleRPM);
+    g->setTextColor(COLOR_GRAY_TEXT);
+    g->setTextSize(1);
+    int16_t rpmW = g->textWidth("RPM");
+    g->setCursor(ox + 230 - 5 - rpmW, oy + 50);
+    g->print("RPM");
 
-    spriteValueDisplay.pushSprite(5, 210);
+    endPanelSprite(230, 65, 5, 210);
 }
 
 void handleStatusTouch(int x, int y) {

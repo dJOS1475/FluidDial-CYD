@@ -1,0 +1,160 @@
+/* FluidDial-CYD simulator — chassis + bench styling */
+:root {
+  --bg: #15171c;
+  --panel: #1e2128;
+  --panel2: #262a33;
+  --line: #333845;
+  --text: #d8dde7;
+  --muted: #8a93a3;
+  --accent: #1c9fff;
+  --case: #2a2a2e;
+  --case2: #1c1c1f;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+.topbar {
+  display: flex; align-items: baseline; gap: 16px;
+  padding: 12px 20px; border-bottom: 1px solid var(--line); background: #111317;
+}
+.brand { font-weight: 700; font-size: 18px; letter-spacing: .3px; }
+.brand span { color: var(--accent); font-weight: 600; }
+.hint { color: var(--muted); font-size: 12.5px; }
+
+.syncbanner {
+  margin: 0; padding: 10px 20px;
+  background: #3a2a12; color: #ffd9a0; border-bottom: 1px solid #6a4a1a;
+  font-size: 13px;
+}
+.syncbanner ul { margin: 6px 0; padding-left: 22px; }
+.syncbanner li { margin: 2px 0; }
+.syncbanner code {
+  background: rgba(0,0,0,.35); padding: 1px 5px; border-radius: 4px;
+  font: 11.5px/1 "SFMono-Regular", Menlo, Consolas, monospace; color: #ffe9c8;
+}
+.syncbanner small { color: #d9b890; }
+
+.stage {
+  display: grid;
+  grid-template-columns: auto 320px;
+  grid-template-rows: auto auto;
+  grid-template-areas: "device bench" "console bench";
+  gap: 20px; padding: 20px; align-items: start;
+}
+.device { grid-area: device; }
+.bench { grid-area: bench; }
+.console { grid-area: console; }
+
+/* ===== Device chassis ===== */
+.device {
+  width: 344px;
+  background: linear-gradient(180deg, var(--case) 0%, var(--case2) 100%);
+  border: 1px solid #000;
+  border-radius: 34px;
+  padding: 18px 0 26px;
+  display: flex; flex-direction: column; align-items: center;
+  box-shadow: 0 12px 40px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.05);
+  /* subtle 3D-print texture */
+  background-image: radial-gradient(rgba(255,255,255,.025) 1px, transparent 1px);
+  background-size: 4px 4px;
+}
+.logo {
+  font-weight: 800; font-size: 26px; letter-spacing: 1px;
+  color: #d12b2b; text-shadow: 0 1px 1px rgba(0,0,0,.6); margin: 4px 0 16px;
+  user-select: none;
+}
+.logo .spark { color: #d12b2b; font-size: 22px; }
+
+.screen-area { position: relative; width: 300px; height: 400px; }
+.screen-area {
+  background: #000;
+  border: 6px solid #0a0a0a;
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.6);
+}
+#screen, #overlay {
+  position: absolute; left: 6px; top: 6px;
+  width: 300px; height: 400px;
+  image-rendering: pixelated; image-rendering: crisp-edges;
+}
+#overlay { pointer-events: none; }
+
+.buttons { display: flex; gap: 36px; margin: 22px 0 8px; }
+.hwbtn {
+  width: 46px; height: 46px; border-radius: 50%;
+  border: 3px solid #0c0c0c; cursor: pointer;
+  box-shadow: inset 0 3px 5px rgba(255,255,255,.35), inset 0 -4px 6px rgba(0,0,0,.5), 0 3px 5px rgba(0,0,0,.5);
+  transition: transform .05s;
+}
+.hwbtn:active { transform: translateY(2px); box-shadow: inset 0 2px 4px rgba(0,0,0,.5); }
+.hwbtn.red    { background: radial-gradient(circle at 38% 30%, #ff6a5a, #c01b10); }
+.hwbtn.yellow { background: radial-gradient(circle at 38% 30%, #ffe06b, #d6a500); }
+.hwbtn.green  { background: radial-gradient(circle at 38% 30%, #6dff7a, #129b25); }
+
+.encoder { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: 10px; }
+.knob {
+  position: relative; width: 150px; height: 150px; border-radius: 50%;
+  background:
+    repeating-conic-gradient(#c7ccd2 0deg 2deg, #9aa0a8 2deg 4deg);
+  border: 3px solid #6c7178;
+  box-shadow: 0 6px 14px rgba(0,0,0,.5), inset 0 0 0 10px #b9bec6;
+  cursor: grab; touch-action: none;
+}
+.knob:active { cursor: grabbing; }
+.knob-cap {
+  position: absolute; inset: 24px; border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #e9ecf0, #aeb4bc 70%, #888d94);
+  box-shadow: inset 0 2px 6px rgba(255,255,255,.6), inset 0 -3px 6px rgba(0,0,0,.3);
+}
+.knob-mark {
+  position: absolute; left: 50%; top: 6px; width: 4px; height: 24px; margin-left: -2px;
+  background: #3a3f47; border-radius: 2px; transform-origin: 50% 69px; z-index: 2;
+}
+.enc-steppers { display: flex; gap: 10px; }
+.enc-steppers button {
+  width: 40px; height: 28px; border-radius: 6px; border: 1px solid var(--line);
+  background: var(--panel2); color: var(--text); font-size: 16px; cursor: pointer;
+}
+.enc-steppers button:active { background: #30353f; }
+
+/* ===== Bench controls ===== */
+.controls {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  padding: 14px 16px; max-height: calc(100vh - 110px); overflow-y: auto;
+}
+.controls h3 {
+  margin: 16px 0 8px; font-size: 12px; text-transform: uppercase;
+  letter-spacing: .6px; color: var(--accent); border-bottom: 1px solid var(--line); padding-bottom: 4px;
+}
+.controls h3:first-child { margin-top: 0; }
+.ctl-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 6px 0; }
+.ctl-label { color: var(--muted); font-size: 12.5px; flex: 0 0 92px; }
+.ctl-row input[type=text], .ctl-row input[type=number], .ctl-row select {
+  flex: 1; min-width: 0; background: var(--panel2); color: var(--text);
+  border: 1px solid var(--line); border-radius: 6px; padding: 5px 7px; font-size: 13px;
+}
+.ctl-row input[type=range] { flex: 1; }
+.ctl-row input[type=checkbox] { width: 16px; height: 16px; }
+.ctl-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.ctl-actions button {
+  flex: 1; padding: 7px 10px; border-radius: 7px; border: 1px solid var(--line);
+  background: var(--panel2); color: var(--text); cursor: pointer; font-size: 13px;
+}
+.ctl-actions button:hover { background: #30353f; }
+
+/* ===== Console ===== */
+.console {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  padding: 12px 16px; width: 360px;
+}
+.console h3 { margin: 0 0 8px; font-size: 13px; }
+.console h3 small { color: var(--muted); font-weight: 400; }
+.log {
+  margin: 0; height: 150px; overflow-y: auto; background: #0c0e12; color: #9fe0a8;
+  border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+  font: 11.5px/1.45 "SFMono-Regular", Menlo, Consolas, monospace; white-space: pre-wrap;
+}

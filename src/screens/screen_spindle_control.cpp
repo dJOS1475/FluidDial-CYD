@@ -1,6 +1,23 @@
 #include "pendant_shared.h"
 #include "screen_spindle_control.h"
 #include "../CNC_Pendant_UI.h"
+#include "screen_probe.h"   // PROBE_* colours — shared adjustable-field style
+
+// Dial toggle drawn in the Probe screens' adjustable-field style: a bordered
+// box that highlights (yellow border + text) while dial mode is active.  Label
+// only — no value — because the target RPM is shown in the readout panel above.
+static void drawSpindleDialButton() {
+    bool     active = pendantSpindle.dialMode;
+    uint16_t bg     = active ? PROBE_SEL_BG   : PROBE_BG_SCREEN;
+    uint16_t bdr    = active ? PROBE_C_YELLOW : PROBE_C_DIMBLUE;
+    display.fillRoundRect(179, 163, 56, 37, 2, bg);
+    display.drawRoundRect(179, 163, 56, 37, 2, bdr);
+    display.setTextSize(2);
+    display.setTextColor(active ? PROBE_C_YELLOW : COLOR_TEAL_BRIGHT);
+    int16_t tw = display.textWidth("Dial");
+    display.setCursor(179 + (56 - tw) / 2, 163 + (37 - 16) / 2);
+    display.print("Dial");
+}
 
 // Compute dynamic presets: 25%, 50%, 100% of max, floored to nearest 100 RPM
 static void getSpindlePresets(int presets[3]) {
@@ -18,10 +35,7 @@ static String fmtRPM(int rpm) {
 }
 
 void enterSpindleControl() {
-    spriteAxisDisplay.deleteSprite();
-    spriteValueDisplay.deleteSprite();
-    spriteStatusBar.deleteSprite();
-    spriteFileDisplay.deleteSprite();
+    releasePanelSprites();
 
     // Defensive re-fetch of $30/$31 on entry. The connect-edge fetch is the
     // primary source, but if it was dropped (UART contention at connect time)
@@ -37,14 +51,11 @@ void enterSpindleControl() {
         pendantSpindle.targetRPM = presets[pendantSpindle.selectedPreset];
     }
 
-    if (ESP.getFreeHeap() < 50000) return;
-
-    spriteValueDisplay.createSprite(230, 60);
-    spriteValueDisplay.setColorDepth(16);
+    // RPM panel uses a transient 16-bit sprite (see updateSpindleRPMDisplay).
 }
 
 void exitSpindleControl() {
-    spriteValueDisplay.deleteSprite();
+    releasePanelSprites();
 }
 
 void drawSpindleControlScreen() {
@@ -71,9 +82,8 @@ void drawSpindleControlScreen() {
                       ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
         drawButton(5 + i * 58, 163, 56, 37, fmtRPM(presets[i]), bg, COLOR_WHITE, 2);
     }
-    // Dial button — teal background, highlighted when dial mode active
-    uint16_t dialBg = pendantSpindle.dialMode ? COLOR_TEAL_BRIGHT : COLOR_TEAL;
-    drawButton(179, 163, 56, 37, "Dial", dialBg, COLOR_WHITE, 2);
+    // Dial toggle — adjustable-field style (label only; target RPM shown above)
+    drawSpindleDialButton();
 
     drawButton(5,   218, 112, 40, "Start", COLOR_DARK_GREEN, COLOR_WHITE, 2);
     drawButton(123, 218, 112, 40, "Stop",  COLOR_RED,        COLOR_WHITE, 2);
@@ -82,42 +92,39 @@ void drawSpindleControlScreen() {
 
 void updateSpindleRPMDisplay() {
     if (currentPendantScreen != PSCREEN_SPINDLE_CONTROL) return;
-    if (!spriteValueDisplay.getBuffer()) return;
 
     int spindleRPM;
     String spindleDir;
-    if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
-        spindleRPM = pendantMachine.spindleRPM;
-        spindleDir = pendantMachine.spindleDir;
-        xSemaphoreGive(stateMutex);
-    } else {
-        spindleRPM = pendantMachine.spindleRPM;
-        spindleDir = pendantMachine.spindleDir;
-    }
+    if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) != pdTRUE) return;
+    spindleRPM = pendantMachine.spindleRPM;
+    spindleDir = pendantMachine.spindleDir;
+    xSemaphoreGive(stateMutex);
 
-    spriteValueDisplay.fillSprite(COLOR_DARKER_BG);
+    int ox, oy;
+    LovyanGFX* g = beginPanelSprite(230, 60, ox, oy, 5, 40);
+    g->fillRect(ox, oy, 230, 60, COLOR_DARKER_BG);
 
     // Left column — current actual spindle RPM
-    spriteValueDisplay.setTextColor(COLOR_GRAY_TEXT);
-    spriteValueDisplay.setTextSize(1);
-    spriteValueDisplay.setCursor(5, 5);
-    spriteValueDisplay.print("RPM");
-    spriteValueDisplay.setTextColor(COLOR_ORANGE);
-    spriteValueDisplay.setTextSize(3);
-    spriteValueDisplay.setCursor(5, 22);
-    spriteValueDisplay.print(spindleRPM);
+    g->setTextColor(COLOR_GRAY_TEXT);
+    g->setTextSize(1);
+    g->setCursor(ox + 5, oy + 5);
+    g->print("RPM");
+    g->setTextColor(COLOR_ORANGE);
+    g->setTextSize(3);
+    g->setCursor(ox + 5, oy + 22);
+    g->print(spindleRPM);
 
     // Right column — user-selected target RPM
-    spriteValueDisplay.setTextColor(COLOR_GRAY_TEXT);
-    spriteValueDisplay.setTextSize(1);
-    spriteValueDisplay.setCursor(120, 5);
-    spriteValueDisplay.print("Target RPM");
-    spriteValueDisplay.setTextColor(COLOR_DARK_GREEN);
-    spriteValueDisplay.setTextSize(3);
-    spriteValueDisplay.setCursor(120, 22);
-    spriteValueDisplay.print(pendantSpindle.targetRPM);
+    g->setTextColor(COLOR_GRAY_TEXT);
+    g->setTextSize(1);
+    g->setCursor(ox + 120, oy + 5);
+    g->print("Target RPM");
+    g->setTextColor(COLOR_DARK_GREEN);
+    g->setTextSize(3);
+    g->setCursor(ox + 120, oy + 22);
+    g->print(pendantSpindle.targetRPM);
 
-    spriteValueDisplay.pushSprite(5, 40);
+    endPanelSprite(230, 60, 5, 40);
 }
 
 void redrawSpindleDirectionButtons() {
@@ -136,8 +143,7 @@ void redrawSpindlePresetButtons() {
                       ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
         drawButton(5 + i * 58, 163, 56, 37, fmtRPM(presets[i]), bg, COLOR_WHITE, 2);
     }
-    uint16_t dialBg = pendantSpindle.dialMode ? display.color565(0, 180, 180) : display.color565(0, 100, 100);
-    drawButton(179, 163, 56, 37, "Dial", dialBg, COLOR_WHITE, 2);
+    drawSpindleDialButton();
     updateSpindleRPMDisplay();
 }
 

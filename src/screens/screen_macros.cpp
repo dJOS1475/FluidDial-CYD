@@ -5,35 +5,32 @@
 // Rendering into it and pushing atomically prevents the fillScreen flicker that
 // would otherwise occur on every DRO STATE_UPDATE (~200 ms).
 
+// Forward declaration for the dirty-state tracker (defined below).
+static void invalidateMacrosRender();
+
 void enterMacros() {
-    spriteAxisDisplay.deleteSprite();
-    spriteValueDisplay.deleteSprite();
-    spriteStatusBar.deleteSprite();
-    spriteFileDisplay.deleteSprite();
+    releasePanelSprites();
 
     pendantMacros.scrollOffset = 0;
     pendantMacros.selected     = -1;
     pendantMacros.pendingRun   = false;
+    invalidateMacrosRender();   // force the first paint after entry
 
     if (pendantMacros.cacheValid) {
-        // Cached list is still good — show it immediately without a UART fetch.
-        pendantMacros.loading = false;
+        // Cached list is still good — show it immediately without a fetch.
+        pendantMacros.loading    = false;
+        pendantMacros.loadFailed = false;
     } else {
         // First visit, or cache explicitly invalidated (Refresh button / disconnect).
-        pendantMacros.loading = true;
-        pendantMacros.count   = 0;
+        pendantMacros.loading    = true;
+        pendantMacros.loadFailed = false;
+        pendantMacros.count      = 0;
         if (pendantConnected) requestMacros();
     }
 
-    // Allocate sprite for the file list area.  Check heap first to avoid crash.
-    if (ESP.getFreeHeap() >= 50000) {
-        spriteFileDisplay.createSprite(230, 200);
-        if (spriteFileDisplay.getBuffer()) {
-            spriteFileDisplay.setColorDepth(16);
-        } else {
-            spriteFileDisplay.deleteSprite();
-        }
-    }
+    // Flicker-free list sprite, now 8-bit (~46 KB, was ~92 KB) so it allocates
+    // far more often; direct-draw fallback when heap is tight.
+    allocPanelSprite(spriteFileDisplay, 230, 200, 60000);
 }
 
 void exitMacros() {
@@ -50,6 +47,7 @@ static void refreshMacros() {
     pendantMacros.pendingRun   = false;
     pendantMacros.loading      = true;
     pendantMacros.count        = 0;
+    invalidateMacrosRender();   // force repaint into the loading state
     if (pendantConnected) requestMacros();
 }
 
@@ -60,26 +58,97 @@ static String macroLabel(int displayIndex) {
     return label;
 }
 
-// Renders the dynamic file-list area into spriteFileDisplay and pushes it.
-// Coordinates are relative to the sprite origin (sprite is pushed at x=5, y=40).
+// Snapshot of last-rendered state.  See screen_sd_card.cpp for rationale —
+// in direct-draw mode the 100 ms tick would otherwise flicker; we skip the
+// paint when nothing visible has changed.
+struct MacrosRenderState {
+    bool valid;
+    bool connected;
+    bool loading;
+    bool loadFailed;
+    bool pendingRun;
+    int  count;
+    int  scrollOffset;
+    int  selected;
+};
+static MacrosRenderState _lastMacrosRender = {};
+
+static void invalidateMacrosRender() { _lastMacrosRender.valid = false; }
+
+// Renders the dynamic file-list area.  Uses the sprite for flicker-free
+// updates when it's been allocated; falls back to drawing directly into the
+// display otherwise.  The area is ALWAYS painted — bailing out silently
+// (the previous behaviour) made the screen look blank on WiFi-enabled
+// builds where the sprite couldn't allocate.
 void updateMacrosFileList() {
     if (currentPendantScreen != PSCREEN_MACROS) return;
-    if (!spriteFileDisplay.getBuffer()) return;
 
-    spriteFileDisplay.fillSprite(COLOR_BACKGROUND);
+    // UI safety deadline: the HTTP fetch task always delivers a terminal
+    // onFilesList()/onError() callback, but if it ever hangs (or its task
+    // dies), this guarantees "Loading…" can't spin forever.  35 s comfortably
+    // exceeds the worst-case retry budget in fetch_macros_http_task
+    // (3 tries × 2 files × 5 s ≈ 30 s).
+    if (pendantMacros.loading && pendantMacros.loadStartMs != 0 &&
+        (millis() - pendantMacros.loadStartMs) > 35000) {
+        pendantMacros.loading    = false;
+        pendantMacros.loadFailed = true;
+    }
+
+    MacrosRenderState cur = {
+        /*valid*/        true,
+        /*connected*/    pendantConnected,
+        /*loading*/      pendantMacros.loading,
+        /*loadFailed*/   pendantMacros.loadFailed,
+        /*pendingRun*/   pendantMacros.pendingRun,
+        /*count*/        pendantMacros.count,
+        /*scrollOffset*/ pendantMacros.scrollOffset,
+        /*selected*/     pendantMacros.selected,
+    };
+    if (_lastMacrosRender.valid &&
+        _lastMacrosRender.connected    == cur.connected &&
+        _lastMacrosRender.loading      == cur.loading &&
+        _lastMacrosRender.loadFailed   == cur.loadFailed &&
+        _lastMacrosRender.pendingRun   == cur.pendingRun &&
+        _lastMacrosRender.count        == cur.count &&
+        _lastMacrosRender.scrollOffset == cur.scrollOffset &&
+        _lastMacrosRender.selected     == cur.selected) {
+        return;
+    }
+    _lastMacrosRender = cur;
+
+    const bool hasSprite = spriteFileDisplay.getBuffer() != nullptr;
+    LovyanGFX* g = hasSprite ? (LovyanGFX*)&spriteFileDisplay
+                             : (LovyanGFX*)&display;
+    // Sprite is pushed at (5, 40); direct-draw uses absolute screen coords.
+    const int ox = hasSprite ? 0 : 5;
+    const int oy = hasSprite ? 0 : 40;
+
+    if (hasSprite) {
+        spriteFileDisplay.fillSprite(COLOR_BACKGROUND);
+    } else {
+        display.fillRect(5, 40, 230, 200, COLOR_BACKGROUND);
+    }
 
     if (pendantMacros.loading) {
-        spriteFileDisplay.setTextColor(COLOR_GRAY_TEXT);
-        spriteFileDisplay.setTextSize(2);
-        spriteFileDisplay.setCursor(45, 100);   // abs y=140 → rel y=100
-        spriteFileDisplay.print(pendantConnected ? "Loading..." : "Not connected.");
+        g->setTextColor(COLOR_GRAY_TEXT);
+        g->setTextSize(2);
+        g->setCursor(ox + 45, oy + 100);
+        g->print(pendantConnected ? "Loading..." : "Not connected.");
+    } else if (pendantMacros.loadFailed) {
+        g->setTextColor(COLOR_ORANGE);
+        g->setTextSize(1);
+        g->setCursor(ox + 15, oy + 90);
+        g->print("Couldn't load macros.");
+        g->setTextColor(COLOR_GRAY_TEXT);
+        g->setCursor(ox + 15, oy + 108);
+        g->print("Tap Refresh to try again.");
     } else if (pendantMacros.count == 0) {
-        spriteFileDisplay.setTextColor(COLOR_GRAY_TEXT);
-        spriteFileDisplay.setTextSize(1);
-        spriteFileDisplay.setCursor(15, 90);    // abs y=130 → rel y=90
-        spriteFileDisplay.print("No macros found.");
-        spriteFileDisplay.setCursor(15, 108);   // abs y=148 → rel y=108
-        spriteFileDisplay.print("Add macros in FluidNC preferences.");
+        g->setTextColor(COLOR_GRAY_TEXT);
+        g->setTextSize(1);
+        g->setCursor(ox + 15, oy + 90);
+        g->print("No macros found.");
+        g->setCursor(ox + 15, oy + 108);
+        g->print("Add macros in FluidNC preferences.");
     } else {
         for (int i = 0; i < 5 && i < pendantMacros.count; i++) {
             int displayIndex = i + pendantMacros.scrollOffset;
@@ -93,23 +162,23 @@ void updateMacrosFileList() {
             } else {
                 bg = COLOR_BUTTON_GRAY;
             }
-            // Row at sprite-relative y = i*40 (abs y = 40 + i*40, minus push offset 40)
-            spriteFileDisplay.fillRoundRect(0, i * 40, 230, 36, 8, bg);
-            spriteFileDisplay.setTextColor(COLOR_WHITE);
-            spriteFileDisplay.setTextSize(1);
-            spriteFileDisplay.setCursor(5, 12 + i * 40);   // abs y=52+i*40 → rel y=12+i*40
-            spriteFileDisplay.print(macroLabel(displayIndex));
+            g->fillRoundRect(ox, oy + i * 40, 230, 36, 8, bg);
+            g->setTextColor(COLOR_WHITE);
+            g->setTextSize(1);
+            g->setCursor(ox + 5, oy + 12 + i * 40);
+            g->print(macroLabel(displayIndex));
         }
     }
 
-    spriteFileDisplay.pushSprite(5, 40);
+    if (hasSprite) spriteFileDisplay.pushSprite(5, 40);
 }
 
 void drawMacrosScreen() {
     display.fillScreen(COLOR_BACKGROUND);
     drawTitle("MACROS");
 
-    // File list area — sprite render (no flicker on repeated STATE_UPDATE calls)
+    // Full redraw — invalidate the dirty cache so the file-list area paints.
+    invalidateMacrosRender();
     updateMacrosFileList();
 
     // Static bottom rows — drawn once; only redrawn when touch changes pendingRun state
