@@ -279,10 +279,17 @@ function restoreSession() {
     s = JSON.parse(sessionStorage.getItem("sim.session") || "null");
   } catch (e) {}
   if (!s) return;
+  // Firmware-identity fields are owned by the code (state.js / sync.py), not the
+  // saved session — otherwise a stale snapshot would shadow a version bump and
+  // the sim would keep showing the old value after the code changed.
+  const CODE_OWNED = ["fluidDialVersion", "fluidNCVersion"];
+  const codeVals = {};
+  for (const k of CODE_OWNED) codeVals[k] = pendantMachine[k];
   _commsMode = s.commsMode;
   pendantConnected = s.connected;
   pendantSynced = s.synced;
   Object.assign(pendantMachine, s.machine);
+  for (const k of CODE_OWNED) pendantMachine[k] = codeVals[k];
   Object.assign(pendantProbing, s.probing);
   Object.assign(pendantJog, s.jog);
   Object.assign(pendantSpindle, s.spindle);

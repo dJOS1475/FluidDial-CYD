@@ -51,7 +51,7 @@ html, body {
 
 /* ===== Device chassis ===== */
 .device {
-  width: 344px;
+  width: 524px;
   background: linear-gradient(180deg, var(--case) 0%, var(--case2) 100%);
   border: 1px solid #000;
   border-radius: 34px;
@@ -69,16 +69,22 @@ html, body {
 }
 .logo .spark { color: #d12b2b; font-size: 22px; }
 
-.screen-area { position: relative; width: 300px; height: 400px; }
+/* The 240x320 canvas is shown at an INTEGER 2x zoom (480x640).  An integer
+   scale means nearest-neighbour upscaling maps every device pixel to exactly
+   2x2 screen pixels with no resampling — so content lands pixel-for-pixel where
+   the firmware draws it (a fractional zoom biased it ~1px right). */
 .screen-area {
+  position: relative;
+  box-sizing: content-box;
+  width: 480px; height: 640px;
   background: #000;
   border: 6px solid #0a0a0a;
   border-radius: 6px;
   box-shadow: 0 2px 6px rgba(0,0,0,.6);
 }
 #screen, #overlay {
-  position: absolute; left: 6px; top: 6px;
-  width: 300px; height: 400px;
+  position: absolute; left: 0; top: 0;
+  width: 480px; height: 640px;
   image-rendering: pixelated; image-rendering: crisp-edges;
 }
 #overlay { pointer-events: none; }

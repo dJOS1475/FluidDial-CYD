@@ -97,7 +97,7 @@ void drawProbeCfg3DScreen() {
     display.setCursor(10, 41);
     display.print("PROBE HARDWARE");
     display.setTextSize(1);
-    display.setTextColor(PROBE_C_DIMBLUE);
+    display.setTextColor(PROBE_C_GREEN);
     display.setCursor(10, 53);
     display.print("3D Touch Probe");
 
@@ -185,7 +185,7 @@ void drawProbeCfgPlateScreen() {
     display.setTextColor(PROBE_C_LBLUE);
     display.setCursor(10, 41);
     display.print("PROBE TYPE");
-    display.setTextColor(PROBE_C_DIMBLUE);
+    display.setTextColor(PROBE_C_GREEN);
     display.setCursor(10, 53);
     display.print(xyz ? "XYZ Touch Plate" : "Z-Height Touch Plate");
 

@@ -13,9 +13,9 @@
   "screens/screen_probe_z.cpp": "5ebe52486a70880db03e478d2f8a197474219eb1",
   "screens/screen_probe_corner.cpp": "88eeb45864a640a2b42793fd994fe62005ebfb11",
   "screens/screen_probe_bore_boss.cpp": "79a2820732b42d055d129ccc128936ff127d115d",
-  "screens/screen_probe_cfg.cpp": "544419ed0d7d1f7dda0102777c9dca74ab95e78d",
+  "screens/screen_probe_cfg.cpp": "876f4781a1e08b90f33dcda9d927d1bb3ab46167",
   "CNC_Pendant_UI.cpp": "7af8c59b7881b6d3db5a5a64f95e5c465408bb3c",
   "screens/pendant_shared.h": "1eade4c1dc1e906943d67720b04290be5d60925a",
-  "cnc_pendant_config.h": "722f25618cb6587460a3d838d102a8178fc62475",
+  "cnc_pendant_config.h": "5841012b22175a2e2d78331f6bb384d1cf7bf972",
   "screens/screen_probe.h": "4cc34ffa4f8316eef81dd5615eceaab356ecc1e9"
 }

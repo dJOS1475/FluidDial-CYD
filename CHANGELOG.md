@@ -5,6 +5,10 @@
 
 **2026-06-14**
 
+v2.0.1
+* UX: the probe-type label on the Probe config screens ("3D Touch Probe" / "Z-Height Touch Plate" / "XYZ Touch Plate") is now green instead of dim grey, for better legibility
+* Fix: the web installer's **Update** path no longer silently wipes saved WiFi credentials — the manifest's `new_install_prompt_erase` was `false`, which (for a non-Improv device) makes ESP Web Tools full-chip-erase by default; set to `true` so Update routes to the erase prompt with the box unchecked, preserving NVS. The installer page and README now note to leave "Erase device" unchecked on an update
+
 v2.0.0
 * Feature: **probing rebuilt around three probe types** — the Probe screen now opens on a hub with a segmented type selector: **Z-Height Touch Plate**, **XYZ Touch Plate**, and **3D Touch Probe**; the routines on offer are gated by the selected type — Z-Height Plate exposes Z Surface only, XYZ Plate adds XYZ Corner, and the 3D Probe adds Bore and Boss
 * Feature: probe routines now **generate their G-code on the pendant** (G38.2 straight-probe moves, with named-parameter arithmetic for circle centre-finding) instead of running pre-written `.nc` macro files from the controller; the trigger offset is computed per type — touch-plate thickness for plates, ball radius for the 3D probe — so the same routine zeroes correctly regardless of probe hardware

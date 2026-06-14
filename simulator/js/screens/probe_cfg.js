@@ -48,7 +48,7 @@ function drawProbeCfg3DScreen() {
   display.fillRoundRect(5, 38, 230, 26, 4, PROBE_BG_PANEL);
   display.setTextSize(1); display.setTextColor(PROBE_C_LBLUE);
   display.setCursor(10, 41); display.print("PROBE HARDWARE");
-  display.setTextColor(PROBE_C_DIMBLUE);
+  display.setTextColor(PROBE_C_GREEN);
   display.setCursor(10, 53); display.print("3D Touch Probe");
 
   display.fillRoundRect(5, 67, 230, 98, 4, PROBE_BG_PANEL);
@@ -93,7 +93,7 @@ function drawProbeCfgPlateScreen() {
   display.fillRoundRect(5, 38, 230, 26, 4, PROBE_BG_PANEL);
   display.setTextSize(1); display.setTextColor(PROBE_C_LBLUE);
   display.setCursor(10, 41); display.print("PROBE TYPE");
-  display.setTextColor(PROBE_C_DIMBLUE);
+  display.setTextColor(PROBE_C_GREEN);
   display.setCursor(10, 53); display.print(xyz ? "XYZ Touch Plate" : "Z-Height Touch Plate");
 
   const panelH = xyz ? 98 : 55;
