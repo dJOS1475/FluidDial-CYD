@@ -103,11 +103,13 @@ On capacitive-screen CYDs a small battery icon appears in the top-right corner o
 
 No wiring changes are needed on CYD boards that already have the battery circuit populated. Battery monitoring is built into the shipping firmware — no opt-in required.
 
+> ⚠️ **"Off" still drains the battery.** Holding the red button powers the pendant *off* by putting the ESP32 into deep sleep, but the CYD's voltage regulator and other on-board parts keep drawing a few milliamps from the battery — there is no hardware switch that fully isolates the cell. A charged LiPo will therefore slowly self-drain over a day or two even while "off", and can end up flat. **If you run on battery, put the pendant on USB charge after use** (or unplug the battery) so it's ready next time.
+
 ---
 
 ## 📡 WiFi Transport
 
-> **Battery-powered pendants only.** WiFi replaces the UART cable with a raw TCP connection to FluidNC's built-in Telnet server (port 23). Wired pendants always use UART — there is no user-facing toggle.
+> **Battery-powered pendants only.** WiFi replaces the UART cable with a **WebSocket** connection to FluidNC, over the same HTTP port (80) that serves its WebUI. Wired pendants always use UART — there is no user-facing toggle.
 
 ### How transport selection works
 
@@ -129,7 +131,7 @@ This means:
 1. Power on the pendant. With no saved credentials it broadcasts an open WiFi network named **FluidDial**.
 2. Connect a phone or laptop to **FluidDial** and browse to **http://192.168.4.1**.
 3. Enter your network SSID, password, and the IP address (or `hostname.local`) of your FluidNC controller, then tap **Save & Connect**.
-4. The pendant restarts, joins your network, and connects to FluidNC over TCP.
+4. The pendant restarts, joins your network, and connects to FluidNC over the WebSocket.
 
 ### Reconfiguring WiFi
 
