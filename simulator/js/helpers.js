@@ -43,13 +43,25 @@ function drawMultiLineButton(x, y, w, h, line1, line2, bgColor, textColor, textS
 }
 
 // ---- Battery icon (top-right, WiFi mode only) ----
+// Lightning-bolt charging glyph (~6w x 9h, full battery height), yellow with a
+// 1px black outline.
+function drawChargeBolt(x, y) {
+  const runs = [[0, 4, 2], [1, 3, 2], [2, 2, 2], [3, 1, 5], [4, 3, 2], [5, 2, 2], [6, 1, 2], [7, 0, 2], [8, 0, 1]];
+  const ox = [-1, 1, 0, 0], oy = [0, 0, -1, 1];
+  for (let d = 0; d < 4; d++)
+    for (const r of runs)
+      display.drawFastHLine(x + r[1] + ox[d], y + r[0] + oy[d], r[2], COLOR_BACKGROUND);
+  for (const r of runs)
+    display.drawFastHLine(x + r[1], y + r[0], r[2], COLOR_YELLOW);
+}
+
 function drawBatteryIcon() {
   if (comms_active_mode() !== COMMS_MODE_WIFI) return;
   const pct = pendantMachine.batteryPercent;
   const charging = pendantMachine.batteryCharging;
   if (pct < 0) return;
 
-  const outline = charging ? COLOR_RED : COLOR_GRAY_TEXT;
+  const outline = COLOR_GRAY_TEXT;   // outline no longer signals charging
   const fg = pct > 50 ? COLOR_GREEN : pct > 20 ? COLOR_ORANGE : COLOR_RED;
 
   // sprite was 25x13 at (212,11); draw directly at that origin
@@ -60,6 +72,7 @@ function drawBatteryIcon() {
   display.fillRect(ox + 21, oy + 4, 3, 5, outline);
   const fillW = (16 * pct) / 100 | 0;
   if (fillW > 0) display.fillRect(ox + 3, oy + 3, fillW, 7, fg);
+  if (charging) drawChargeBolt(ox + 8, oy + 2);   // full-height yellow lightning bolt overlay
 }
 
 // ---- WiFi signal icon (top-left, WiFi mode only) ----

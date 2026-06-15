@@ -19,7 +19,7 @@
 // step with the top entry in CHANGELOG.md on every release — it is independent
 // of the git-tag-derived `git_info` string (which only changes when a tag is
 // actually cut, and is kept for the full build identifier in the About screen).
-#define FIRMWARE_VERSION "v2.0.2"
+#define FIRMWARE_VERSION "v2.0.3"
 
 // ===== Display Configuration =====
 #define DISPLAY_WIDTH 240
@@ -68,6 +68,7 @@
 #define COLOR_CYAN 0x07FF            // Cyan
 #define COLOR_BLUE 0x1C9F            // Blue
 #define COLOR_RED 0xF800             // Red
+#define COLOR_YELLOW 0xFFE0          // Yellow (e.g. charging bolt)
 #define COLOR_WHITE 0xFFFF           // White
 #define COLOR_BUTTON_GRAY 0x31A6     // Dark button gray
 #define COLOR_BUTTON_ACTIVE 0x5AEB   // Active button gray

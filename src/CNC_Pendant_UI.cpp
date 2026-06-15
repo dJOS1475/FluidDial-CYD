@@ -217,6 +217,23 @@ void drawMultiLineButton(int x, int y, int w, int h, String line1, String line2,
 // product policy — wired pendants always use UART).  This is a more robust
 // gate than I2C-probing the IP5306, which can fail on some hardware variants
 // even when a battery and resistor-divider are present.
+// Lightning-bolt charging glyph, drawn into the battery sprite at top-left
+// (x,y).  ~6w × 9h — spans the full height of the battery body — yellow with a
+// 1px black outline so it reads on any charge-level bar colour behind it.
+static void drawChargeBolt(LGFX_Sprite& spr, int x, int y) {
+    static const uint8_t runs[9][3] = {   // {row, x-offset, width}
+        {0, 4, 2}, {1, 3, 2}, {2, 2, 2}, {3, 1, 5},
+        {4, 3, 2}, {5, 2, 2}, {6, 1, 2}, {7, 0, 2}, {8, 0, 1},
+    };
+    static const int ox[4] = { -1, 1, 0, 0 };
+    static const int oy[4] = {  0, 0, -1, 1 };
+    for (int d = 0; d < 4; ++d)            // black 1px outline (4-way offset)
+        for (int i = 0; i < 9; ++i)
+            spr.drawFastHLine(x + runs[i][1] + ox[d], y + runs[i][0] + oy[d], runs[i][2], COLOR_BACKGROUND);
+    for (int i = 0; i < 9; ++i)            // yellow fill
+        spr.drawFastHLine(x + runs[i][1], y + runs[i][0], runs[i][2], COLOR_YELLOW);
+}
+
 static void drawBatteryIcon() {
 #ifdef USE_WIFI
     if (comms_active_mode() != COMMS_MODE_WIFI) return;  // wired pendant
@@ -233,7 +250,7 @@ static void drawBatteryIcon() {
         if (!spr.getBuffer()) return;  // allocation failed — silent no-op
     }
 
-    uint16_t outline = charging ? COLOR_RED : COLOR_GRAY_TEXT;
+    uint16_t outline = COLOR_GRAY_TEXT;   // outline no longer signals charging
     uint16_t fg      = (pct > 50) ? COLOR_GREEN : (pct > 20) ? COLOR_ORANGE : COLOR_RED;
 
     spr.fillSprite(COLOR_DARKER_BG);          // background
@@ -242,6 +259,8 @@ static void drawBatteryIcon() {
     int fillW = 16 * pct / 100;                   // interior width = bw-4 = 16
     if (fillW > 0)
         spr.fillRect(3, 3, fillW, 7, fg);         // charge level bar
+    if (charging)
+        drawChargeBolt(spr, 8, 2);                // full-height yellow lightning bolt overlay
     // Position: x=212 to leave a ~3px right margin so the icon's right edge
     // sits symmetrically relative to the WiFi icon's left edge at x=5.
     spr.pushSprite(212, 11);                      // atomic blit — no visible clear step
@@ -1431,12 +1450,11 @@ void pendant_hw_task(void* /*pvParameters*/) {
             lastBatteryMs = millis();
         }
 
-        // Charging status every 3 s (I²C read of IP5306).  Was 60 s, which
-        // made the charging outline take up to a minute to react to plugging
-        // in / unplugging USB — long enough that it looked broken.  3 s is
-        // responsive without meaningfully loading the shared I²C_NUM_0 bus
-        // (touch polls far more often); collisions are bounded by the 10 ms
-        // timeout inside i2c_master_write_read_device().
+        // Charging status every 3 s — now a battery-VOLTAGE-TREND inference
+        // (battery_charging()), not an IP5306 register read: the PMIC's charge
+        // bits don't track reality on these boards.  Cheap ADC-only read; the
+        // function smooths over a 90 s window internally, so the 3 s cadence
+        // just feeds it samples and the icon reacts in ~1-2 min.
         if (millis() - lastChargingMs >= 3000) {
             bool charging = battery_charging();
             if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {

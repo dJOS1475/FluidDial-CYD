@@ -97,7 +97,7 @@ The 3 physical buttons always perform the same function regardless of the active
 On capacitive-screen CYDs a small battery icon appears in the top-right corner of every screen title bar when a LiPo battery is connected to the CYD's 3.3 V rail (via GPIO 39 voltage divider):
 
 * **Icon colour** — green above 50 %, orange 20–50 %, red below 20 %
-* **Charging indicator** — if the board includes an IP5306 PMIC (I²C address 0x75), the icon outline turns red while charging
+* **Charging indicator** — a yellow lightning-bolt overlay appears on the battery icon while charging. Charging is inferred from the battery-voltage trend (rising/held-high ⇒ on charger), so it reacts within ~30 s of plugging in
 * **Update rate** — battery level refreshes every 5 seconds; charging status every 60 seconds (low-priority I²C read)
 * The icon is hidden on resistive CYDs or when no battery hardware is detected
 

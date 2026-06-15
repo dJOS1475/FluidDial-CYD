@@ -716,59 +716,61 @@ int battery_level() {
 // UART and never start WiFi.
 bool battery_hardware_present() { return ip5306_present; }
 
-// Reads IP5306 register 0x70 bit 3 = "charging in progress".
-// Called from Core 1 every 60 s (pendant_hw_task), so concurrent touch reads
-// on the same I2C_NUM_0 are infrequent; the 10 ms timeout inside
-// i2c_master_write_read_device() handles rare collisions gracefully.
+// Charging detection by battery-VOLTAGE TREND (Li-Ion cells only).
 //
-// Late-binding probe: if the IP5306 wasn't detected at boot (eg. bus was
-// busy with touch init), we keep trying every call so that the charging
-// icon can come alive whenever the chip finally answers.  Once detected,
-// the flag latches true and we skip the probe path.
-// Returns true when the pendant is on external (USB) power — i.e. the outline
-// should light up.  Detection combines two IP5306 status bits:
+// The IP5306's I2C charge-status bits (0x70/0x71 bit 3) proved unreliable on
+// these CYD boards — the chip ACKs on the bus (which is why transport autodetect
+// works) but those bits don't track the real charge state.  So instead of asking
+// the PMIC, we watch the cell voltage and infer direction.
 //
-//   REG_READ0 (0x70) bit 3  → charging in progress (battery not yet full)
-//   REG_READ1 (0x71) bit 3  → charge complete / "charge full" (plugged in,
-//                             battery topped off, charge current tapered off)
+// The pendant runs under a constant WiFi load, so on battery the cell sags and
+// its voltage trends DOWN; only an external charger can hold the voltage HIGH or
+// push it UP.  We detect that with a fast/slow EMA crossover, evaluated on every
+// call (~3 s) so the indicator reacts within ~15-30 s rather than minutes:
 //
-// We OR them because reading only 0x70 bit 3 misses the very common
-// "plugged in but already full" case: once the IP5306 finishes charging it
-// clears the in-progress bit and sets the full bit, so a 0x70-only check
-// would drop the outline back to grey even though USB is still connected.
-// On battery (no USB) both bits read 0.  This matches the M5Stack IP5306
-// convention (isCharging = 0x70.3, isChargeFull = 0x71.3).
+//   • fast EMA leads the slow EMA while voltage is rising ⇒ charging,
+//     trails it while falling ⇒ on battery (a few mV of separation is enough on
+//     a Li-Ion cell — no need to wait out a long window).
+//   • "pinned near full" (≥ ~4.15 V under load) ⇒ on charger, caught instantly.
+//   • Hysteresis: a flat reading holds the previous state, so the icon doesn't
+//     flicker as charge current tapers near full.
 //
-// Logged once per second at most so a user diagnosing "outline never changes"
-// can see the raw register values over the serial console.
+// Caveat: a battery that is *already full* when you plug in (flat ~4.2 V, no
+// rise) is only caught by the "pinned near full" rule, not the trend.
 bool battery_charging() {
-    if (display_num == 1) return false;  // resistive — IP5306 not present
+    if (display_num == 1) return false;   // resistive — no battery hardware
+    if (!bat_ready)        return false;
 
-    if (!ip5306_present) {
-        // Late-binding probe: confirm the chip answers before trusting reads.
-        uint8_t probe = 0;
-        if (i2c_read_reg(0x75, 0x70, &probe) != ESP_OK) {
-            return false;
-        }
-        ip5306_present = true;
-        dbg_printf("IP5306 detected late (reg70=0x%02x)\n", probe);
+    int mv = battery_millivolts();        // EMA-smoothed cell voltage
+    static float fast_mv = 0.0f;          // fast EMA (~15 s at 3 s cadence)
+    static float slow_mv = 0.0f;          // slow EMA (~60 s)
+    static bool  state   = false;
+
+    if (mv <= 0) return state;            // bad reading — hold last decision
+    if (fast_mv < 1.0f) {                 // first valid call: seed, assume not charging
+        fast_mv = slow_mv = (float)mv;
+        return false;
     }
 
-    uint8_t reg70 = 0, reg71 = 0;
-    if (i2c_read_reg(0x75, 0x70, &reg70) != ESP_OK) return false;
-    i2c_read_reg(0x75, 0x71, &reg71);  // best-effort; 0 on failure
+    fast_mv = fast_mv * 0.80f + (float)mv * 0.20f;
+    slow_mv = slow_mv * 0.95f + (float)mv * 0.05f;
+    float diff = fast_mv - slow_mv;       // + rising (charging), - falling (on battery)
 
-    bool charging   = (reg70 & 0x08) != 0;  // 0x70 bit 3 — charging in progress
-    bool chargeFull = (reg71 & 0x08) != 0;  // 0x71 bit 3 — charge complete
-    bool on_power   = charging || chargeFull;
+    const float DRIFT_MV = 3.0f;          // Li-Ion: a few mV of rise is a clear signal
+    const int   FULL_MV  = 4150;          // held this high under load ⇒ on charger
+
+    if      (mv >= FULL_MV)     state = true;    // pinned near full ⇒ external power
+    else if (diff >=  DRIFT_MV) state = true;    // rising ⇒ charging
+    else if (diff <= -DRIFT_MV) state = false;   // falling ⇒ on battery
+    // else flat ⇒ hold previous state (hysteresis)
 
     static uint32_t last_log = 0;
-    if ((millis() - last_log) > 1000) {
+    if (millis() - last_log > 5000) {
         last_log = millis();
-        dbg_printf("IP5306 reg70=0x%02x reg71=0x%02x  charging=%d full=%d → onPower=%d\n",
-                   reg70, reg71, charging, chargeFull, on_power);
+        dbg_printf("Batt charge-trend: mv=%d fast=%.0f slow=%.0f diff=%+.1f → charging=%d\n",
+                   mv, fast_mv, slow_mv, diff, state);
     }
-    return on_power;
+    return state;
 }
 
 #else  // ── stubs — compiles on all targets; returns "not available" values ──

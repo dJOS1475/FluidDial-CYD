@@ -5,6 +5,12 @@
 
 **2026-06-14**
 
+v2.0.3
+* Feature: **charging detection + indicator reworked** — charging is now inferred from the battery-voltage trend (a fast/slow EMA crossover, tuned for Li-Ion cells) instead of the IP5306's status bits, which proved unreliable on these boards; it reacts within ~30 s of plugging in. The indicator is now a **full-height yellow lightning bolt** overlaid on the battery icon, replacing the previous red outline.
+* Docs: README WiFi transport corrected to **WebSocket** (was described as Telnet/TCP); added a battery **"off"-mode drain** note — deep sleep still draws a few mA, so charge after use.
+
+**2026-06-14**
+
 v2.0.2
 * Fix: the WiFi **captive portal again starts on a clean build** — `comms_init()` was defaulting to UART whenever no transport override was stored in NVS (i.e. every fresh flash / factory reset), so a battery pendant silently picked UART and never raised the setup AP. It now autodetects from hardware when no override is stored (battery/IP5306 pendant → WiFi + captive portal, wired → UART); an explicit UART/WiFi choice from the WiFi Setup screen still overrides and persists. The transport toggle now flips the *active* transport so it points the right way after an autodetected default.
 * Fix: the captive-portal **soft-AP now hands out DHCP leases** — `softAPConfig()` was called *after* `softAP()`, which left the on-AP DHCP server not serving, so a connecting phone/PC got a `169.254.x.x` (APIPA) address and couldn't reach `192.168.4.1`. The AP IP/subnet is now configured before `softAP()` brings the AP up.
