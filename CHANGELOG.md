@@ -5,6 +5,11 @@
 
 **2026-06-14**
 
+v2.0.4
+* Fix: **wired (UART) pendants no longer have their feed rate drift down mid-job** — `dbg_printf()` wrote debug output to UART0 via `vprintf`, which on a wired build is the same port the pendant uses to reach FluidNC, so debug text was injected into the control stream (and read by the controller as feed-override realtime commands). `dbg_printf()` now routes through the gated debug path — silent in the shipped firmware and never on the controller UART; two stray raw `printf` calls were cleaned up the same way.
+
+**2026-06-14**
+
 v2.0.3
 * Feature: **charging detection + indicator reworked** — charging is now inferred from the battery-voltage trend (a fast/slow EMA crossover, tuned for Li-Ion cells) instead of the IP5306's status bits, which proved unreliable on these boards; it reacts within ~30 s of plugging in. The indicator is now a **full-height yellow lightning bolt** overlaid on the battery icon, replacing the previous red outline.
 * Docs: README WiFi transport corrected to **WebSocket** (was described as Telnet/TCP); added a battery **"off"-mode drain** note — deep sleep still draws a few mA, so charge after use.

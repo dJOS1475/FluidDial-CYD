@@ -271,7 +271,7 @@ public:
             } else {
                 int y_offset = offset * y_inc;
                 y_offset += (offset > 0) ? y_distance : -y_distance;
-                printf("y_offset %d\n", y_offset);
+                dbg_printf("y_offset %d\n", y_offset);  // gated — never raw printf to UART0
                 int width = big_width;
                 if (round_display) {
                     // If the display is round, we need to reduce the width available

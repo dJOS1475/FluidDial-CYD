@@ -16,6 +16,6 @@
   "screens/screen_probe_cfg.cpp": "876f4781a1e08b90f33dcda9d927d1bb3ab46167",
   "CNC_Pendant_UI.cpp": "2fd7b114b01f218c64236b3eda6bd0f72be4229d",
   "screens/pendant_shared.h": "1eade4c1dc1e906943d67720b04290be5d60925a",
-  "cnc_pendant_config.h": "4c00939511e9828c97f1077b8dd1e5f48952e0e9",
+  "cnc_pendant_config.h": "f9eba8ece9ccaf1e4cb0b14d041c3ae8230c8593",
   "screens/screen_probe.h": "4cc34ffa4f8316eef81dd5615eceaab356ecc1e9"
 }

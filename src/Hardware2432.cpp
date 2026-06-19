@@ -471,7 +471,7 @@ void redrawButtons() {
     display.startWrite();
     for (int i = 0; i < n_buttons; i++) {
         Point position = layout->buttonsXY + layout->buttonOffset(i);
-        printf("button position %d,%d\n", position.x, position.y);
+        dbg_printf("button position %d,%d\n", position.x, position.y);  // gated — never raw printf to UART0
         auto& sprite = last_locked == 1 ? locked_button : buttons[i];
         sprite.pushSprite(position.x, position.y);
     }
