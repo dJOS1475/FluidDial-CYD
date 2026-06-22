@@ -47,6 +47,7 @@ The 3 physical buttons always perform the same function regardless of the active
   * Fine metric: 0.01 / 0.1 / 1 / 10 mm — Fine imperial: .0001 / .001 / .010 / .100 in
   * Coarse metric: 1 / 10 / 50 / 100 mm — Coarse imperial: .05 / .5 / 2.0 / 4.0 in
 * Units detected automatically from the controller (G20/G21) — no manual switching needed
+* The **A axis** (4th axis) is treated as rotary — its DRO shows a **degree symbol (°)** instead of mm/in; X/Y/Z use mm/in as normal
 * Axis selection and increment buttons on screen
 * Home buttons for each detected axis, plus an "ALL" home button on 3-axis machines
 * Only axes present on the connected machine are shown

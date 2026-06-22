@@ -47,6 +47,23 @@ function enterJogHoming() {
 }
 function exitJogHoming() { releasePanelSprites(); }
 
+// Redraws just the "JOG INCREMENT (unit) - mode" label row — refreshes on axis
+// change (A → "deg", X/Y/Z → "mm"/"in") without a full-screen redraw.
+function redrawJogIncrementLabel() {
+  display.fillRect(5, 219, 230, 9, COLOR_BACKGROUND);
+  display.setTextSize(1);
+  display.setCursor(5, 219);
+  if (pendantMachine.status.startsWith("Alarm")) {
+    display.setTextColor(TFT_RED);
+    display.print("JOG INCREMENT  *** " + pendantMachine.status + " ***");
+  } else {
+    display.setTextColor(COLOR_GRAY_TEXT);
+    const unitStr = pendantJog.selectedAxis === 3 ? "deg" : (pendantMachine.inInches ? "in" : "mm");
+    const modeStr = pendantJog.fineIncrements ? " - fine" : " - coarse";
+    display.print("JOG INCREMENT (" + unitStr + ")" + modeStr);
+  }
+}
+
 function drawJogHomingScreen() {
   display.fillScreen(COLOR_BACKGROUND);
   drawTitle("JOG & HOMING");
@@ -76,17 +93,7 @@ function drawJogHomingScreen() {
     drawButton(5 + i * btnW, 173, btnW - 4, 38, axisNames[i], bg, COLOR_WHITE, 3);
   }
 
-  display.setTextSize(1);
-  display.setCursor(5, 219);
-  if (pendantMachine.status.startsWith("Alarm")) {
-    display.setTextColor(TFT_RED);
-    display.print("JOG INCREMENT  *** " + pendantMachine.status + " ***");
-  } else {
-    display.setTextColor(COLOR_GRAY_TEXT);
-    const unitStr = pendantMachine.inInches ? "in" : "mm";
-    const modeStr = pendantJog.fineIncrements ? " - fine" : " - coarse";
-    display.print("JOG INCREMENT (" + unitStr + ")" + modeStr);
-  }
+  redrawJogIncrementLabel();
 
   const incs = currentIncrements();
   for (let i = 0; i < 4; i++) {
@@ -124,10 +131,20 @@ function updateJogAxisDisplay() {
     const inAlarm = pendantMachine.status.startsWith("Alarm");
     const dispAxis = pendantJog.homingAxis >= 0 ? pendantJog.homingAxis : pendantJog.selectedAxis;
     const decPlaces = pendantMachine.inInches ? 4 : 2;
-    const unitOrAlarm = inAlarm ? pendantMachine.status : (pendantMachine.inInches ? "in" : "mm");
-    const mainLine = `${axisNames[dispAxis]} ${fmtF(pos[dispAxis], decPlaces)} ${unitOrAlarm}`;
+    // A axis (rotary) → no "mm"/"in"; a degree symbol is drawn after the value.
+    const isAAxis = dispAxis === 3;
+    const val = fmtF(pos[dispAxis], decPlaces);
+    let mainLine;
+    if (inAlarm) mainLine = `${axisNames[dispAxis]} ${val} ${pendantMachine.status}`;
+    else if (isAAxis) mainLine = `${axisNames[dispAxis]} ${val}`;
+    else mainLine = `${axisNames[dispAxis]} ${val} ${pendantMachine.inInches ? "in" : "mm"}`;
     g.setTextColor(inAlarm ? TFT_RED : COLOR_GREEN); g.setTextSize(3);
     g.setCursor(ox + 5, oy + 5); g.print(mainLine);
+    if (isAAxis && !inAlarm) {
+      const iconX = ox + 5 + g.textWidth(mainLine) + 6;
+      g.drawCircle(iconX, oy + 8, 3, COLOR_GREEN);
+      g.drawCircle(iconX, oy + 8, 2, COLOR_GREEN);
+    }
 
     g.setTextColor(COLOR_GRAY_TEXT); g.setTextSize(1);
     const numAx = pendantMachine.numAxes;
@@ -187,6 +204,7 @@ function handleJogHomingTouch(x, y) {
       pendantJog.homingAxis = -1;
       redrawJogAxisButtons();
       redrawJogSpeedButton();
+      redrawJogIncrementLabel();   // A<->X/Y/Z changes the unit (deg vs mm/in)
       return;
     }
   }

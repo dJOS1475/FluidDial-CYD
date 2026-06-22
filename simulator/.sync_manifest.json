@@ -1,7 +1,7 @@
 {
   "screens/screen_main_menu.cpp": "baf34b3eeacaa9c0c06044cfa5e7ca5119d815ac",
   "screens/screen_status.cpp": "c93e85910b91a0583223a91f5b592661ee715b2a",
-  "screens/screen_jog_homing.cpp": "7914d48b2939ad3dddc653a933ca20f1be08a1ad",
+  "screens/screen_jog_homing.cpp": "bdb2fd76be510ae5ad26c9092c1d96c93a8bd6b5",
   "screens/screen_probing_work.cpp": "19c0af5c3868ba581049ac7016606b2ba2891dc2",
   "screens/screen_feeds_speeds.cpp": "4f6621b96e12617db34d264c9a5e0314feac3dde",
   "screens/screen_spindle_control.cpp": "df79772078a8742b954a830d069346fc1a022cf5",
@@ -16,6 +16,6 @@
   "screens/screen_probe_cfg.cpp": "876f4781a1e08b90f33dcda9d927d1bb3ab46167",
   "CNC_Pendant_UI.cpp": "2fd7b114b01f218c64236b3eda6bd0f72be4229d",
   "screens/pendant_shared.h": "1eade4c1dc1e906943d67720b04290be5d60925a",
-  "cnc_pendant_config.h": "f9eba8ece9ccaf1e4cb0b14d041c3ae8230c8593",
+  "cnc_pendant_config.h": "b5c7aab8633bfd0a1f548677f55283d53d8d72c8",
   "screens/screen_probe.h": "4cc34ffa4f8316eef81dd5615eceaab356ecc1e9"
 }

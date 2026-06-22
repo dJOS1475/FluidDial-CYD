@@ -96,6 +96,26 @@ void exitJogHoming() {
 
 // ===== Draw =====
 
+// Redraws just the "JOG INCREMENT (unit) — mode" label row.  Pulled out so it
+// can refresh when the selected axis changes (A → "deg", X/Y/Z → "mm"/"in")
+// without a full-screen redraw.
+static void redrawJogIncrementLabel() {
+    display.fillRect(5, 219, 230, 9, COLOR_BACKGROUND);   // clear the old text row
+    display.setTextSize(1);
+    display.setCursor(5, 219);
+    if (pendantMachine.status.startsWith("Alarm")) {
+        display.setTextColor(TFT_RED);
+        display.print("JOG INCREMENT  *** " + pendantMachine.status + " ***");
+    } else {
+        display.setTextColor(COLOR_GRAY_TEXT);
+        // A axis (rotary) → label the increments in degrees, not mm/in.
+        String unitStr = (pendantJog.selectedAxis == 3) ? "deg"
+                                                        : (pendantMachine.inInches ? "in" : "mm");
+        String modeStr = pendantJog.fineIncrements ? " — fine" : " — coarse";
+        display.print("JOG INCREMENT (" + unitStr + ")" + modeStr);
+    }
+}
+
 void drawJogHomingScreen() {
     display.fillScreen(COLOR_BACKGROUND);
     drawTitle("JOG & HOMING");
@@ -134,17 +154,7 @@ void drawJogHomingScreen() {
         drawButton(5 + i * btnW, 173, btnW - 4, 38, axisNames[i], bg, COLOR_WHITE, 3);
     }
 
-    display.setTextSize(1);
-    display.setCursor(5, 219);
-    if (pendantMachine.status.startsWith("Alarm")) {
-        display.setTextColor(TFT_RED);
-        display.print("JOG INCREMENT  *** " + pendantMachine.status + " ***");
-    } else {
-        display.setTextColor(COLOR_GRAY_TEXT);
-        String unitStr = pendantMachine.inInches ? "in" : "mm";
-        String modeStr = pendantJog.fineIncrements ? " — fine" : " — coarse";
-        display.print("JOG INCREMENT (" + unitStr + ")" + modeStr);
-    }
+    redrawJogIncrementLabel();
 
     IncrementSet incs = currentIncrements();
     for (int i = 0; i < 4; i++) {
@@ -159,6 +169,13 @@ void drawJogHomingScreen() {
 }
 
 // ===== Sprite update =====
+
+// Tiny degree "°" glyph drawn from two concentric rings — font-independent, so
+// it works regardless of whether the active font carries a degree character.
+static void drawDegreeIcon(LovyanGFX* g, int x, int y, uint16_t color) {
+    g->drawCircle(x, y, 3, color);
+    g->drawCircle(x, y, 2, color);
+}
 
 void updateJogAxisDisplay() {
     if (currentPendantScreen != PSCREEN_JOG_HOMING) return;
@@ -207,20 +224,38 @@ void updateJogAxisDisplay() {
         int dispAxis = (pendantJog.homingAxis >= 0) ? pendantJog.homingAxis
                                                      : pendantJog.selectedAxis;
 
-        // Large display axis + position on one line; unit replaced with alarm state when active
+        // Large display: axis + position on one line.  Unit handling:
+        //   • in alarm        → unit slot shows the alarm state (red)
+        //   • A axis (rotary)  → no "mm"/"in"; a degree symbol is drawn instead
+        //   • X / Y / Z        → "mm" or "in" as usual
+        bool isAAxis = (dispAxis == 3);
         char posBuf[12];
         int  decPlaces = pendantMachine.inInches ? 4 : 2;
         dtostrf(positions[dispAxis], 1, decPlaces, posBuf);
-        String unitOrAlarm = inAlarm ? pendantMachine.status
-                                     : (pendantMachine.inInches ? "in" : "mm");
+
         char mainLine[32];
-        snprintf(mainLine, sizeof(mainLine), "%s %s %s",
-                 axisNames[dispAxis].c_str(), posBuf,
-                 unitOrAlarm.c_str());
+        if (inAlarm) {
+            snprintf(mainLine, sizeof(mainLine), "%s %s %s",
+                     axisNames[dispAxis].c_str(), posBuf, pendantMachine.status.c_str());
+        } else if (isAAxis) {
+            // No text unit — a degree icon is overlaid after the value below.
+            snprintf(mainLine, sizeof(mainLine), "%s %s",
+                     axisNames[dispAxis].c_str(), posBuf);
+        } else {
+            snprintf(mainLine, sizeof(mainLine), "%s %s %s",
+                     axisNames[dispAxis].c_str(), posBuf,
+                     pendantMachine.inInches ? "in" : "mm");
+        }
         g->setTextColor(inAlarm ? TFT_RED : COLOR_GREEN);
         g->setTextSize(3);
         g->setCursor(ox + 5, oy + 5);
         g->print(mainLine);
+
+        // Rotary A axis: draw a degree "°" after the value (font-independent).
+        if (isAAxis && !inAlarm) {
+            int iconX = ox + 5 + g->textWidth(mainLine) + 6;
+            drawDegreeIcon(g, iconX, oy + 8, COLOR_GREEN);
+        }
 
         // Non-selected axes in a small row underneath
         g->setTextColor(COLOR_GRAY_TEXT);
@@ -315,6 +350,7 @@ void handleJogHomingTouch(int x, int y) {
             pendantJog.homingAxis    = -1;   // manual selection cancels any homing DRO override
             redrawJogAxisButtons();
             redrawJogSpeedButton();
+            redrawJogIncrementLabel();       // A↔X/Y/Z changes the unit (deg vs mm/in)
             return;
         }
     }

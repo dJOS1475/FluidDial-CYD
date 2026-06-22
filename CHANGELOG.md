@@ -5,6 +5,11 @@
 
 **2026-06-14**
 
+v2.0.5
+* Feature: the **A axis (4th axis)** is treated as rotary on the Jog & Homing screen — the DRO shows a **degree symbol** (°, drawn as a small ring) instead of "mm"/"in", and the **"JOG INCREMENT (mm)" label reads "JOG INCREMENT (deg)"** when A is selected. X/Y/Z still show mm/in, and the alarm state still takes precedence over the unit.
+
+**2026-06-14**
+
 v2.0.4
 * Fix: **wired (UART) pendants no longer have their feed rate drift down mid-job** — `dbg_printf()` wrote debug output to UART0 via `vprintf`, which on a wired build is the same port the pendant uses to reach FluidNC, so debug text was injected into the control stream (and read by the controller as feed-override realtime commands). `dbg_printf()` now routes through the gated debug path — silent in the shipped firmware and never on the controller UART; two stray raw `printf` calls were cleaned up the same way.
 

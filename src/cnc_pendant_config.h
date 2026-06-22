@@ -19,7 +19,7 @@
 // step with the top entry in CHANGELOG.md on every release — it is independent
 // of the git-tag-derived `git_info` string (which only changes when a tag is
 // actually cut, and is kept for the full build identifier in the About screen).
-#define FIRMWARE_VERSION "v2.0.4"
+#define FIRMWARE_VERSION "v2.0.5"
 
 // ===== Display Configuration =====
 #define DISPLAY_WIDTH 240
