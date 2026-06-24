@@ -3,6 +3,12 @@
 **ChangeLog:**
 
 
+**2026-06-25**
+
+v2.0.6
+* Feature: **screen sleep** — battery (WiFi) pendants now blank the display (backlight off) after **15 minutes of inactivity** while the CNC is **Idle**, or while the pendant has been stuck **"Connecting"** that long. A **touch anywhere wakes it** back to the exact screen you left, and the waking touch sends **no command** to the controller. It never sleeps mid-job: any active machine state (Run/Jog/Hold/Home/Alarm) keeps it awake and resets the timer, and it wakes automatically if a job starts or an alarm fires while blanked. The WiFi Setup screen is excluded. **Wired (UART) pendants never sleep** — they're powered by the controller and have no battery, so they switch off with it.
+* Fix: the **charging indicator no longer false-triggers for minutes after boot** on a battery-only pendant — the boot load spike sags the cell, and the recovery as that load eased was being misread as a charging trend. A post-boot settling window now holds the trend detector off until the cell voltage stops climbing (or a 3-minute cap), so the lightning bolt only appears when actually on charge.
+
 **2026-06-14**
 
 v2.0.5

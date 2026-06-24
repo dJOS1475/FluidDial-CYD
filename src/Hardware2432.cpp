@@ -734,6 +734,9 @@ bool battery_hardware_present() { return ip5306_present; }
 //   • "pinned near full" (≥ ~4.15 V under load) ⇒ on charger, caught instantly.
 //   • Hysteresis: a flat reading holds the previous state, so the icon doesn't
 //     flicker as charge current tapers near full.
+//   • Post-boot settling window: the trend is NOT evaluated until the cell stops
+//     climbing after boot (see below) — otherwise the normal boot-load voltage
+//     recovery reads as "charging" for minutes on a battery-only pendant.
 //
 // Caveat: a battery that is *already full* when you plug in (flat ~4.2 V, no
 // rise) is only caught by the "pinned near full" rule, not the trend.
@@ -742,14 +745,36 @@ bool battery_charging() {
     if (!bat_ready)        return false;
 
     int mv = battery_millivolts();        // EMA-smoothed cell voltage
-    static float fast_mv = 0.0f;          // fast EMA (~15 s at 3 s cadence)
-    static float slow_mv = 0.0f;          // slow EMA (~60 s)
-    static bool  state   = false;
+    static float    fast_mv   = 0.0f;     // fast EMA (~15 s at 3 s cadence)
+    static float    slow_mv   = 0.0f;     // slow EMA (~60 s)
+    static bool     state     = false;
+    static bool     settled   = false;    // false until the post-boot ramp ends
+    static uint32_t settleMs  = 0;        // millis() of the first valid sample
+    static int      prev_mv   = 0;        // previous sample, for the stability test
+    static int      stableCnt = 0;        // consecutive near-flat samples
 
     if (mv <= 0) return state;            // bad reading — hold last decision
-    if (fast_mv < 1.0f) {                 // first valid call: seed, assume not charging
-        fast_mv = slow_mv = (float)mv;
-        return false;
+
+    // ── Post-boot settling window ─────────────────────────────────────────────
+    // The boot load spike (WiFi + display init) sags the cell; as that load eases
+    // the cell RECOVERS upward over the next ~minute.  Seeding the trend detector
+    // mid-spike and then watching that recovery makes a battery-only pendant read
+    // as "charging" for several minutes after boot.  So until the voltage stops
+    // climbing — stable for a few samples past a 45 s floor, or a 180 s hard cap —
+    // we hold the EMAs at the live reading and report not-charging.  Trend
+    // evaluation then starts from a settled baseline (and a pendant booted ON the
+    // charger, whose voltage keeps rising, is still caught after the cap).
+    if (!settled) {
+        if (settleMs == 0) { settleMs = millis(); prev_mv = mv; }
+        fast_mv = slow_mv = (float)mv;                 // hold EMAs at live voltage
+        if (abs(mv - prev_mv) <= 2) stableCnt++; else stableCnt = 0;
+        prev_mv = mv;
+        uint32_t elapsed = millis() - settleMs;
+        if ((elapsed >= 45000UL && stableCnt >= 3) || elapsed >= 180000UL) {
+            settled = true;
+        } else {
+            return false;
+        }
     }
 
     fast_mv = fast_mv * 0.80f + (float)mv * 0.20f;

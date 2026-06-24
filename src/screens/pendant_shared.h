@@ -89,7 +89,8 @@ enum PendantScreen {
     PSCREEN_MACROS,
     PSCREEN_SD_CARD,
     PSCREEN_FLUIDNC,
-    PSCREEN_WIFI_SETUP
+    PSCREEN_WIFI_SETUP,
+    PSCREEN_SLEEP            // hidden — display-blank after idle; touch-to-wake (not a menu item)
 };
 
 // ===== Hardware Event (Core 0 → Core 1) =====

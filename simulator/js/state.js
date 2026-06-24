@@ -22,6 +22,7 @@ const PSCREEN_MACROS        = "MACROS";
 const PSCREEN_SD_CARD       = "SD_CARD";
 const PSCREEN_FLUIDNC       = "FLUIDNC";
 const PSCREEN_WIFI_SETUP    = "WIFI_SETUP";
+const PSCREEN_SLEEP         = "SLEEP";   // hidden — display blank after idle; touch-to-wake
 
 // ===== Machine state =====
 const pendantMachine = {
@@ -40,7 +41,7 @@ const pendantMachine = {
   rotation: 2,
   spindleMaxRPM: 24000,
   spindleMinRPM: 0,
-  fluidDialVersion: "v2.0.5",
+  fluidDialVersion: "v2.0.6",
   fluidNCVersion: "v3.7.16",
   baudRate: "1000000",
   port: "UART0",

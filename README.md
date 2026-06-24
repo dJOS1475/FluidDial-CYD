@@ -98,8 +98,9 @@ The 3 physical buttons always perform the same function regardless of the active
 On capacitive-screen CYDs a small battery icon appears in the top-right corner of every screen title bar when a LiPo battery is connected to the CYD's 3.3 V rail (via GPIO 39 voltage divider):
 
 * **Icon colour** — green above 50 %, orange 20–50 %, red below 20 %
-* **Charging indicator** — a yellow lightning-bolt overlay appears on the battery icon while charging. Charging is inferred from the battery-voltage trend (rising/held-high ⇒ on charger), so it reacts within ~30 s of plugging in
-* **Update rate** — battery level refreshes every 5 seconds; charging status every 60 seconds (low-priority I²C read)
+* **Charging indicator** — a yellow lightning-bolt overlay appears on the battery icon while charging. Charging is inferred from the battery-voltage trend (rising/held-high ⇒ on charger), so it reacts within ~30 s of plugging in. A short post-boot settling window suppresses it for the first couple of minutes after power-up, so the normal boot-load voltage recovery isn't mistaken for charging
+* **Update rate** — battery level refreshes every 5 seconds; charging status every 3 seconds (cheap ADC read)
+* **Screen sleep** — to save power on battery, the display backlight switches off after **15 minutes** with the CNC Idle (or stuck "Connecting"); **a touch anywhere wakes it** back to the screen you left, without sending any command to the controller. This is backlight-off only — the pendant stays connected and running. Wired (UART) pendants don't sleep
 * The icon is hidden on resistive CYDs or when no battery hardware is detected
 
 No wiring changes are needed on CYD boards that already have the battery circuit populated. Battery monitoring is built into the shipping firmware — no opt-in required.

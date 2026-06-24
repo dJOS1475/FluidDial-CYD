@@ -24,6 +24,7 @@ const SCREENS = {
   [PSCREEN_SD_CARD]:       { enter: enterSDCard,       exit: exitSDCard,       draw: drawSDCardScreen,        handle: handleSDCardTouch,       update: [updateSDCardFileList] },
   [PSCREEN_FLUIDNC]:       { enter: enterFluidNC,      exit: exitFluidNC,      draw: drawFluidNCScreen,       handle: handleFluidNCTouch,      update: [updateFluidNCDisplay] },
   [PSCREEN_WIFI_SETUP]:    { enter: enterWiFiSetup,    exit: exitWiFiSetup,    draw: drawWiFiSetupScreen,     handle: handleWiFiSetupTouch,    update: [updateWiFiSetupDisplay] },
+  [PSCREEN_SLEEP]:         { enter: enterSleep,        exit: exitSleep,        draw: drawSleepScreen,         handle: handleSleepTouch,        update: [] },
 };
 
 const SCREEN_LABELS = {
@@ -212,8 +213,49 @@ function flashTap(x, y) {
   setTimeout(() => octxo.clearRect(0, 0, overlay.width, overlay.height), 130);
 }
 
+// ===== Screen sleep (PSCREEN_SLEEP) — mirrors CNC_Pendant_UI.cpp =====
+// Hidden, button-less screen that blanks the display after idle while the CNC is
+// Idle.  Being the active screen, only handleSleepTouch() is reachable, so a wake
+// touch can never hit a control.  (No real backlight in the sim — we just paint
+// black; on hardware it's setBrightness(0).)
+let SLEEP_TIMEOUT_MS = 15 * 60 * 1000;   // 15 min; `let` so a demo can shorten it
+let sleepReturnScreen = PSCREEN_MAIN_MENU;
+let lastActivityMs = 0;
+
+function enterSleep() {}                                   // (hardware: setBrightness(0))
+function exitSleep() {}                                    // (hardware: restore brightness)
+function drawSleepScreen() { display.fillScreen(COLOR_BACKGROUND); }
+function handleSleepTouch(/*x, y*/) {                      // any touch wakes; sends nothing
+  lastActivityMs = millis();
+  currentPendantScreen = sleepReturnScreen;   // wrapper (handlePendantTouch) runs exit/enter/draw
+}
+// Demo helper: blank immediately (so you don't wait out the 15-min timer).
+function forceSleepNow() {
+  if (currentPendantScreen === PSCREEN_SLEEP || currentPendantScreen === PSCREEN_WIFI_SETUP) return;
+  sleepReturnScreen = currentPendantScreen;
+  navigateTo(PSCREEN_SLEEP);
+}
+function manageScreenSleep() {
+  // WiFi (battery) pendants only — wired pendants power down with the controller.
+  // Eligible to blank when Idle OR while "Connecting" (not connected); any
+  // connected-but-busy state keeps it awake and resets the idle clock.
+  if (comms_active_mode() !== COMMS_MODE_WIFI) return;
+  const sleepEligible = !pendantConnected || pendantMachine.status.startsWith("Idle");
+  if (!sleepEligible) lastActivityMs = millis();
+  if (currentPendantScreen === PSCREEN_SLEEP) {
+    if (pendantConnected && !pendantMachine.status.startsWith("Idle")) navigateTo(sleepReturnScreen);
+  } else if (currentPendantScreen !== PSCREEN_WIFI_SETUP
+             && sleepEligible
+             && millis() - lastActivityMs >= SLEEP_TIMEOUT_MS) {
+    sleepReturnScreen = currentPendantScreen;
+    navigateTo(PSCREEN_SLEEP);
+  }
+}
+
 // ===== Refresh tick (firmware updates panels ~every 100 ms) =====
 function tick() {
+  manageScreenSleep();
+  if (currentPendantScreen === PSCREEN_SLEEP) return;   // nothing to update while blank
   const u = SCREENS[currentPendantScreen].update;
   for (const fn of u) fn();
 }
@@ -304,6 +346,7 @@ function setupCanvasInput() {
     const x = ((e.clientX - rect.left) * 240) / rect.width;
     const y = ((e.clientY - rect.top) * 320) / rect.height;
     flashTap(x, y);
+    lastActivityMs = millis();     // any touch counts as activity
     handlePendantTouch(x | 0, y | 0);
   });
 }

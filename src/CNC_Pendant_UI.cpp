@@ -18,6 +18,7 @@
 
 #include "System.h"
 #include "Scene.h"
+#include "AboutScene.h"   // aboutScene.getBrightness() — normal backlight level
 #include "FluidNCModel.h"
 #include "FileParser.h"
 #include "ConfigItem.h"
@@ -338,6 +339,38 @@ void drawInfoBox(int x, int y, int w, int h, String label, String value, uint16_
     display.print(value);
 }
 
+// ===== Screen sleep (PSCREEN_SLEEP) =====
+// A hidden, button-less screen used to BLANK the display after a period of
+// inactivity while the CNC is idle.  Because it becomes the ACTIVE screen while
+// asleep, the touch dispatcher (a switch on currentPendantScreen) can only reach
+// handleSleepTouch() — there are no other screen's buttons under the blank, so a
+// wake touch can never reach a control or send a byte to the controller.
+// This is a screen blank only: the framebuffer, the ESP32 and all comms keep
+// running (it is NOT power-off / deep sleep).
+#define SLEEP_TIMEOUT_MS (15UL * 60UL * 1000UL)   // 15 min of idle inactivity
+
+extern AboutScene aboutScene;   // normal backlight level (AboutScene.cpp)
+
+static PendantScreen sleepReturnScreen        = PSCREEN_MAIN_MENU;
+static unsigned long lastActivityMs           = 0;
+static bool          swallowTouchUntilRelease = false;
+
+static void enterSleep()      { display.setBrightness(0); }                          // backlight off
+static void exitSleep()       { display.setBrightness(aboutScene.getBrightness()); } // restore normal
+static void drawSleepScreen() { display.fillScreen(COLOR_BACKGROUND); }              // black (invisible w/ BL off)
+
+static void handleSleepTouch(int /*x*/, int /*y*/) {
+    // ANY touch wakes.  The touch is consumed here and never dispatched to the
+    // previous screen.  Per the dispatch convention we only set the target
+    // screen; handlePendantTouch()'s wrapper then runs exitSleep() (restores
+    // brightness) + enter/draw of the return screen exactly once.  The
+    // release-gate stops a held finger from carrying into a button on the
+    // restored screen until it is lifted.
+    swallowTouchUntilRelease = true;
+    lastActivityMs           = millis();
+    currentPendantScreen     = sleepReturnScreen;
+}
+
 // ===== Screen Lifecycle Routing =====
 static void callScreenExit(PendantScreen s) {
     switch (s) {
@@ -358,6 +391,7 @@ static void callScreenExit(PendantScreen s) {
         case PSCREEN_SD_CARD:          exitSDCard();          break;
         case PSCREEN_FLUIDNC:          exitFluidNC();         break;
         case PSCREEN_WIFI_SETUP:       exitWiFiSetup();       break;
+        case PSCREEN_SLEEP:            exitSleep();           break;
     }
 }
 
@@ -380,6 +414,7 @@ static void callScreenEnter(PendantScreen s) {
         case PSCREEN_SD_CARD:          enterSDCard();          break;
         case PSCREEN_FLUIDNC:          enterFluidNC();         break;
         case PSCREEN_WIFI_SETUP:       enterWiFiSetup();       break;
+        case PSCREEN_SLEEP:            enterSleep();           break;
     }
 }
 
@@ -402,6 +437,7 @@ void drawCurrentPendantScreen() {
         case PSCREEN_SD_CARD:          drawSDCardScreen();          break;
         case PSCREEN_FLUIDNC:          drawFluidNCScreen();         break;
         case PSCREEN_WIFI_SETUP:       drawWiFiSetupScreen();       break;
+        case PSCREEN_SLEEP:            drawSleepScreen();           break;
     }
 }
 
@@ -441,6 +477,7 @@ static void handlePendantTouch(int x, int y) {
         case PSCREEN_STATUS:           handleStatusTouch(x, y);          break;
         case PSCREEN_FLUIDNC:          handleFluidNCTouch(x, y);         break;
         case PSCREEN_WIFI_SETUP:       handleWiFiSetupTouch(x, y);       break;
+        case PSCREEN_SLEEP:            handleSleepTouch(x, y);           break;
     }
 
     if (currentPendantScreen != before) {
@@ -1453,8 +1490,9 @@ void pendant_hw_task(void* /*pvParameters*/) {
         // Charging status every 3 s — now a battery-VOLTAGE-TREND inference
         // (battery_charging()), not an IP5306 register read: the PMIC's charge
         // bits don't track reality on these boards.  Cheap ADC-only read; the
-        // function smooths over a 90 s window internally, so the 3 s cadence
-        // just feeds it samples and the icon reacts in ~1-2 min.
+        // function holds off for a post-boot settling window then smooths the
+        // trend internally, so the 3 s cadence just feeds it samples and the
+        // icon settles within a couple of minutes (and won't false-trip at boot).
         if (millis() - lastChargingMs >= 3000) {
             bool charging = battery_charging();
             if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
@@ -1551,13 +1589,21 @@ void loop_pendant() {
     while (xQueueReceive(hwEventQueue, &ev, 0) == pdTRUE) {
         switch (ev.type) {
             case HwEvent::ENCODER_DELTA:
-                handleEncoderDelta(ev.value);
+                // Discard dial movement while asleep (touch-only wake; never jog
+                // blind, and don't let queued detents fire a burst on wake).
+                if (currentPendantScreen != PSCREEN_SLEEP) {
+                    handleEncoderDelta(ev.value);
+                    lastActivityMs = millis();
+                }
                 break;
             case HwEvent::BUTTON_RED:
+                lastActivityMs = millis();
                 break;
             case HwEvent::BUTTON_YELLOW:
+                lastActivityMs = millis();
                 break;
             case HwEvent::BUTTON_GREEN:
+                lastActivityMs = millis();
                 rtcCore1Stage = 6;     // inside GREEN handler
                 // If a file has been loaded via the SD card Load button, run it now
                 if (pendantSdCard.loadedFile.length() > 0 && pendantConnected) {
@@ -1606,19 +1652,51 @@ void loop_pendant() {
     }
     rtcCore1Stage = 8;     // queue dispatch done
 
-    // Periodic sprite refresh (100ms) — only fires if STATE_UPDATE didn't already redraw
-    if (millis() - lastSpriteUpdate >= 100) {
+    // ── Screen sleep management (WiFi pendants only) ──────────────────────────
+    // Only WiFi (battery) pendants sleep — wired pendants are powered from the
+    // controller and have no battery, so they power down with it and there's
+    // nothing to blank.  Eligible to blank when the CNC is Idle OR while the
+    // pendant is still "Connecting" (not connected) — both are no-activity
+    // states.  Any connected-but-busy state (Run/Jog/Hold/Home/Alarm/…) keeps
+    // it awake and resets the idle clock, so it never blanks mid-job.
+    if (comms_active_mode() == COMMS_MODE_WIFI) {
+        bool sleepEligible = !pendantConnected || pendantMachine.status.startsWith("Idle");
+        if (!sleepEligible) {
+            lastActivityMs = millis();
+        }
+        if (currentPendantScreen == PSCREEN_SLEEP) {
+            // Wake if the machine becomes active while asleep (e.g. a job is started
+            // from the WebUI, or an alarm fires) so it's never hidden behind the blank.
+            if (pendantConnected && !pendantMachine.status.startsWith("Idle")) {
+                navigateTo(sleepReturnScreen);
+            }
+        } else if (currentPendantScreen != PSCREEN_WIFI_SETUP
+                   && sleepEligible
+                   && (millis() - lastActivityMs >= SLEEP_TIMEOUT_MS)) {
+            sleepReturnScreen = currentPendantScreen;
+            navigateTo(PSCREEN_SLEEP);   // enterSleep() turns the backlight off
+        }
+    }
+
+    // Periodic sprite refresh (100ms) — only fires if STATE_UPDATE didn't already
+    // redraw.  Skipped while asleep (nothing visible; full redraw happens on wake).
+    if (currentPendantScreen != PSCREEN_SLEEP && millis() - lastSpriteUpdate >= 100) {
         updateCurrentScreenSprites();
         lastSpriteUpdate = millis();
     }
     rtcCore1Stage = 9;     // periodic sprite refresh done
 
-    // Touch input (200ms debounce)
+    // Touch input (200ms debounce).  swallowTouchUntilRelease guards the wake
+    // touch: after a wake we ignore touches until the finger lifts, so a held
+    // press/drag can't carry into a button on the restored screen.
     lgfx::touch_point_t tp;
-    if (display.getTouch(&tp)) {
+    if (!display.getTouch(&tp)) {
+        swallowTouchUntilRelease = false;          // finger lifted — re-arm dispatch
+    } else if (!swallowTouchUntilRelease) {
         static unsigned long lastTouch = 0;
         if (millis() - lastTouch > 200) {
-            handlePendantTouch(tp.x, tp.y);
+            lastActivityMs = millis();             // any touch counts as activity
+            handlePendantTouch(tp.x, tp.y);        // on SLEEP → handleSleepTouch wakes
             lastTouch = millis();
         }
     }
