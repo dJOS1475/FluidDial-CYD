@@ -55,7 +55,7 @@ void loadProbeSettings() {
     preferences.begin("probe", true);
     pendantProbeV2.probeTypeIdx = preferences.getInt  ("probeType",   0);
     pendantProbeV2.probeRate    = preferences.getFloat("probeRate",   150.0f);
-    pendantProbeV2.seekRate     = preferences.getFloat("seekRate",    600.0f);
+    pendantProbeV2.seekRate     = preferences.getFloat("seekRate",    500.0f);
     pendantProbeV2.retractDist  = preferences.getFloat("retractDist", 20.0f);
     pendantProbeV2.maxZTravel   = preferences.getFloat("maxZTravel",  20.0f);
     pendantProbeV2.ballDia      = preferences.getFloat("ballDia",      2.0f);
@@ -330,6 +330,61 @@ float probeDialStep(int delta, float baseStep) {
     pendantProbeV2.dialLastMs = now;
     float mult = (pendantProbeV2.dialAccelCount >= 5) ? 10.0f : 1.0f;
     return baseStep * mult;
+}
+
+// Crash-safe two-pass approach: fast seek to contact, back off, slow re-probe.
+// Ends AT the fine trigger so the caller can set a WCS axis there.  Stays G91.
+void probeSeekFine(const char* axis, float seekDist, float seekF, float fineF) {
+    const float BACKOFF = 1.5f;
+    int  dir = (seekDist >= 0.0f) ? 1 : -1;
+    char b[96];
+    snprintf(b, sizeof(b), "G38.2 %s%.3f F%.0f", axis, seekDist, seekF);                send_line(b);
+    snprintf(b, sizeof(b), "G0 %s%.3f F1000",    axis, -dir * BACKOFF);                 send_line(b);
+    snprintf(b, sizeof(b), "G38.2 %s%.3f F%.0f", axis, dir * (BACKOFF + 1.0f), fineF);  send_line(b);
+}
+
+// Work-area selector button — styled like the Z-Surface "Sets" box (rounded
+// rect, small label over the WCS).  Shared by every routine screen so the WCS
+// the probe zeroes can be cycled from each one.
+void probeDrawWorkAreaButton(int x, int y, int w, int h) {
+    display.fillRoundRect(x, y, w, h, 8, PROBE_BG_SCREEN);
+    display.drawRoundRect(x, y, w, h, 8, PROBE_C_DIMBLUE);
+    display.setTextSize(1);
+    display.setTextColor(PROBE_C_LBLUE);
+    const char* lbl = "WORK AREA";
+    int16_t lw = display.textWidth(lbl);
+    display.setCursor(x + (w - lw) / 2, y + 5);
+    display.print(lbl);
+    display.setTextSize(2);
+    display.setTextColor(PROBE_C_BLUE);
+    const char* v = pendantProbing.selectedCoordSystem.c_str();
+    int16_t vw = display.textWidth(v);
+    display.setCursor(x + (w - vw) / 2, y + 17);
+    display.print(v);
+}
+
+// Cycle G54 → G55 → G56 → G57 → G54.  Selection only — does not change the
+// machine's active WCS; the probe writes the offset to this system via G10 L20 P#.
+void probeCycleWorkArea() {
+    static const char* coords[] = { "G54", "G55", "G56", "G57" };
+    pendantProbing.selectedCoordIndex  = (pendantProbing.selectedCoordIndex + 1) % 4;
+    pendantProbing.selectedCoordSystem = coords[pendantProbing.selectedCoordIndex];
+}
+
+// Sequence-step badge: filled numbered circle + label beside it.
+void drawSeqStep(int x, int y, int num, const char* txt, bool active) {
+    uint16_t bg = active ? PROBE_AMBER    : PROBE_BG_PANEL;
+    uint16_t fg = active ? COLOR_WHITE    : PROBE_C_DIMBLUE;
+    uint16_t tc = active ? PROBE_C_YELLOW : PROBE_C_DIMBLUE;
+    display.fillCircle(x + 6, y + 6, 6, bg);
+    display.setTextSize(1);
+    display.setTextColor(fg);
+    int16_t nw = display.textWidth(String(num).c_str());
+    display.setCursor(x + 6 - nw / 2, y + 2);
+    display.print(num);
+    display.setTextColor(tc);
+    display.setCursor(x + 16, y + 2);
+    display.print(txt);
 }
 
 // ── SCR0 screen lifecycle ────────────────────────────────────────────────────

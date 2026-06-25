@@ -3,6 +3,14 @@
 **ChangeLog:**
 
 
+**2026-06-26**
+
+v2.1.0
+* Probing — **crash-safe two-pass probing across all routines** (Z Surface, XYZ Corner, Bore, Boss): every wall/surface is reached with a **fast seek + slow re-probe** `G38.2` move — never a blind rapid — so a wrong nominal size can no longer drive the tip into a wall, and the slow second pass improves repeatability. The default **seek rate is now 500 mm/min** (≈19.7 in/min).
+* Probing — **Bore** reworked: probes the walls with no Z motion at all (place the tip inside at any depth), **re-centres on X before the Y pair** so Y runs through the true diameter, and sets **X0/Y0 only** — Z work-zero is done separately with the Z Surface routine. Also fixed a latent **Boss** crash where the tip could be carried back over the feature between sides (now lifts straight up). Boss still touches the flat top to set **Z0**.
+* Probing — **XYZ Corner now always probes X/Y/Z** (the Axes selector was removed).
+* UI — **all four probe routine screens share one consistent layout**: a combined Sequence/Settings panel, a **probe-sequence list** and an at-a-glance **probe diagram** on the left, and a **Work Area (WCS) selector** on each screen — tap to cycle **G54→G57** for the system the probe will zero. The Z Surface, Corner, Bore and Boss screens were all brought in line with this style.
+
 **2026-06-25**
 
 v2.0.6

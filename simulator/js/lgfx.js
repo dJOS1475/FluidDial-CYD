@@ -146,6 +146,16 @@ class LGFX {
     }
   }
 
+  drawEllipse(x0, y0, rx, ry, color) {
+    this.ctx.strokeStyle = rgb565ToCss(color);
+    this.ctx.lineWidth = 1;
+    this.ctx.beginPath();
+    this.ctx.ellipse(Math.round(x0) + 0.5, Math.round(y0) + 0.5,
+                     Math.max(0, Math.round(rx)), Math.max(0, Math.round(ry)),
+                     0, 0, Math.PI * 2);
+    this.ctx.stroke();
+  }
+
   // ---- rounded rects (Adafruit GFX) ----
   fillRoundRect(x, y, w, h, r, color) {
     this.ctx.fillStyle = rgb565ToCss(color);

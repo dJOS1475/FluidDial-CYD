@@ -344,3 +344,47 @@ function probeDialStep(delta, baseStep) {
   const mult = pendantProbeV2.dialAccelCount >= 5 ? 10.0 : 1.0;
   return baseStep * mult;
 }
+
+// Crash-safe two-pass approach: fast seek to contact, back off, slow re-probe.
+// Ends AT the fine trigger so the caller can set a WCS axis there.  Stays G91.
+function probeSeekFine(axis, seekDist, seekF, fineF) {
+  const BACKOFF = 1.5;
+  const dir = seekDist >= 0 ? 1 : -1;
+  send_line(`G38.2 ${axis}${fmtF(seekDist, 3)} F${fmtF(seekF, 0)}`);
+  send_line(`G0 ${axis}${fmtF(-dir * BACKOFF, 3)} F1000`);
+  send_line(`G38.2 ${axis}${fmtF(dir * (BACKOFF + 1), 3)} F${fmtF(fineF, 0)}`);
+}
+
+// Work-area selector button — styled like the Z-Surface "Sets" box.
+function probeDrawWorkAreaButton(x, y, w, h) {
+  display.fillRoundRect(x, y, w, h, 8, PROBE_BG_SCREEN);
+  display.drawRoundRect(x, y, w, h, 8, PROBE_C_DIMBLUE);
+  display.setTextSize(1); display.setTextColor(PROBE_C_LBLUE);
+  const lbl = "WORK AREA";
+  display.setCursor(x + ((w - display.textWidth(lbl)) / 2 | 0), y + 5);
+  display.print(lbl);
+  display.setTextSize(2); display.setTextColor(PROBE_C_BLUE);
+  const v = pendantProbing.selectedCoordSystem;
+  display.setCursor(x + ((w - display.textWidth(v)) / 2 | 0), y + 17);
+  display.print(v);
+}
+
+// Cycle G54 → G55 → G56 → G57.  Selection only (probe writes via G10 L20 P#).
+function probeCycleWorkArea() {
+  const coords = ["G54", "G55", "G56", "G57"];
+  pendantProbing.selectedCoordIndex = (pendantProbing.selectedCoordIndex + 1) % 4;
+  pendantProbing.selectedCoordSystem = coords[pendantProbing.selectedCoordIndex];
+}
+
+// Sequence-step badge: filled numbered circle + label beside it.
+function drawSeqStep(x, y, num, txt, active) {
+  const bg = active ? PROBE_AMBER : PROBE_BG_PANEL;
+  const fg = active ? COLOR_WHITE : PROBE_C_DIMBLUE;
+  const tc = active ? PROBE_C_YELLOW : PROBE_C_DIMBLUE;
+  display.fillCircle(x + 6, y + 6, 6, bg);
+  display.setTextSize(1); display.setTextColor(fg);
+  const nw = display.textWidth(String(num));
+  display.setCursor(x + 6 - (nw / 2 | 0), y + 2); display.print(num);
+  display.setTextColor(tc);
+  display.setCursor(x + 16, y + 2); display.print(txt);
+}

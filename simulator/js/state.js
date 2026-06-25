@@ -41,7 +41,7 @@ const pendantMachine = {
   rotation: 2,
   spindleMaxRPM: 24000,
   spindleMinRPM: 0,
-  fluidDialVersion: "v2.0.6",
+  fluidDialVersion: "v2.1.0",
   fluidNCVersion: "v3.7.16",
   baudRate: "1000000",
   port: "UART0",
@@ -119,7 +119,7 @@ const pendantProbing = {
 const pendantProbeV2 = {
   probeTypeIdx: 0,
   probeRate: 150.0,
-  seekRate: 600.0,
+  seekRate: 500.0,
   retractDist: 5.0,
   maxZTravel: 40.0,
   ballDia: 2.0,

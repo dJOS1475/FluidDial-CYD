@@ -66,5 +66,19 @@ void probeDrawKVTouchInt(int x, int y, int w, int h, const char* label, int valu
 void probeDrawWarn(int y, const char* msg, bool isRed = false, int h = 14);
 void probeDrawConfirmOverlay(const char* routineName);
 
+// Work-area button (shared across all routine screens): shows the WCS the probe
+// will zero (G54..G57) in the Z-Surface "Sets" style; tap cycles it.
+void probeDrawWorkAreaButton(int x, int y, int w, int h);
+void probeCycleWorkArea();
+
+// Sequence-step badge (numbered circle + label) used by the routine screens.
+void drawSeqStep(int x, int y, int num, const char* txt, bool active);
+
 // Dial acceleration helper — returns the adjusted step multiplier
 float probeDialStep(int delta, float baseStep);
+
+// Crash-safe two-pass approach along one axis: fast seek to contact, back off a
+// little, then slow re-probe.  Ends AT the fine trigger (no trailing retract) so
+// the caller can set a WCS axis there, or save the trigger param.  Stays in the
+// caller's G91 frame; seekDist is signed (e.g. "Z", -maxZ for a downward probe).
+void probeSeekFine(const char* axis, float seekDist, float seekF, float fineF);

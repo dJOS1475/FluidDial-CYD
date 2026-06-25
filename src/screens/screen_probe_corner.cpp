@@ -35,7 +35,8 @@ static void runProbeCorner() {
     if (!pendantConnected) return;
 
     int   pNum    = pendantProbing.selectedCoordIndex + 1;
-    float rate    = pendantProbeV2.probeRate;
+    float rate    = pendantProbeV2.probeRate;   // fine (slow) re-probe feed
+    float seekF   = pendantProbeV2.seekRate;    // fast seek feed
     float depth   = pendantProbeV2.cornerDepth;    // positive mm below surface
     float over    = pendantProbeV2.cornerOver;     // overshoot approach distance
     float retXY   = pendantProbeV2.cornerRetXY;
@@ -47,7 +48,6 @@ static void runProbeCorner() {
     float edgeOfs = is3D ? (pendantProbeV2.ballDia / 2.0f) : 0.0f;
 
     int   cIdx    = pendantProbeV2.cornerIdx;   // 0=BotL 1=BotR 2=TopL 3=TopR
-    int   aIdx    = pendantProbeV2.axesIdx;     // 0=XYZ  1=XY   2=Z
 
     // Direction signs: X probe direction (+1 or -1), Y probe direction
     // Bot-Left:  probe toward +X (+1), toward +Y (+1) — we approach from outside (left/below)
@@ -58,14 +58,13 @@ static void runProbeCorner() {
     int yDir = (cIdx == 0 || cIdx == 1) ? +1 : -1;
 
     char buf[80];
-    bool doXY = (aIdx == 0 || aIdx == 1);
-    bool doZ  = (aIdx == 0 || aIdx == 2);
+    bool doXY = true;   // corner probe always does X/Y/Z
+    bool doZ  = true;
 
     // ── Z probe (surface, via plate) ─────────────────────────────────────
     if (doZ) {
         send_line("G91 G21");
-        snprintf(buf, sizeof(buf), "G38.2 Z-%.3f F%.0f", maxZ, rate);
-        send_line(buf);
+        probeSeekFine("Z", -maxZ, seekF, rate);   // two-pass surface touch
         send_line("G90");
         snprintf(buf, sizeof(buf), "G10 L20 P%d Z%.3f", pNum, platZ);
         send_line(buf);
@@ -90,9 +89,8 @@ static void runProbeCorner() {
         // Move overshoot in opposite direction to X wall (away from workpiece)
         snprintf(buf, sizeof(buf), "G0 X%.3f F1000", -xDir * over);
         send_line(buf);
-        // Probe toward X wall
-        snprintf(buf, sizeof(buf), "G38.2 X%.3f F%.0f", xDir * (over + 20.0f), rate);
-        send_line(buf);
+        // Two-pass probe toward X wall
+        probeSeekFine("X", xDir * (over + 20.0f), seekF, rate);
         // Set X WCS: when probing toward +X, edge is +edgeOfs past probe trigger
         //   G10 L20 gives: current machine pos = WCS value supplied
         //   We want WCS X=0 at the workpiece edge:
@@ -111,8 +109,8 @@ static void runProbeCorner() {
         // Move overshoot in opposite direction to Y wall
         snprintf(buf, sizeof(buf), "G0 Y%.3f F1000", -yDir * over);
         send_line(buf);
-        snprintf(buf, sizeof(buf), "G38.2 Y%.3f F%.0f", yDir * (over + 20.0f), rate);
-        send_line(buf);
+        // Two-pass probe toward Y wall
+        probeSeekFine("Y", yDir * (over + 20.0f), seekF, rate);
         send_line("G90");
         float yWCS = yDir > 0 ? -edgeOfs : +edgeOfs;
         snprintf(buf, sizeof(buf), "G10 L20 P%d Y%.3f", pNum, yWCS);
@@ -131,75 +129,30 @@ static void runProbeCorner() {
 // ── Draw helpers ─────────────────────────────────────────────────────────────
 
 static const char* cornerLabels[] = { "Bot-Left", "Bot-Right", "Top-Left", "Top-Right" };
-static const char* axesLabels[]   = { "X+Y+Z", "X+Y", "Z" };
 
-static void drawCyclePair() {
-    // Panel
-    display.fillRoundRect(5, 69, 230, 46, 4, PROBE_BG_PANEL);
-    display.setTextSize(1);
-    display.setTextColor(PROBE_C_LBLUE);
-    display.setCursor(10, 72);
-    display.print("TAP TO CYCLE");
-
-    // CORNER button (orange active)
-    display.fillRoundRect(7, 81, 110, 30, 4, PROBE_BG_PANEL);
-    display.drawRoundRect(7, 81, 110, 30, 4, PROBE_C_YELLOW);
-    display.setTextSize(1);
-    display.setTextColor(PROBE_C_LBLUE);
-    display.setCursor(12, 84);
-    display.print("CORNER");
-    display.setTextSize(1);
-    display.setTextColor(PROBE_C_YELLOW);
-    display.setCursor(12, 95);
-    display.print(cornerLabels[pendantProbeV2.cornerIdx]);
-
-    // AXES button (green active)
-    display.fillRoundRect(120, 81, 113, 30, 4, PROBE_BG_PANEL);
-    display.drawRoundRect(120, 81, 113, 30, 4, COLOR_GREEN);
-    display.setTextSize(1);
-    display.setTextColor(PROBE_C_LBLUE);
-    display.setCursor(125, 84);
-    display.print("AXES");
-    display.setTextSize(1);
-    display.setTextColor(PROBE_C_GREEN);
-    display.setCursor(125, 95);
-    display.print(axesLabels[pendantProbeV2.axesIdx]);
+// Top-down diagram of corner probing: a workpiece corner with arrows probing the
+// X and Y edges, and a dot marking the found corner.
+static void drawCornerDiagram() {
+    display.fillRect(20, 182, 38, 22, PROBE_C_DIMBLUE);   // workpiece (corner top-right)
+    // Probe body/stem + stylus descending onto the corner
+    display.fillRoundRect(53, 141, 10, 12, 2, PROBE_C_LBLUE);
+    display.drawLine(58, 152, 58, 180, PROBE_C_YELLOW);
+    display.fillCircle(58, 182, 2, PROBE_C_YELLOW);       // probe ball at the corner
+    // X probe → toward the right edge
+    display.drawLine(80, 192, 61, 192, PROBE_C_GREEN);
+    display.drawLine(61, 192, 65, 189, PROBE_C_GREEN);
+    display.drawLine(61, 192, 65, 195, PROBE_C_GREEN);
+    // Y probe → toward the top edge
+    display.drawLine(40, 164, 40, 177, PROBE_C_GREEN);
+    display.drawLine(40, 177, 37, 173, PROBE_C_GREEN);
+    display.drawLine(40, 177, 43, 173, PROBE_C_GREEN);
 }
 
-static void drawCornerSpecificPanel() {
-    display.fillRoundRect(5, 118, 230, 80, 4, PROBE_BG_PANEL);
-    display.setTextSize(1);
-    display.setTextColor(PROBE_C_LBLUE);
-    display.setCursor(10, 121);
-    display.print("CORNER - SPECIFIC");
-
-    int fo = pendantProbeV2.focusedField;
-    probeDrawKVTouch( 7, 130, 112, 30, "Probe depth", pendantProbeV2.cornerDepth, "mm", PROBE_C_RED,  fo==0, 3);
-    probeDrawKVTouch(122, 130, 111, 30, "Overshoot",  pendantProbeV2.cornerOver,  "mm", PROBE_C_BLUE, fo==1, 3);
-    probeDrawKVTouch( 7, 163, 112, 30, "XY retract",  pendantProbeV2.cornerRetXY, "mm", PROBE_C_BLUE, fo==2, 3);
-
-    // Static "Sets" cell
-    display.fillRoundRect(122, 163, 111, 30, 4, PROBE_BG_SCREEN);
-    display.drawRoundRect(122, 163, 111, 30, 4, PROBE_C_DIMBLUE);
-    display.setTextSize(1);
-    display.setTextColor(PROBE_C_LBLUE);
-    display.setCursor(127, 166);
-    display.print("Sets");
-    display.setTextColor(PROBE_C_BLUE);
-    const char* axLbl = (pendantProbeV2.axesIdx == 0) ? "XYZ0"
-                       : (pendantProbeV2.axesIdx == 1) ? "XY0" : "Z0";
-    char setsBuf[20];
-    snprintf(setsBuf, sizeof(setsBuf), "%s %s", pendantProbing.selectedCoordSystem.c_str(), axLbl);
-    display.setCursor(127, 178);
-    display.print(setsBuf);
-}
-
-// Layout:
+// Layout (boss style):
 //   drawTitle    y=0   h=35
 //   Pos panel    y=38  h=28
-//   Cycle panel  y=69  h=46
-//   Specific     y=118 h=80  (4 KV touch + sets cell)
-//   Warn         y=205 h=14
+//   Combined     y=70  h=146  (left: sequence+diagram / right: settings)
+//   Warn         y=220 h=14
 //   Back         y=239 h=38
 //   Btn pair     y=280 h=38
 
@@ -207,15 +160,54 @@ void drawProbeCornerScreen() {
     display.fillScreen(PROBE_BG_SCREEN);
     drawTitle("XYZ CORNER");
     probeDrawPosPanel(38);
-    drawCyclePair();
-    drawCornerSpecificPanel();
 
-    // (Redundant "selected field" bar removed — the focused KV field already
-    //  shows its value live, matching the config screens.)
-    probeDrawWarn(205, "! Position probe above corner edge");
+    display.fillRoundRect(5, 70, 230, 146, 4, PROBE_BG_PANEL);
 
-    // Back — same location/style as the Z Surface screen
-    drawButton(5, 239, 230, 38, "Back", PROBE_BTN_BLUE, COLOR_WHITE, 2);
+    // Left column: sequence + diagram
+    display.setTextSize(1);
+    display.setTextColor(PROBE_C_LBLUE);
+    display.setCursor(10, 73);
+    display.print("SEQUENCE");
+    drawSeqStep( 8, 87,  1, "Touch top->Z0", true);
+    drawSeqStep( 8, 105, 2, "Probe X & Y",   false);
+    drawSeqStep( 8, 123, 3, "Set X0 Y0 Z0",  false);
+    drawCornerDiagram();
+
+    // Right column: settings
+    display.setTextSize(1);
+    display.setTextColor(PROBE_C_LBLUE);
+    display.setCursor(122, 73);
+    display.print("SETTINGS");
+
+    // Corner selector (tap to cycle) — top of the right column
+    display.fillRoundRect(122, 84, 111, 27, 4, PROBE_BG_PANEL);
+    display.drawRoundRect(122, 84, 111, 27, 4, PROBE_C_YELLOW);
+    display.setTextColor(PROBE_C_LBLUE);
+    display.setCursor(127, 87);
+    display.print("CORNER");
+    display.setTextColor(PROBE_C_YELLOW);
+    display.setCursor(127, 98);
+    display.print(cornerLabels[pendantProbeV2.cornerIdx]);
+
+    int fo = pendantProbeV2.focusedField;
+    probeDrawKVTouch(122, 113, 111, 27, "Probe depth", pendantProbeV2.cornerDepth, "mm", PROBE_C_RED,  fo==0, 3);
+    probeDrawKVTouch(122, 142, 111, 27, "Overshoot",   pendantProbeV2.cornerOver,  "mm", PROBE_C_BLUE, fo==1, 3);
+    probeDrawKVTouch(122, 171, 111, 27, "XY retract",  pendantProbeV2.cornerRetXY, "mm", PROBE_C_BLUE, fo==2, 3);
+
+    // Result line — what the probe will set
+    {
+        const char* s = "Sets X0 Y0 Z0";
+        display.setTextSize(1);
+        display.setTextColor(PROBE_C_GREEN);
+        display.setCursor(177 - display.textWidth(s) / 2, 203);
+        display.print(s);
+    }
+
+    probeDrawWarn(220, "! Position probe above corner edge");
+
+    // Bottom-nav row: Back (left) | work-area selector (right)
+    drawButton(5, 239, 112, 38, "Back", PROBE_BTN_BLUE, COLOR_WHITE, 2);
+    probeDrawWorkAreaButton(123, 239, 112, 38);
 
     drawButton(  5, 280, 112, 38, "Main Menu", PROBE_BTN_BLUE,  COLOR_WHITE, 2);
     drawButton(123, 280, 112, 38, "Probe",     PROBE_BTN_GREEN, COLOR_WHITE, 2);
@@ -242,32 +234,30 @@ void handleProbeCornerTouch(int x, int y) {
         return;
     }
 
-    // CORNER cycle button
-    if (isTouchInBounds(x, y, 7, 81, 110, 30)) {
+    // CORNER cycle button (top of right column)
+    if (isTouchInBounds(x, y, 122, 84, 111, 27)) {
         pendantProbeV2.cornerIdx = (pendantProbeV2.cornerIdx + 1) % 4;
-        drawCyclePair();
-        drawCornerSpecificPanel();
-        return;
-    }
-    // AXES cycle button
-    if (isTouchInBounds(x, y, 120, 81, 113, 30)) {
-        pendantProbeV2.axesIdx = (pendantProbeV2.axesIdx + 1) % 3;
-        drawCyclePair();
-        drawCornerSpecificPanel();
+        drawProbeCornerScreen();
         return;
     }
 
-    // KV fields
+    // KV fields (right column)
     bool redraw = false;
-    if (isTouchInBounds(x, y,  7, 130, 112, 30)) { pendantProbeV2.focusedField = (pendantProbeV2.focusedField==0)?-1:0; redraw=true; }
-    if (isTouchInBounds(x, y, 122, 130, 111, 30)) { pendantProbeV2.focusedField = (pendantProbeV2.focusedField==1)?-1:1; redraw=true; }
-    if (isTouchInBounds(x, y,  7, 163, 112, 30))  { pendantProbeV2.focusedField = (pendantProbeV2.focusedField==2)?-1:2; redraw=true; }
+    if (isTouchInBounds(x, y, 122, 113, 111, 27)) { pendantProbeV2.focusedField = (pendantProbeV2.focusedField==0)?-1:0; redraw=true; }
+    if (isTouchInBounds(x, y, 122, 142, 111, 27)) { pendantProbeV2.focusedField = (pendantProbeV2.focusedField==1)?-1:1; redraw=true; }
+    if (isTouchInBounds(x, y, 122, 171, 111, 27)) { pendantProbeV2.focusedField = (pendantProbeV2.focusedField==2)?-1:2; redraw=true; }
     if (redraw) { drawProbeCornerScreen(); return; }
 
     // Back → config hub
-    if (isTouchInBounds(x, y, 5, 239, 230, 38)) {
+    if (isTouchInBounds(x, y, 5, 239, 112, 38)) {
         pendantProbeV2.returnScreen  = PSCREEN_PROBE_CORNER;
         currentPendantScreen = PSCREEN_PROBE;
+        return;
+    }
+    // Work-area selector → cycle G54..G57
+    if (isTouchInBounds(x, y, 123, 239, 112, 38)) {
+        probeCycleWorkArea();
+        drawProbeCornerScreen();
         return;
     }
 
@@ -278,7 +268,7 @@ void handleProbeCornerTouch(int x, int y) {
     }
     // Probe
     if (isTouchInBounds(x, y, 123, 280, 112, 38)) {
-        if (!pendantConnected) { probeDrawWarn(205, "! Not connected", true); return; }
+        if (!pendantConnected) { probeDrawWarn(220, "! Not connected", true); return; }
         pendantProbeV2.confirmActive = true;
         drawProbeCornerScreen();
         return;

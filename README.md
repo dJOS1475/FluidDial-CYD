@@ -65,13 +65,13 @@ The 3 physical buttons always perform the same function regardless of the active
 * Opens on a hub with a **probe-type selector** — choose **Z-Height Touch Plate**, **XYZ Touch Plate**, or **3D Touch Probe**; the routines on offer change to match the selected type
 * Routines:
   * **Z Surface** — probes Z and zeroes it (all probe types)
-  * **XYZ Corner** — finds a workpiece corner; cycle which corner (Bot-Left … Top-Right) and which axes to set (X+Y+Z / X+Y / Z) (XYZ Plate and 3D Probe)
-  * **Bore** — finds the centre of an inside circle (3D Probe)
-  * **Boss** — finds the centre of an outside circle / round stock (3D Probe)
-* Probe G-code is **generated on the pendant** (G38.2 straight-probe moves) — no probe macro files need to live on the controller; the trigger offset is computed automatically from the configured plate thickness or 3D-probe ball radius, so a routine zeroes correctly whichever probe you use
+  * **XYZ Corner** — finds a workpiece corner and sets X0/Y0/Z0; cycle which corner (Bot-Left … Top-Right) (XYZ Plate and 3D Probe)
+  * **Bore** — finds the centre of an inside circle and sets X0/Y0 (place the tip inside at any depth — there's no Z motion; set Z separately with Z Surface) (3D Probe)
+  * **Boss** — finds the centre of an outside circle / round stock; touches the flat top for Z0 and sets X0/Y0/Z0 (3D Probe)
+* Probe G-code is **generated on the pendant** (`G38.2` straight-probe moves) — no probe macro files need to live on the controller. Every wall/surface is reached with a **crash-safe two-pass move** (a fast seek then a slow re-probe), so a wrong nominal size can't drive the tip into a wall; the trigger offset is computed automatically from the configured plate thickness or 3D-probe ball radius, so a routine zeroes correctly whichever probe you use
+* Each routine screen shows a **sequence list** and a **diagram** of the probe move, and a **Work Area** button to pick the coordinate system the probe will zero — tap it to cycle **G54–G57** right from the routine screen
 * **Configure** opens a per-type setup screen — stylus parameters for the 3D probe (ball dia, stylus length, deflection, pre-travel), or plate dimensions for a touch plate (thickness, plus width and XY offsets for the XYZ plate); a diagram of the selected probe type is shown for reference
-* Shared settings (probe rate, seek rate, retract distance, max Z travel) apply to every routine
-* Results are written to the work coordinate system (G54–G57) selected on the Work Area screen
+* Shared settings (probe rate, seek rate, retract distance, max Z travel) apply to every routine; the default seek rate is 500 mm/min
 
 **Feeds & Speeds**
 * Feed and spindle override preset buttons (50% / 75% / 100% / 125% / 150%)

@@ -630,27 +630,18 @@ static void handleEncoderDelta(int32_t delta) {
             drawProbeCornerScreen();
 
         } else if (currentPendantScreen == PSCREEN_PROBE_BORE) {
-            // 0=boreDia 1=boreDepth 2=boreOffset 3=borePasses
-            if (fo == 3) {
-                p.borePasses = constrain(p.borePasses + delta, 1, 4);
-            } else {
-                float step = probeDialStep(delta, 0.1f);
-                if (fo == 0) p.boreDia    = constrain(p.boreDia    + delta * step, 0.1f, 500.0f);
-                if (fo == 1) p.boreDepth  = constrain(p.boreDepth  + delta * step, 0.1f, 100.0f);
-                if (fo == 2) p.boreOffset = constrain(p.boreOffset + delta * step, 0.1f,  50.0f);
-            }
+            // 0=boreDia 1=boreOffset
+            float step = probeDialStep(delta, 0.1f);
+            if (fo == 0) p.boreDia    = constrain(p.boreDia    + delta * step, 0.1f, 500.0f);
+            if (fo == 1) p.boreOffset = constrain(p.boreOffset + delta * step, 0.1f,  50.0f);
             drawProbeBoreScreen();
 
         } else if (currentPendantScreen == PSCREEN_PROBE_BOSS) {
-            // 0=bossDia 1=bossDepth 2=bossClear 3=bossPasses
-            if (fo == 3) {
-                p.bossPasses = constrain(p.bossPasses + delta, 1, 4);
-            } else {
-                float step = probeDialStep(delta, 0.1f);
-                if (fo == 0) p.bossDia   = constrain(p.bossDia   + delta * step, 0.1f, 500.0f);
-                if (fo == 1) p.bossDepth = constrain(p.bossDepth + delta * step, 0.1f, 100.0f);
-                if (fo == 2) p.bossClear = constrain(p.bossClear + delta * step, 0.1f,  50.0f);
-            }
+            // 0=bossDia 1=bossDepth 2=bossClear
+            float step = probeDialStep(delta, 0.1f);
+            if (fo == 0) p.bossDia   = constrain(p.bossDia   + delta * step, 0.1f, 500.0f);
+            if (fo == 1) p.bossDepth = constrain(p.bossDepth + delta * step, 0.1f, 100.0f);
+            if (fo == 2) p.bossClear = constrain(p.bossClear + delta * step, 0.1f,  50.0f);
             drawProbeBossScreen();
         }
         return;

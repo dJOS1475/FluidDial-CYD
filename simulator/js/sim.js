@@ -140,22 +140,15 @@ function handleEncoderDelta(delta) {
       if (fo === 2) p.cornerRetXY = constrain(p.cornerRetXY + delta * step, 0.1, 20);
       drawProbeCornerScreen();
     } else if (currentPendantScreen === PSCREEN_PROBE_BORE) {
-      if (fo === 3) p.borePasses = constrain(p.borePasses + delta, 1, 4);
-      else {
-        const step = probeDialStep(delta, 0.1);
-        if (fo === 0) p.boreDia = constrain(p.boreDia + delta * step, 0.1, 500);
-        if (fo === 1) p.boreDepth = constrain(p.boreDepth + delta * step, 0.1, 100);
-        if (fo === 2) p.boreOffset = constrain(p.boreOffset + delta * step, 0.1, 50);
-      }
+      const step = probeDialStep(delta, 0.1);
+      if (fo === 0) p.boreDia = constrain(p.boreDia + delta * step, 0.1, 500);
+      if (fo === 1) p.boreOffset = constrain(p.boreOffset + delta * step, 0.1, 50);
       drawProbeBoreScreen();
     } else if (currentPendantScreen === PSCREEN_PROBE_BOSS) {
-      if (fo === 3) p.bossPasses = constrain(p.bossPasses + delta, 1, 4);
-      else {
-        const step = probeDialStep(delta, 0.1);
-        if (fo === 0) p.bossDia = constrain(p.bossDia + delta * step, 0.1, 500);
-        if (fo === 1) p.bossDepth = constrain(p.bossDepth + delta * step, 0.1, 100);
-        if (fo === 2) p.bossClear = constrain(p.bossClear + delta * step, 0.1, 50);
-      }
+      const step = probeDialStep(delta, 0.1);
+      if (fo === 0) p.bossDia = constrain(p.bossDia + delta * step, 0.1, 500);
+      if (fo === 1) p.bossDepth = constrain(p.bossDepth + delta * step, 0.1, 100);
+      if (fo === 2) p.bossClear = constrain(p.bossClear + delta * step, 0.1, 50);
       drawProbeBossScreen();
     }
     return;
