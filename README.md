@@ -31,7 +31,7 @@ The 3 physical buttons always perform the same function regardless of the active
 * **Green:** Start / Resume — starts a new job or resumes after a Yellow pause.
 * **Red (held 5 seconds): Power Off** — draws a shutdown screen, dims the backlight, and enters deep sleep. Press Red once to wake and resume normal operation.
 
-<img src="https://raw.githubusercontent.com/dJOS1475/FluidDial-CYD/refs/heads/main/new_ui/Pendant3.jpeg" alt="CYD Dial Pendant With Buttons and Jog Dial" height="400">
+<img src="https://raw.githubusercontent.com/dJOS1475/FluidDial-CYD/refs/heads/main/new_ui/Pendant4.jpeg" alt="CYD Dial Pendant With Buttons and Jog Dial" height="400">
 
 ---
 
