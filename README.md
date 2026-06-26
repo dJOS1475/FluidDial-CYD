@@ -72,6 +72,7 @@ The 3 physical buttons always perform the same function regardless of the active
 * Each routine screen shows a **sequence list** and a **diagram** of the probe move, and a **Work Area** button to pick the coordinate system the probe will zero — tap it to cycle **G54–G57** right from the routine screen
 * **Configure** opens a per-type setup screen — stylus parameters for the 3D probe (ball dia, stylus length, deflection, pre-travel), or plate dimensions for a touch plate (thickness, plus width and XY offsets for the XYZ plate); a diagram of the selected probe type is shown for reference
 * Shared settings (probe rate, seek rate, retract distance, max Z travel) apply to every routine; the default seek rate is 500 mm/min
+* **For more info** — see the [Probing Guide](Probing.md) for a detailed, per-screen breakdown of every probing screen, what each option does, and how each routine moves the machine
 
 **Feeds & Speeds**
 * Feed and spindle override preset buttons (50% / 75% / 100% / 125% / 150%)
