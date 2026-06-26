@@ -44,8 +44,12 @@ static void runProbeCorner() {
     float maxZ    = pendantProbeV2.maxZTravel;
     bool  is3D    = probeIs3D();
     float platZ   = is3D ? (pendantProbeV2.ballDia / 2.0f) : pendantProbeV2.plateThick;
-    // For XY compensation: ball radius shifts edge; use half ball dia
-    float edgeOfs = is3D ? (pendantProbeV2.ballDia / 2.0f) : 0.0f;
+    // XY edge compensation: the contact point sits outside the true workpiece
+    // edge by the ball radius (3D probe) or the XYZ plate's wall thickness on
+    // each axis (plate).  Both shift the edge the same way in the approach
+    // direction, so they use the same sign convention below.
+    float edgeOfsX = is3D ? (pendantProbeV2.ballDia / 2.0f) : pendantProbeV2.plateOffX;
+    float edgeOfsY = is3D ? (pendantProbeV2.ballDia / 2.0f) : pendantProbeV2.plateOffY;
 
     int   cIdx    = pendantProbeV2.cornerIdx;   // 0=BotL 1=BotR 2=TopL 3=TopR
 
@@ -97,7 +101,7 @@ static void runProbeCorner() {
         //     probing +X: edge is edgeOfs ahead of trigger → supply -edgeOfs
         //     probing -X: edge is edgeOfs behind trigger   → supply +edgeOfs
         send_line("G90");
-        float xWCS = xDir > 0 ? -edgeOfs : +edgeOfs;
+        float xWCS = xDir > 0 ? -edgeOfsX : +edgeOfsX;
         snprintf(buf, sizeof(buf), "G10 L20 P%d X%.3f", pNum, xWCS);
         send_line(buf);
         // Retract from X wall
@@ -112,7 +116,7 @@ static void runProbeCorner() {
         // Two-pass probe toward Y wall
         probeSeekFine("Y", yDir * (over + 20.0f), seekF, rate);
         send_line("G90");
-        float yWCS = yDir > 0 ? -edgeOfs : +edgeOfs;
+        float yWCS = yDir > 0 ? -edgeOfsY : +edgeOfsY;
         snprintf(buf, sizeof(buf), "G10 L20 P%d Y%.3f", pNum, yWCS);
         send_line(buf);
         send_line("G91");

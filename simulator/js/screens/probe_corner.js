@@ -15,7 +15,9 @@ function runProbeCorner() {
   const retZ = p.retractDist, maxZ = p.maxZTravel;
   const is3D = probeIs3D();
   const platZ = is3D ? p.ballDia / 2 : p.plateThick;
-  const edgeOfs = is3D ? p.ballDia / 2 : 0;
+  // XY edge comp: ball radius (3D) or the XYZ plate's wall thickness per axis.
+  const edgeOfsX = is3D ? p.ballDia / 2 : p.plateOffX;
+  const edgeOfsY = is3D ? p.ballDia / 2 : p.plateOffY;
   const cIdx = p.cornerIdx;
   const xDir = cIdx === 0 || cIdx === 2 ? 1 : -1;
   const yDir = cIdx === 0 || cIdx === 1 ? 1 : -1;
@@ -36,13 +38,13 @@ function runProbeCorner() {
     send_line(`G0 X${fmtF(-xDir * over, 3)} F1000`);
     probeSeekFine("X", xDir * (over + 20), seekF, rate);   // two-pass toward X wall
     send_line("G90");
-    send_line(`G10 L20 P${pNum} X${fmtF(xDir > 0 ? -edgeOfs : edgeOfs, 3)}`);
+    send_line(`G10 L20 P${pNum} X${fmtF(xDir > 0 ? -edgeOfsX : edgeOfsX, 3)}`);
     send_line("G91");
     send_line(`G0 X${fmtF(-xDir * retXY, 3)} F1000`);
     send_line(`G0 Y${fmtF(-yDir * over, 3)} F1000`);
     probeSeekFine("Y", yDir * (over + 20), seekF, rate);   // two-pass toward Y wall
     send_line("G90");
-    send_line(`G10 L20 P${pNum} Y${fmtF(yDir > 0 ? -edgeOfs : edgeOfs, 3)}`);
+    send_line(`G10 L20 P${pNum} Y${fmtF(yDir > 0 ? -edgeOfsY : edgeOfsY, 3)}`);
     send_line("G91");
     send_line(`G0 Y${fmtF(-yDir * retXY, 3)} F1000`);
     send_line(`G0 Z${fmtF(depth, 3)} F500`);

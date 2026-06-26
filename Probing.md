@@ -28,9 +28,10 @@ writes so the WCS lands on the real surface:
 - **3D probe** → offset = **ball radius** (`Ball dia ÷ 2`).
 - **Touch plate** → offset = **plate thickness**.
 
-> The other config fields (stylus length, deflection, pre-travel, plate width and
-> XY offsets) are saved for reference but are **not currently applied** to the
-> generated moves — only ball radius / plate thickness affect the result.
+> The **XYZ-plate XY offsets** are also applied — they compensate the corner probe
+> for the plate's wall thickness on each axis (see [Calibration](#calibration)).
+> The remaining config fields (stylus length, deflection, pre-travel, plate width)
+> are saved for reference but are **not currently applied** to the generated moves.
 
 **Two-pass, crash-safe probing.** Every wall/surface is found with two moves:
 a **fast seek** (at *Seek rate*) to make first contact, a small back-off, then a
@@ -105,8 +106,8 @@ dial to adjust.
 |---|---|---|
 | **Thickness** | both plate types | Plate thickness — used as the Z trigger offset so Z0 lands on the work surface *under* the plate. |
 | **Width** | XYZ plate only | Plate dimension. Recorded; not applied to moves. |
-| **XY offset X** | XYZ plate only | Plate edge offset in X. Recorded; not applied to moves. |
-| **XY offset Y** | XYZ plate only | Plate edge offset in Y. Recorded; not applied to moves. |
+| **XY offset X** | XYZ plate only | The plate's wall thickness on the X face. **Applied** to the corner probe so X0 lands on the workpiece edge, not the plate face. |
+| **XY offset Y** | XYZ plate only | The plate's wall thickness on the Y face. **Applied** to the corner probe so Y0 lands on the workpiece edge. |
 
 ---
 
@@ -159,7 +160,8 @@ with a top-down diagram of the corner and the X/Y probe arrows.
 
 **How it works:** probes the **top** to set Z0 (with offset), retracts, drops by
 *Probe depth*, then probes the **X** edge (two-pass) and sets X0, and the **Y**
-edge (two-pass) and sets Y0 — each with ball-radius edge compensation — then lifts.
+edge (two-pass) and sets Y0 — each with edge compensation (ball radius for the 3D
+probe, or the plate's XY-offset wall thickness for the XYZ plate) — then lifts.
 
 ---
 
@@ -238,6 +240,50 @@ jogging to a known point).
   Tapping a button zeroes that axis (or all axes) in the selected WCS at the
   current position (`G10 L20 P# …0`).
 - **Main Menu** · **Jog** at the bottom.
+
+---
+
+## Calibration
+
+The only config values that change *where a zero lands* are the **ball radius**
+(3D probe) and the **plate thickness / XY offsets** (touch plate). Get these right
+and every routine is accurate — the rest (stylus length, deflection, pre-travel,
+plate width) don't affect the result.
+
+> Centre-finding (**Bore**, **Boss**) is self-calibrating for radius: the offset
+> cancels when opposing walls are averaged, so radius accuracy only matters for
+> **Z Surface** and the **Corner** edges.
+
+### 3D probe — effective ball radius
+
+The number that matters is the *effective* radius — the nominal ball radius plus the
+probe's pre-travel (the tiny lag between contact and trigger). Calibrate it against a
+known reference rather than trusting the printed ball size:
+
+1. Set **Ball dia.** to the manufacturer's nominal value.
+2. Run **XYZ Corner** against a known straight edge / precision square at a known position.
+3. Check where the set **X0** (or Y0) actually landed versus the true edge — touch off
+   with an edge finder/dowel, or sweep an indicator. Call that single-edge error **Δ**.
+4. Adjust **Ball dia.** by **2 × Δ** (the radius is half the diameter), in the
+   direction that moves the zero onto the true edge: if the zero sits *outside* the
+   material the probe over-compensated → **reduce** Ball dia.; if it's *inside* →
+   **increase** it.
+5. Re-probe and confirm; iterate once or twice. Keep the final pass slow (a low
+   **Probe rate**) so pre-travel stays small and repeatable.
+
+A ring/plug gauge or a 1-2-3 block makes a good reference. This single calibrated
+ball-diameter value absorbs pre-travel, which is why those fields aren't entered
+separately.
+
+### XYZ touch plate — plate offsets
+
+The plate adds material between the tool and the true edge, so each offset is just a
+physical thickness:
+
+- **Thickness** (Z) — the plate's flat thickness. Measure it with calipers and enter it.
+- **XY offset X / Y** — the thickness of each *vertical* wall of the L-block. Measure
+  each wall with calipers and enter it, or calibrate exactly like the 3D probe above
+  but adjust the offset by **1 × Δ** (the plate offset is applied directly, not halved).
 
 ---
 

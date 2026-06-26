@@ -3,6 +3,12 @@
 **ChangeLog:**
 
 
+**2026-06-27**
+
+v2.1.1
+* Fix: the **XYZ touch-plate corner probe now compensates for the plate's wall thickness** — previously the X/Y zero landed on the plate's outer face instead of the true workpiece edge. The **XY offset X/Y** config fields are now applied (in the approach direction, the same way the 3D probe's ball radius is), so the corner zeroes on the workpiece edge. The 3D-probe corner is unchanged.
+* Docs: added a **Calibration** section to the [Probing guide](Probing.md) — how to dial in the effective ball radius (3D probe) and the plate offsets (touch plate) against a known reference.
+
 **2026-06-26**
 
 v2.1.0
