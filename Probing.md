@@ -45,10 +45,12 @@ confirmation overlay (Cancel / Confirm). Nothing moves until you confirm. When t
 routine starts, the pendant switches to the **Status** screen so you can watch it.
 
 **Work Area button (which WCS gets zeroed).** Every routine screen has a **WORK
-AREA** button (bottom-right) showing **G54–G57**. Tap it to cycle the coordinate
-system the probe will write its zeros into (`G10 L20 P1…P4`). This is a *selection
-only* — it does not change the machine's currently-active WCS, it just chooses
-which system the routine zeroes.
+AREA** button (bottom-right) showing **G54–G57**. Tap it to choose the coordinate
+system the probe will zero. Tapping is *selection only* — it doesn't switch the
+active WCS while you're choosing (no surprise DRO jumps). When you actually
+**probe**, the routine **activates** that system and writes the zero into it
+(`G54…G57` then `G10 L20 P1…P4`), so the result is immediately live in the system
+shown on screen — you don't need to re-zero by hand.
 
 **Sequence list + diagram.** The left column of each routine screen shows a
 numbered **sequence** of what the routine will do, and a small **diagram** of the
@@ -297,8 +299,10 @@ physical thickness:
 |---|---|---|---|
 | **Z Surface** | all | Z0 | probes down |
 | **XYZ Corner** | XYZ plate, 3D | X0 Y0 Z0 | top touch + side edges |
-| **Bore** | 3D | X0 Y0 | none (Z via Z Surface) |
-| **Boss** | 3D | X0 Y0 Z0 | top touch + plunge beside walls |
+| **Bore** | 3D | X0 Y0 | none — 3-point radial (Z via Z Surface) |
+| **Boss** | 3D | X0 Y0 Z0 | top touch + 3-point radial |
 
-All zeros are written to the coordinate system shown on the screen's **Work Area**
-button (G54–G57), using two-pass crash-safe probing throughout.
+Each routine **activates** the coordinate system shown on its **Work Area** button
+(G54–G57) and writes the zero there, so it's live immediately — no manual re-zero.
+Everything uses two-pass crash-safe probing; the circle routines (Bore/Boss) fit a
+circle to three radial points, computed in machine coordinates.
