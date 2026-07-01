@@ -1,6 +1,6 @@
 {
   "name": "FluidDial-CYD (Update — preserves WiFi)",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "new_install_prompt_erase": true,
   "builds": [
     {

@@ -65,6 +65,8 @@ static void runProbeCorner() {
     bool doXY = true;   // corner probe always does X/Y/Z
     bool doZ  = true;
 
+    probeActivateWcs();          // zero into the system shown on screen
+
     // ── Z probe (surface, via plate) ─────────────────────────────────────
     if (doZ) {
         send_line("G91 G21");

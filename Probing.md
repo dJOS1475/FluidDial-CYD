@@ -174,7 +174,7 @@ motion at all** — set Z separately with the Z Surface routine.
 centred, at any comfortable depth. The warning on screen reads *"Place tip inside
 the bore."*
 
-**Left column** — Sequence: ① *Probe XY walls* → ② *Re-centre on X* → ③ *Set X0 Y0*,
+**Left column** — Sequence: ① *Probe 3 points* → ② *Find centre* → ③ *Set X0 Y0*,
 with a cross-section diagram of the probe inside a pocket and outward arrows.
 
 **Right column — SETTINGS:**
@@ -188,11 +188,14 @@ The right column also notes that **Z work-zero is set via the Z Surface routine*
 
 **Result line:** *Sets X0 Y0*.
 
-**How it works:** two-pass probes **+X** then **−X** (probing *across* the hole,
-never rapiding), **moves to the computed X centre**, then two-pass probes **+Y**
-and **−Y** *through that true centre* (so Y is square to the wall), moves to the
-final XY centre, and `G10 L20 P# X0 Y0`. Because the centre is the average of
-opposing walls, the ball radius cancels — no edge offset is needed.
+**How it works:** probes **three points radially outward** (120° apart), each a
+two-pass move so contact is **perpendicular to the wall** (no tangential skid).
+It fits a circle through the three points (circumcentre), then moves to that
+centre and `G10 L20 P# X0 Y0`. The three points define the circle exactly, so it
+stays correct even if you didn't start dead-centre; because the points are equally
+compensated, the ball radius cancels — no edge offset is needed. The maths and the
+final move are done in **machine coordinates** (FluidNC returns G38 results in
+machine coords), so the result is correct under any work offset.
 
 ---
 
@@ -203,7 +206,7 @@ Finds the **centre of an outside circle / round stock** and sets **X0, Y0 and Z0
 **Position before probing:** start with the probe **above the centre of the boss**.
 The warning reads *"Start above centre of boss."*
 
-**Left column** — Sequence: ① *Touch top→Z0* → ② *Probe XY walls* → ③ *Set X0 Y0*,
+**Left column** — Sequence: ① *Touch top→Z0* → ② *Probe 3 points* → ③ *Set X0 Y0*,
 with a cross-section diagram of the probe over a raised boss and inward arrows.
 
 **Right column — SETTINGS:**
@@ -217,11 +220,12 @@ with a cross-section diagram of the probe over a raised boss and inward arrows.
 **Result line:** *Sets X0 Y0 Z0*.
 
 **How it works:** touches the **flat top** to set **Z0** (with offset). Then for
-each side it moves clear of the boss by *Clearance*, plunges to *Probe depth*
-beside it, and two-pass probes inward to the wall. It **re-centres on X before the
-Y pair** (so Y runs through the true centre), lifts straight up between sides (so
-the tip is never carried back over the boss), then moves to the computed centre and
-`G10 L20 P# X0 Y0`. Z0 from the top is preserved.
+**three directions** (120° apart) it moves clear of the boss by *Clearance*,
+plunges to *Probe depth* beside it, and two-pass probes **radially inward** to the
+wall (perpendicular contact), lifting straight up between points. It fits a circle
+through the three points (circumcentre), moves there and `G10 L20 P# X0 Y0`; Z0
+from the top is preserved. The maths and final move use **machine coordinates**
+(what FluidNC returns for G38), so the result is correct under any work offset.
 
 ---
 

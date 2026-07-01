@@ -44,6 +44,7 @@ static void runProbeZ() {
                                 : pendantProbeV2.plateThick;
 
     char buf[64];
+    probeActivateWcs();          // zero into the system shown on screen
     send_line("G91 G21");
     // Two-pass: fast seek down to the surface, then slow re-probe for precision.
     probeSeekFine("Z", -pendantProbeV2.maxZTravel,

@@ -11,6 +11,7 @@ function runProbeZ() {
   if (!pendantConnected) return;
   const pNum = pendantProbing.selectedCoordIndex + 1;
   const zOffset = probeIs3D() ? pendantProbeV2.ballDia / 2.0 : pendantProbeV2.plateThick;
+  probeActivateWcs();          // zero into the system shown on screen
   send_line("G91 G21");
   // Two-pass: fast seek down to the surface, then slow re-probe for precision.
   probeSeekFine("Z", -pendantProbeV2.maxZTravel, pendantProbeV2.seekRate, pendantProbeV2.probeRate);

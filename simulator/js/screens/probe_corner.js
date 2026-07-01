@@ -23,6 +23,7 @@ function runProbeCorner() {
   const yDir = cIdx === 0 || cIdx === 1 ? 1 : -1;
   const doXY = true;   // corner probe always does X/Y/Z
   const doZ = true;
+  probeActivateWcs();          // zero into the system shown on screen
   if (doZ) {
     send_line("G91 G21");
     probeSeekFine("Z", -maxZ, seekF, rate);   // two-pass surface touch

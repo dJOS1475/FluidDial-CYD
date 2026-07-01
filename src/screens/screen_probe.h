@@ -74,6 +74,11 @@ void probeCycleWorkArea();
 // Sequence-step badge (numbered circle + label) used by the routine screens.
 void drawSeqStep(int x, int y, int num, const char* txt, bool active);
 
+// Make the selected work coordinate system (G54..G57) active on the controller,
+// so a probe's G10 L20 zero takes effect immediately in the system on screen
+// (no manual re-zero).  Every routine calls this before it probes.
+void probeActivateWcs();
+
 // Dial acceleration helper — returns the adjusted step multiplier
 float probeDialStep(int delta, float baseStep);
 

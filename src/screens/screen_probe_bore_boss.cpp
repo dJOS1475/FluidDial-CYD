@@ -1,24 +1,28 @@
 /*
  * screen_probe_bore_boss.cpp  —  SCR3a: Bore / SCR3b: Boss
  *
- * Both routines find the XY centre of a round feature with crash-safe two-pass
- * probing: every wall is reached with a G38.2 probing move (fast seek + slow
- * re-probe) — never a blind rapid — so a wrong nominal diameter can't drive the
- * tip into a wall.  Each re-centres on X before the Y pair so Y runs through the
- * true diameter (square to the wall) for better precision.
+ * Both routines find the XY centre of a round feature by probing THREE points
+ * radially (120° apart) and fitting a circle through them (circumcentre).  Each
+ * point is a crash-safe two-pass move (fast seek + slow re-probe) approaching the
+ * wall RADIALLY, so contact is perpendicular to the curve — no tangential skid,
+ * and it stays exact even if the operator didn't start dead-centre.
+ *
+ * Coordinate frames: FluidNC returns G38 probe results (#5061/#5062) in MACHINE
+ * coordinates, so the centre maths and the final move are done in machine coords
+ * (G53).  The between-probe return uses the saved start (current-position params
+ * #5420/#5421, work coords) via G90 — the same convention as the reference macro.
  *
  * BORE (inside circle):
- *   Operator places the probe tip INSIDE the bore at any comfortable depth.
- *   No Z motion at all — Z work-zero is handled separately by the Z Surface
- *   probe (the screen says so).  Probe +X/-X, re-centre, probe +Y/-Y, then
- *   G10 L20 sets X0 Y0.
+ *   Operator places the probe tip INSIDE the bore at any comfortable depth.  No Z
+ *   motion — Z work-zero is handled separately by the Z Surface probe.  Probe 3
+ *   points outward, compute the centre, G53 move to it, G10 L20 sets X0 Y0.
  *
  * BOSS (outside circle):
  *   Operator starts above the boss centre.
  *   1. Touch the flat top and set Z0 there (the top is the natural Z datum).
- *   2. For each side: move clear of the boss, plunge beside it, two-pass probe
- *      inward.  Re-centre on X before the Y pair.
- *   3. Move to centre, G10 L20 sets X0 Y0 (Z0 already set at the top).
+ *   2. For each of 3 directions: move clear, plunge beside the boss, two-pass
+ *      probe inward.
+ *   3. Compute the centre, G53 move to it, G10 L20 sets X0 Y0 (Z0 already set).
  *
  * focusedField for bore:  0=boreDia  1=boreOffset
  * focusedField for boss:  0=bossDia  1=bossDepth  2=bossClear
@@ -28,18 +32,36 @@
 #include "screen_probe.h"
 #include "screen_probe_bore_boss.h"
 
-// One crash-safe edge for centre-finding: two-pass approach (probeSeekFine),
-// save the fine trigger to a named param, then back off so the probe input is
-// open for the next G38.2.  seekDist is signed; resultReg is the probe-result
-// register (#5061 X / #5062 Y).
-static void probeEdge2Pass(const char* axis, float seekDist, const char* resultReg,
-                           const char* namedParam, float seekF, float fineF) {
+// Three probe directions, 120° apart (unit vectors).  Shared by bore (outward)
+// and boss (inward = negated).  Chosen so no two contact points coincide.
+static const float kDir3[3][2] = { { 0.0f, 1.0f }, { -0.866025f, -0.5f }, { 0.866025f, -0.5f } };
+static const char* kPX[3] = { "#<ax>", "#<bx>", "#<cx>" };
+static const char* kPY[3] = { "#<ay>", "#<by>", "#<cy>" };
+
+// Two-pass probe along a unit direction (ux,uy): fast seek to contact, back off,
+// slow re-probe.  Ends at the fine trigger (machine pos in #5061/#5062).  G91.
+static void probeRadial2Pass(float ux, float uy, float seekDist, float seekF, float fineF) {
     const float BACKOFF = 1.5f;
-    int  dir = (seekDist >= 0.0f) ? 1 : -1;
     char b[96];
-    probeSeekFine(axis, seekDist, seekF, fineF);                     // ends at the trigger
-    snprintf(b, sizeof(b), "%s = %s", namedParam, resultReg);        send_line(b);  // save trigger
-    snprintf(b, sizeof(b), "G0 %s%.3f F1000", axis, -dir * BACKOFF); send_line(b);  // open probe
+    snprintf(b, sizeof(b), "G38.2 G91 X%.3f Y%.3f F%.0f", seekDist * ux, seekDist * uy, seekF); send_line(b);
+    snprintf(b, sizeof(b), "G0 G91 X%.3f Y%.3f F1000",   -BACKOFF * ux, -BACKOFF * uy);         send_line(b);
+    snprintf(b, sizeof(b), "G38.2 G91 X%.3f Y%.3f F%.0f", (BACKOFF + 1.0f) * ux, (BACKOFF + 1.0f) * uy, fineF); send_line(b);
+}
+
+// From the three saved machine-coord points (#<ax>..#<cy>), compute the circle
+// circumcentre (determinant form — only divides by the triangle area, so no
+// horizontal-chord singularity), G53-move to it, and zero X/Y there.
+static void emitCircleCentreAndZero(int pNum) {
+    send_line("#<a2> = [#<ax>*#<ax> + #<ay>*#<ay>]");
+    send_line("#<b2> = [#<bx>*#<bx> + #<by>*#<by>]");
+    send_line("#<c2> = [#<cx>*#<cx> + #<cy>*#<cy>]");
+    send_line("#<dd> = [2 * [#<ax>*[#<by>-#<cy>] + #<bx>*[#<cy>-#<ay>] + #<cx>*[#<ay>-#<by>]]]");
+    send_line("#<ux> = [[#<a2>*[#<by>-#<cy>] + #<b2>*[#<cy>-#<ay>] + #<c2>*[#<ay>-#<by>]] / #<dd>]");
+    send_line("#<uy> = [[#<a2>*[#<cx>-#<bx>] + #<b2>*[#<ax>-#<cx>] + #<c2>*[#<bx>-#<ax>]] / #<dd>]");
+    send_line("G53 G0 X#<ux> Y#<uy>");
+    char b[64];
+    snprintf(b, sizeof(b), "G10 L20 P%d X0 Y0", pNum);
+    send_line(b);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -58,11 +80,9 @@ void enterProbeBore() {
 
 void exitProbeBore() {}
 
-// ── G-code: bore centre finding ──────────────────────────────────────────────
-// No Z motion — the tip is pre-placed inside the bore.  Every wall is reached
-// with a G38.2 probing move (two-pass), so the nominal diameter is only a travel
-// hint and a wrong value can't crash the tip.  We re-centre on X before probing
-// Y so the Y pair runs through the true diameter.  Sets X0/Y0 only.
+// ── G-code: bore centre finding (3-point radial) ─────────────────────────────
+// No Z motion — the tip is pre-placed inside the bore.  Probe 3 points radially
+// outward (two-pass), fit the circle, G53-move to the centre and set X0/Y0.
 
 static void runProbeBore() {
     if (!pendantConnected) return;
@@ -71,32 +91,25 @@ static void runProbeBore() {
     float seekF  = pendantProbeV2.seekRate;
     float fineF  = pendantProbeV2.probeRate;
     float rad    = pendantProbeV2.boreDia / 2.0f;
-    float wallOf = pendantProbeV2.boreOffset;   // extra seek over-travel margin
-    // Seek travel from ~centre to a wall, and across to the opposite wall.
-    float toWall  = rad + wallOf + 3.0f;
-    float across  = 2.0f * rad + wallOf + 3.0f;
+    float wallOf = pendantProbeV2.boreOffset;
+    // Generous outward seek — a diameter + margin covers an off-centre start
+    // (the G38.2 stops on contact, so over-estimating is safe).
+    float d = 2.0f * rad + wallOf + 3.0f;
 
-    send_line("G91 G21");
+    char buf[64];
+    probeActivateWcs();          // zero into the system shown on screen
+    send_line("G21 G90");
+    send_line("#<sx> = #5420");   // save start (work coords) to return between probes
+    send_line("#<sy> = #5421");
 
-    // ── X pair ──────────────────────────────────────────────────────────────
-    probeEdge2Pass("X",  toWall,  "#5061", "#<bx_pos>", seekF, fineF);
-    probeEdge2Pass("X", -across,  "#5061", "#<bx_neg>", seekF, fineF);
+    for (int i = 0; i < 3; i++) {
+        probeRadial2Pass(kDir3[i][0], kDir3[i][1], d, seekF, fineF);   // outward
+        snprintf(buf, sizeof(buf), "%s = #5061", kPX[i]); send_line(buf);   // machine X
+        snprintf(buf, sizeof(buf), "%s = #5062", kPY[i]); send_line(buf);   // machine Y
+        send_line("G90 G0 X#<sx> Y#<sy> F1000");                            // back to start
+    }
 
-    // Move to the computed X centre (work coords) before the Y pair.
-    send_line("G90");
-    send_line("G0 X[{#<bx_pos>+#<bx_neg>}/2] F1000");
-    send_line("G91");
-
-    // ── Y pair (now through the true X centre) ────────────────────────────────
-    probeEdge2Pass("Y",  toWall,  "#5062", "#<by_pos>", seekF, fineF);
-    probeEdge2Pass("Y", -across,  "#5062", "#<by_neg>", seekF, fineF);
-
-    // Move to centre and set XY origin.  Z is left untouched (use Z Surface).
-    char buf[80];
-    send_line("G90");
-    send_line("G0 X[{#<bx_pos>+#<bx_neg>}/2] Y[{#<by_pos>+#<by_neg>}/2] F1000");
-    snprintf(buf, sizeof(buf), "G10 L20 P%d X0 Y0", pNum);
-    send_line(buf);
+    emitCircleCentreAndZero(pNum);
 }
 
 // ── Draw helpers (bore) ──────────────────────────────────────────────────────
@@ -135,8 +148,8 @@ void drawProbeBoreScreen() {
     display.setTextColor(PROBE_C_LBLUE);
     display.setCursor(10, 73);
     display.print("SEQUENCE");
-    drawSeqStep( 8, 87,  1, "Probe XY walls", true);
-    drawSeqStep( 8, 105, 2, "Re-centre on X", false);
+    drawSeqStep( 8, 87,  1, "Probe 3 points", true);
+    drawSeqStep( 8, 105, 2, "Find centre",    false);
     drawSeqStep( 8, 123, 3, "Set X0 Y0",      false);
     drawBoreDiagram();
 
@@ -242,12 +255,10 @@ void enterProbeBoss() {
 
 void exitProbeBoss() {}
 
-// ── G-code: boss centre finding ──────────────────────────────────────────────
-// Starts above the boss centre.  Touches the flat top and sets Z0 there (the top
-// is the natural Z datum for an outside feature).  For each side it moves clear
-// of the boss, plunges beside it, and two-pass probes inward; re-centres on X
-// before the Y pair.  Every wall is found with a G38.2 probing move.  Because the
-// centre is the average of opposing walls, the ball radius cancels for XY.
+// ── G-code: boss centre finding (3-point radial) ─────────────────────────────
+// Starts above the boss centre.  Touches the flat top and sets Z0 there.  For
+// each of 3 directions it moves clear, plunges beside the boss, and two-pass
+// probes inward; then fits the circle, G53-moves to the centre and sets X0/Y0.
 
 static void runProbeBoss() {
     if (!pendantConnected) return;
@@ -263,63 +274,39 @@ static void runProbeBoss() {
     float platZ = probeIs3D() ? pendantProbeV2.ballDia / 2.0f
                               : pendantProbeV2.plateThick;
 
-    float out   = rad + clear;             // radial move to clear the boss
-    float inSeek= clear + rad + 5.0f;      // inward seek travel toward a wall
-    float plunge= depth + retZ;            // from (top+retZ) down to (top-depth)
+    float out    = rad + clear;             // radial move to clear the boss
+    float inSeek = clear + rad + 5.0f;      // inward seek travel toward a wall
+    float plunge = depth + retZ;            // from (top+retZ) down to (top-depth)
 
     char buf[80];
+    probeActivateWcs();          // zero into the system shown on screen
+    send_line("G21 G90");
+    send_line("#<sx> = #5420");   // save start (work coords)
+    send_line("#<sy> = #5421");
 
-    send_line("G91 G21");
-
-    // Touch the top and set Z0 there (the boss top is the Z datum).
-    snprintf(buf, sizeof(buf), "G38.2 Z-%.3f F%.0f", maxZ, fineF);
-    send_line(buf);
-    send_line("G90");
-    snprintf(buf, sizeof(buf), "G10 L20 P%d Z%.3f", pNum, platZ);
-    send_line(buf);
+    // Touch the top and set Z0 there (the boss top is the Z datum), then lift.
     send_line("G91");
-    snprintf(buf, sizeof(buf), "G0 Z%.3f F500", retZ);   // up to top + retZ
-    send_line(buf);
-
-    // Each side: move clear of the boss, plunge beside it, two-pass probe inward,
-    // then lift STRAIGHT UP (the probe is already 1.5 mm off the wall) before
-    // traversing — no horizontal retract, which would otherwise carry the tip
-    // back over the boss and crash the next plunge.
-
-    // ── +X side (probe inward, -X) ────────────────────────────────────────────
-    snprintf(buf, sizeof(buf), "G0 X%.3f F1000", out);     send_line(buf);
-    snprintf(buf, sizeof(buf), "G0 Z-%.3f F500", plunge);  send_line(buf);
-    probeEdge2Pass("X", -inSeek, "#5061", "#<px_pos>", seekF, fineF);
-    snprintf(buf, sizeof(buf), "G0 Z%.3f F500", plunge);   send_line(buf);   // lift over top
-
-    // ── -X side (probe inward, +X) ────────────────────────────────────────────
-    snprintf(buf, sizeof(buf), "G0 X-%.3f F1000", 2.0f * out); send_line(buf);
-    snprintf(buf, sizeof(buf), "G0 Z-%.3f F500", plunge);      send_line(buf);
-    probeEdge2Pass("X",  inSeek, "#5061", "#<px_neg>", seekF, fineF);
-    snprintf(buf, sizeof(buf), "G0 Z%.3f F500", plunge);  send_line(buf);    // lift over top
-
-    // Re-centre on X (work coords) at safe height before the Y pair.
+    snprintf(buf, sizeof(buf), "G38.2 Z-%.3f F%.0f", maxZ, fineF);  send_line(buf);
     send_line("G90");
-    send_line("G0 X[{#<px_pos>+#<px_neg>}/2] F1000");
+    snprintf(buf, sizeof(buf), "G10 L20 P%d Z%.3f", pNum, platZ);   send_line(buf);
     send_line("G91");
-
-    // ── +Y side (probe inward, -Y) ────────────────────────────────────────────
-    snprintf(buf, sizeof(buf), "G0 Y%.3f F1000", out);     send_line(buf);
-    snprintf(buf, sizeof(buf), "G0 Z-%.3f F500", plunge);  send_line(buf);
-    probeEdge2Pass("Y", -inSeek, "#5062", "#<py_pos>", seekF, fineF);
-    snprintf(buf, sizeof(buf), "G0 Z%.3f F500", plunge);   send_line(buf);
-
-    // ── -Y side (probe inward, +Y) ────────────────────────────────────────────
-    snprintf(buf, sizeof(buf), "G0 Y-%.3f F1000", 2.0f * out); send_line(buf);
-    snprintf(buf, sizeof(buf), "G0 Z-%.3f F500", plunge);      send_line(buf);
-    probeEdge2Pass("Y",  inSeek, "#5062", "#<py_neg>", seekF, fineF);
-    snprintf(buf, sizeof(buf), "G0 Z%.3f F500", plunge);  send_line(buf);    // lift to safe height
-
-    // Move to centre and set XY origin.  Z is left untouched (use Z Surface).
+    snprintf(buf, sizeof(buf), "G0 Z%.3f F500", retZ);             send_line(buf);  // to top+retZ
     send_line("G90");
-    send_line("G0 X[{#<px_pos>+#<px_neg>}/2] Y[{#<py_pos>+#<py_neg>}/2] F1000");
-    snprintf(buf, sizeof(buf), "G10 L20 P%d X0 Y0", pNum);
-    send_line(buf);
+
+    // Each direction: move clear (at safe Z), plunge beside the boss, two-pass
+    // probe inward, lift straight up, return to start.
+    for (int i = 0; i < 3; i++) {
+        float ux = kDir3[i][0], uy = kDir3[i][1];
+        snprintf(buf, sizeof(buf), "G0 G91 X%.3f Y%.3f F1000", out * ux, out * uy); send_line(buf);
+        snprintf(buf, sizeof(buf), "G0 G91 Z-%.3f F500", plunge);                    send_line(buf);
+        probeRadial2Pass(-ux, -uy, inSeek, seekF, fineF);   // inward
+        snprintf(buf, sizeof(buf), "%s = #5061", kPX[i]); send_line(buf);
+        snprintf(buf, sizeof(buf), "%s = #5062", kPY[i]); send_line(buf);
+        snprintf(buf, sizeof(buf), "G0 G91 Z%.3f F500", plunge);                     send_line(buf);  // lift
+        send_line("G90 G0 X#<sx> Y#<sy> F1000");                                     // back to start
+    }
+
+    emitCircleCentreAndZero(pNum);   // sets X0 Y0; Z0 already set at the top
 }
 
 // ── Layout SCR3b ─────────────────────────────────────────────────────────────
@@ -368,7 +355,7 @@ void drawProbeBossScreen() {
     display.setCursor(10, 73);
     display.print("SEQUENCE");
     drawSeqStep( 8, 87,  1, "Touch top->Z0",  true);
-    drawSeqStep( 8, 105, 2, "Probe XY walls", false);
+    drawSeqStep( 8, 105, 2, "Probe 3 points", false);
     drawSeqStep( 8, 123, 3, "Set X0 Y0",      false);
     drawBossDiagram();
 

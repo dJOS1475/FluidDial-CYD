@@ -363,12 +363,20 @@ void probeDrawWorkAreaButton(int x, int y, int w, int h) {
     display.print(v);
 }
 
-// Cycle G54 → G55 → G56 → G57 → G54.  Selection only — does not change the
-// machine's active WCS; the probe writes the offset to this system via G10 L20 P#.
+// Cycle G54 → G55 → G56 → G57 → G54.  Selection only — the button doesn't switch
+// the active WCS (no surprise DRO jumps while choosing); the probe routine
+// activates and zeroes the chosen system when you actually probe.
 void probeCycleWorkArea() {
     static const char* coords[] = { "G54", "G55", "G56", "G57" };
     pendantProbing.selectedCoordIndex  = (pendantProbing.selectedCoordIndex + 1) % 4;
     pendantProbing.selectedCoordSystem = coords[pendantProbing.selectedCoordIndex];
+}
+
+// Activate the selected WCS on the controller so the probe's G10 L20 zero is
+// immediately in effect in the system shown on screen.
+void probeActivateWcs() {
+    static const char* coords[] = { "G54", "G55", "G56", "G57" };
+    send_line(coords[pendantProbing.selectedCoordIndex]);
 }
 
 // Sequence-step badge: filled numbered circle + label beside it.

@@ -3,6 +3,14 @@
 **ChangeLog:**
 
 
+**2026-07-01**
+
+v2.1.2
+* Fix: **Bore/Boss centre-finding was broken** — the centre-average expression used curly braces `{ }`, which FluidNC's parser rejects (it only groups with square brackets), so the final centre move errored out. Corrected to valid nested `[ ]`.
+* Fix: **Bore/Boss computed the centre in the wrong coordinate frame** — FluidNC returns G38 probe results in **machine** coordinates, but the routines were treating them as work coordinates, so the found centre was off by the active work offset. The maths and the final move are now done in machine coordinates (`G53`).
+* Improve: **Bore/Boss now use radial 3-point probing** — three points 120° apart, each approached **perpendicular to the wall** (no tangential skid), fitted to a circle (circumcentre). More accurate than the old ±X/±Y sweep, and exact even when you don't start dead-centre.
+* Fix: **automatic work-zeroing now takes effect** — every routine (Z Surface, XYZ Corner, Bore, Boss) now **activates** the selected work coordinate system (G54–G57) before it probes, so the zero it sets is live in the system shown on screen; no manual re-zero.
+
 **2026-06-27**
 
 v2.1.1

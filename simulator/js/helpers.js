@@ -369,11 +369,18 @@ function probeDrawWorkAreaButton(x, y, w, h) {
   display.print(v);
 }
 
-// Cycle G54 → G55 → G56 → G57.  Selection only (probe writes via G10 L20 P#).
+// Cycle G54 → G55 → G56 → G57.  Selection only; the probe routine activates the
+// chosen system when you actually probe.
 function probeCycleWorkArea() {
   const coords = ["G54", "G55", "G56", "G57"];
   pendantProbing.selectedCoordIndex = (pendantProbing.selectedCoordIndex + 1) % 4;
   pendantProbing.selectedCoordSystem = coords[pendantProbing.selectedCoordIndex];
+}
+
+// Activate the selected WCS so the probe's G10 L20 zero is immediately in effect.
+function probeActivateWcs() {
+  const coords = ["G54", "G55", "G56", "G57"];
+  send_line(coords[pendantProbing.selectedCoordIndex]);
 }
 
 // Sequence-step badge: filled numbered circle + label beside it.
