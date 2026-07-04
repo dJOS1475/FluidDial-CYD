@@ -41,7 +41,7 @@ const pendantMachine = {
   rotation: 2,
   spindleMaxRPM: 24000,
   spindleMinRPM: 0,
-  fluidDialVersion: "v2.1.3",
+  fluidDialVersion: "v2.1.4",
   fluidNCVersion: "v3.7.16",
   baudRate: "1000000",
   port: "UART0",
@@ -142,6 +142,8 @@ const pendantProbeV2 = {
   bossDepth: 5.0,
   bossClear: 5.0,
   bossPasses: 2,
+  bossRect: false,   // false = circular boss, true = rectangular (X size + Y size)
+  bossSizeY: 60.0,   // mm — rect-boss Y size (X size reuses bossDia)
   focusedField: -1,
   confirmActive: false,
   returnScreen: PSCREEN_PROBE,

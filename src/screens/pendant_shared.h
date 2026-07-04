@@ -289,10 +289,12 @@ struct ProbeV2State {
     int   borePasses   = 2;        // probe passes (1–4)
 
     // ── SCR3b: boss probe ─────────────────────────────────────────────────
-    float bossDia      = 60.0f;    // mm — nominal boss diameter
+    float bossDia      = 60.0f;    // mm — nominal boss diameter (also X size in rect mode)
     float bossDepth    = 5.0f;     // mm — probe depth below boss top (positive value)
     float bossClear    = 5.0f;     // mm — clearance outside boss before probing
     int   bossPasses   = 2;        // probe passes (1–4)
+    bool  bossRect     = false;    // false = circular boss, true = rectangular (X size + Y size)
+    float bossSizeY    = 60.0f;    // mm — rect-boss Y-axis size (X-axis size reuses bossDia)
 
     // ── UI runtime state (not persisted) ─────────────────────────────────
     // focusedField: screen-relative index of the field the dial currently adjusts.

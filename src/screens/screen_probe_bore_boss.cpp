@@ -281,9 +281,12 @@ static void bossWallStore(float ux, float uy, float out, float inSeek, float plu
 
 // ── G-code: boss centre finding (4-point radial) ─────────────────────────────
 // Starts above the boss centre.  Touches the flat top and sets Z0 there.  Probes
-// the ±X pair, re-centres X, then probes the ±Y pair through that centred X
-// (true vertical diameter); averages each pair, G53-moves to the centre and
-// sets X0/Y0.
+// the ±X pair, re-centres X, then probes the ±Y pair through that centred X;
+// averages each pair, G53-moves to the centre and sets X0/Y0.  Works for a
+// circular boss (one diameter) or a rectangular boss (independent X/Y sizes) —
+// the only difference is that the per-axis clear/seek distances are sized from
+// half the X size for the X pair and half the Y size for the Y pair.  The
+// opposed-pair midpoint gives the true centre for either shape.
 
 static void runProbeBoss() {
     if (!pendantConnected) return;
@@ -292,16 +295,22 @@ static void runProbeBoss() {
     float seekF = pendantProbeV2.seekRate;
     float fineF = pendantProbeV2.probeRate;
     float depth = pendantProbeV2.bossDepth;    // mm below boss top to probe at
-    float rad   = pendantProbeV2.bossDia / 2.0f;
     float clear = pendantProbeV2.bossClear;
     float retZ  = pendantProbeV2.retractDist;
     float maxZ  = pendantProbeV2.maxZTravel;
     float platZ = probeIs3D() ? probeTipOffset3D()
                               : pendantProbeV2.plateThick;
 
-    float out    = rad + clear;             // radial move to clear the boss
-    float inSeek = clear + rad + 5.0f;      // inward seek travel toward a wall
-    float plunge = depth + retZ;            // from (top+retZ) down to (top-depth)
+    // Half-size per axis.  Circular: both halves = bossDia/2.  Rectangular: X uses
+    // bossDia/2, Y uses bossSizeY/2.
+    float radX = pendantProbeV2.bossDia / 2.0f;
+    float radY = (pendantProbeV2.bossRect ? pendantProbeV2.bossSizeY : pendantProbeV2.bossDia) / 2.0f;
+
+    float outX    = radX + clear;           // clear the boss on X before plunging
+    float inSeekX = clear + radX + 5.0f;    // inward seek travel toward an X wall
+    float outY    = radY + clear;
+    float inSeekY = clear + radY + 5.0f;
+    float plunge  = depth + retZ;           // from (top+retZ) down to (top-depth)
 
     char buf[80];
     probeActivateWcs();          // zero into the system shown on screen
@@ -321,17 +330,17 @@ static void runProbeBoss() {
     // Each wall: move clear (at safe Z), plunge beside the boss, two-pass probe
     // inward, lift straight up, return home.
     // ── X pair along Y = start ──
-    bossWallStore( 1.0f, 0.0f, out, inSeek, plunge, seekF, fineF, "#<ax>", true);
+    bossWallStore( 1.0f, 0.0f, outX, inSeekX, plunge, seekF, fineF, "#<ax>", true);
     send_line("G90 G0 X#<sx> Y#<sy> F1000");                 // back to start
-    bossWallStore(-1.0f, 0.0f, out, inSeek, plunge, seekF, fineF, "#<cx>", true);
+    bossWallStore(-1.0f, 0.0f, outX, inSeekX, plunge, seekF, fineF, "#<cx>", true);
     send_line("G90 G0 X#<sx> Y#<sy> F1000");                 // back to start
     send_line("#<xc> = [[#<ax> + #<cx>] / 2]");              // machine X of centre
     send_line("G53 G0 X#<xc>");                              // re-centre X at safe Z (Y at start)
 
-    // ── Y pair through the centred X (true vertical diameter) ──
-    bossWallStore(0.0f,  1.0f, out, inSeek, plunge, seekF, fineF, "#<by>", false);
+    // ── Y pair through the centred X ──
+    bossWallStore(0.0f,  1.0f, outY, inSeekY, plunge, seekF, fineF, "#<by>", false);
     send_line("G90 G0 Y#<sy> F1000");                        // Y back to start (X stays centred)
-    bossWallStore(0.0f, -1.0f, out, inSeek, plunge, seekF, fineF, "#<dy>", false);
+    bossWallStore(0.0f, -1.0f, outY, inSeekY, plunge, seekF, fineF, "#<dy>", false);
     send_line("#<yc> = [[#<by> + #<dy>] / 2]");              // machine Y of centre
 
     emitMoveCentreZero(pNum);   // sets X0 Y0; Z0 already set at the top
@@ -369,6 +378,38 @@ static void drawBossDiagram() {
     display.drawLine(76, 189, 80, 192, PROBE_C_GREEN);
 }
 
+// Top-down diagram of RECTANGULAR boss probing: the boss outline (plan view) with
+// four inward arrows probing the ±X / ±Y faces and a Z0 tick at the centre.  The
+// top-down projection (vs the circular boss's side view) is the visual cue that
+// rectangular mode is active.
+static void drawBossDiagramRect() {
+    // Boss outline (plan view), centred on (60, 175).
+    display.drawRect(40, 161, 41, 29, PROBE_C_LBLUE);
+    // Inward face-probe arrows (green), one per side, pointing at the face middle.
+    // +X (from the right, probing toward −X)
+    display.drawLine(94, 175, 83, 175, PROBE_C_GREEN);
+    display.drawLine(83, 175, 87, 172, PROBE_C_GREEN);
+    display.drawLine(83, 175, 87, 178, PROBE_C_GREEN);
+    // −X (from the left, probing toward +X)
+    display.drawLine(26, 175, 37, 175, PROBE_C_GREEN);
+    display.drawLine(37, 175, 33, 172, PROBE_C_GREEN);
+    display.drawLine(37, 175, 33, 178, PROBE_C_GREEN);
+    // +Y (from the top, probing downward)
+    display.drawLine(60, 145, 60, 158, PROBE_C_GREEN);
+    display.drawLine(60, 158, 57, 154, PROBE_C_GREEN);
+    display.drawLine(60, 158, 63, 154, PROBE_C_GREEN);
+    // −Y (from the bottom, probing upward)
+    display.drawLine(60, 205, 60, 192, PROBE_C_GREEN);
+    display.drawLine(60, 192, 57, 196, PROBE_C_GREEN);
+    display.drawLine(60, 192, 63, 196, PROBE_C_GREEN);
+    // Z0 tick at the centre (the top touch still sets Z0 first).
+    display.fillCircle(60, 175, 2, PROBE_C_YELLOW);
+    display.setTextSize(1);
+    display.setTextColor(PROBE_C_YELLOW);
+    display.setCursor(64, 172);
+    display.print("Z0");
+}
+
 void drawProbeBossScreen() {
     display.fillScreen(PROBE_BG_SCREEN);
     drawTitle("BOSS");
@@ -385,25 +426,36 @@ void drawProbeBossScreen() {
     drawSeqStep( 8, 87,  1, "Touch top->Z0",  true);
     drawSeqStep( 8, 105, 2, "Probe 4 points", false);
     drawSeqStep( 8, 123, 3, "Set X0 Y0",      false);
-    drawBossDiagram();
+    if (pendantProbeV2.bossRect) drawBossDiagramRect();
+    else                         drawBossDiagram();
 
-    // Right: KV settings (h=27 so the value isn't clipped)
+    // Right: KV settings (h=27 so the value isn't clipped).  Rectangular mode
+    // splits the nominal size into X-size / Y-size, so it shows one extra field.
     display.setTextSize(1);
     display.setTextColor(PROBE_C_LBLUE);
     display.setCursor(122, 73);
     display.print("SETTINGS");
 
     int fo = pendantProbeV2.focusedField;
-    probeDrawKVTouch(122, 84,  111, 27, "Nominal dia.", pendantProbeV2.bossDia,   "mm", PROBE_C_BLUE,  fo==0, 3);
-    probeDrawKVTouch(122, 113, 111, 27, "Probe depth",  pendantProbeV2.bossDepth, "mm", PROBE_C_BLUE,     fo==1, 3);
-    probeDrawKVTouch(122, 142, 111, 27, "Clearance",    pendantProbeV2.bossClear, "mm", PROBE_C_BLUE,    fo==2, 3);
+    if (pendantProbeV2.bossRect) {
+        // 0=X size (bossDia) 1=Y size (bossSizeY) 2=Probe depth Z 3=Clearance
+        probeDrawKVTouch(122, 84,  111, 27, "X size",       pendantProbeV2.bossDia,   "mm", PROBE_C_BLUE, fo==0, 3);
+        probeDrawKVTouch(122, 113, 111, 27, "Y size",       pendantProbeV2.bossSizeY, "mm", PROBE_C_BLUE, fo==1, 3);
+        probeDrawKVTouch(122, 142, 111, 27, "Probe depth Z", pendantProbeV2.bossDepth, "mm", PROBE_C_BLUE, fo==2, 3);
+        probeDrawKVTouch(122, 171, 111, 27, "Clearance",    pendantProbeV2.bossClear, "mm", PROBE_C_BLUE, fo==3, 3);
+    } else {
+        // 0=Nominal dia. (bossDia) 1=Probe depth Z 2=Clearance
+        probeDrawKVTouch(122, 84,  111, 27, "Nominal dia.",  pendantProbeV2.bossDia,   "mm", PROBE_C_BLUE, fo==0, 3);
+        probeDrawKVTouch(122, 113, 111, 27, "Probe depth Z", pendantProbeV2.bossDepth, "mm", PROBE_C_BLUE, fo==1, 3);
+        probeDrawKVTouch(122, 142, 111, 27, "Clearance",     pendantProbeV2.bossClear, "mm", PROBE_C_BLUE, fo==2, 3);
+    }
 
-    // Result line — what axes the probe will set (in the right column, below clearance)
+    // Result line — what axes the probe will set (below the last field)
     {
         const char* s = "Sets X0 Y0 Z0";
         display.setTextSize(1);
         display.setTextColor(PROBE_C_GREEN);
-        display.setCursor(177 - display.textWidth(s) / 2, 182);
+        display.setCursor(177 - display.textWidth(s) / 2, pendantProbeV2.bossRect ? 205 : 182);
         display.print(s);
     }
 
@@ -438,10 +490,36 @@ void handleProbeBossTouch(int x, int y) {
         return;
     }
 
+    // Field 0 (Nominal dia. / X size) doubles as the shape toggle: triple-tap
+    // within 600 ms flips circular ↔ rectangular (mirrors the Jog screen's
+    // triple-tap gesture).  Single taps focus the field for dial editing.
+    static int           shapeTapCount = 0;
+    static unsigned long shapeTapMs    = 0;
+
     bool redraw = false;
-    if (isTouchInBounds(x, y, 122, 84,  111, 27)) { pendantProbeV2.focusedField=(pendantProbeV2.focusedField==0)?-1:0; redraw=true; }
-    if (isTouchInBounds(x, y, 122, 113, 111, 27)) { pendantProbeV2.focusedField=(pendantProbeV2.focusedField==1)?-1:1; redraw=true; }
-    if (isTouchInBounds(x, y, 122, 142, 111, 27)) { pendantProbeV2.focusedField=(pendantProbeV2.focusedField==2)?-1:2; redraw=true; }
+    if (isTouchInBounds(x, y, 122, 84, 111, 27)) {
+        unsigned long now = millis();
+        shapeTapCount = (now - shapeTapMs < 600) ? shapeTapCount + 1 : 1;
+        shapeTapMs = now;
+        if (shapeTapCount >= 3) {
+            shapeTapCount = 0;
+            pendantProbeV2.bossRect = !pendantProbeV2.bossRect;
+            // Clamp focus to the field count of the new mode (rect=4, circ=3).
+            int maxField = pendantProbeV2.bossRect ? 3 : 2;
+            if (pendantProbeV2.focusedField > maxField) pendantProbeV2.focusedField = -1;
+            saveProbeSettings();
+            drawProbeBossScreen();
+            return;
+        }
+        pendantProbeV2.focusedField = (pendantProbeV2.focusedField == 0) ? -1 : 0;
+        redraw = true;
+    } else {
+        shapeTapCount = 0;   // any other tap breaks the triple-tap sequence
+        if (isTouchInBounds(x, y, 122, 113, 111, 27)) { pendantProbeV2.focusedField=(pendantProbeV2.focusedField==1)?-1:1; redraw=true; }
+        if (isTouchInBounds(x, y, 122, 142, 111, 27)) { pendantProbeV2.focusedField=(pendantProbeV2.focusedField==2)?-1:2; redraw=true; }
+        if (pendantProbeV2.bossRect &&
+            isTouchInBounds(x, y, 122, 171, 111, 27)) { pendantProbeV2.focusedField=(pendantProbeV2.focusedField==3)?-1:3; redraw=true; }
+    }
     if (redraw) { drawProbeBossScreen(); return; }
 
     if (isTouchInBounds(x, y, 5, 239, 112, 38)) {

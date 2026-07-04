@@ -203,33 +203,49 @@ coords), so the result is correct under any work offset.
 
 ## 6. Boss (3D probe only)
 
-Finds the **centre of an outside circle / round stock** and sets **X0, Y0 and Z0**.
+Finds the **centre of a raised feature** and sets **X0, Y0 and Z0**. Handles both
+a **circular boss / round stock** and a **rectangular / square boss** — see the
+mode toggle below.
 
 **Position before probing:** start with the probe **above the centre of the boss**.
 The warning reads *"Start above centre of boss."*
 
-**Left column** — Sequence: ① *Touch top→Z0* → ② *Probe 4 points* → ③ *Set X0 Y0*,
-with a cross-section diagram of the probe over a raised boss and inward arrows.
+**Left column** — Sequence: ① *Touch top→Z0* → ② *Probe 4 points* → ③ *Set X0 Y0*.
+The diagram reflects the mode: **circular** shows a cross-section of the probe over
+a raised boss with inward arrows; **rectangular** shows a **top-down** view of the
+boss outline with four inward arrows (±X, ±Y) and a *Z0* mark at the centre.
 
-**Right column — SETTINGS:**
+**Shape toggle (triple-tap):** triple-tap the first settings field to switch
+between **Circular** and **Rectangular** boss. The label of that field and the
+diagram change to confirm the active mode (the top-down rectangle diagram is the
+tell you're in rectangular mode).
+
+**Right column — SETTINGS (circular):**
 
 | Field | Meaning |
 |---|---|
 | **Nominal dia.** | Approximate boss diameter — a travel hint for the inward seeks. |
-| **Probe depth** | How far *below the boss top* to probe the side walls. |
-| **Clearance** | How far *outside* the nominal radius to move before plunging down beside the boss. **Must exceed any under-estimate of the diameter** — this is the one number that has to be safe, because the downward plunge beside the boss can't be probe-protected. |
+| **Probe depth Z** | How far *below the boss top* to probe the side walls. |
+| **Clearance** | How far *outside* the nominal radius to move before plunging down beside the boss. **Must exceed any under-estimate of the size** — this is the one number that has to be safe, because the downward plunge beside the boss can't be probe-protected. |
+
+**Right column — SETTINGS (rectangular):** the same, except *Nominal dia.* splits
+into **X size** (feature width along X) and **Y size** (along Y); *Probe depth Z*
+and *Clearance* are unchanged. Each axis's seek/clear distances are sized from its
+own half-dimension.
 
 **Result line:** *Sets X0 Y0 Z0*.
 
 **How it works:** touches the **flat top** to set **Z0** (with offset). Then, for
 each of **four directions** at 90° (+X, +Y, −X, −Y), it moves clear of the boss by
-*Clearance*, plunges to *Probe depth* beside it, and two-pass probes **radially
+*Clearance*, plunges to *Probe depth Z* beside it, and two-pass probes **radially
 inward** to the wall (perpendicular contact), lifting straight up between points.
 It does the **±X pair first**, **re-centres in X**, then probes the **±Y pair
-through that centred X** (true vertical diameter). The centre is the **midpoint of
-each opposed pair**, so it moves there and `G10 L20 P# X0 Y0`; Z0 from the top is
-preserved. The maths and final move use **machine coordinates** (what FluidNC
-returns for G38), so the result is correct under any work offset.
+through that centred X**. The centre is the **midpoint of each opposed pair** —
+which is exact for a circle *and* a rectangle — so it moves there and
+`G10 L20 P# X0 Y0`; Z0 from the top is preserved. In rectangular mode the only
+difference is that the X pair is sized from *X size* and the Y pair from *Y size*.
+The maths and final move use **machine coordinates** (what FluidNC returns for
+G38), so the result is correct under any work offset.
 
 ---
 

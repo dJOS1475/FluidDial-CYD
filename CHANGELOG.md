@@ -5,6 +5,12 @@
 
 **2026-07-04**
 
+v2.1.4
+* Add: **Rectangular / square boss probing.** The Boss screen now handles rectangular features as well as round ones. **Triple-tap the first settings field** to switch between **Circular** boss (one *Nominal dia.*) and **Rectangular** boss (independent **X size** / **Y size**); the field labels and the diagram change to confirm the mode (rectangular shows a top-down view of the boss with inward ±X/±Y arrows and a Z0 centre mark). Centre-finding is the same opposed-pair midpoint (exact for a rectangle too) with X re-centred before the Y pair; the only difference is each axis's seek/clear distances are sized from its own half-dimension. Sets **X0/Y0/Z0** as before.
+* Change: the boss **Probe depth** field is relabelled **Probe depth Z** to distinguish it from the new horizontal size fields (it always meant the Z depth below the boss top).
+
+**2026-07-04**
+
 v2.1.3
 * Safety: **jogging can no longer be driven past the machine's soft limits.** The old per-tick distance cap only bounded a single encoder detent, so cumulative `$J=G91` jogs could still walk an axis into a hard stop. The pendant now clamps every jog so the resulting **absolute machine position** stays inside the homed travel envelope. The per-axis envelope sign is read from the controller's **`$23`** homing-direction mask (home = MPos 0; homes + → `[-$13x, 0]`, homes − → `[0, +$13x]`), so mixed homing directions are handled correctly with nothing assumed. A 0.5 mm margin keeps the tip off the switch at both ends. The clamp works against a **predicted** position that leads the reported MPos by queued-but-unexecuted jogs (re-seeded from the real MPos when a jog burst ends and the machine idles), so a fast continuous spin can't over-commit while FluidNC's status lags. Engages only for X/Y/Z once travel + `$23` are known and the machine isn't in Alarm; otherwise it falls through to FluidNC's own soft limits unchanged. **Recommended companion setting: enable FluidNC soft limits (`$20=1`, with homing `$22=1`) as the authoritative backstop.**
 * Improve: **Bore/Boss now probe 4 points at 90° (±X, ±Y)** instead of 3 at 120°. The centre is the midpoint of each opposed pair — division-free, and it cancels the tip radius per axis. The **X pair is probed first and the tool re-centres in X before the Y pair**, so the Y touches run through the true vertical diameter and contact each wall head-on even from a well off-centre start. Same probe count as before (one extra re-centre move).

@@ -164,14 +164,23 @@ function bossWallStore(ux, uy, out, inSeek, plunge, seekF, fineF, storeVar, axis
   send_line(`G0 G91 Z${fmtF(plunge, 3)} F500`);                      // lift
 }
 
+// Persistent triple-tap state for the boss shape toggle (mirrors the firmware's
+// function-static shapeTapCount / shapeTapMs).
+const _bossShapeTap = { count: 0, ms: 0 };
+
 function runProbeBoss() {
   if (!pendantConnected) return;
   const p = pendantProbeV2;
   const pNum = pendantProbing.selectedCoordIndex + 1;
-  const seekF = p.seekRate, fineF = p.probeRate, depth = p.bossDepth, rad = p.bossDia / 2, clear = p.bossClear;
+  const seekF = p.seekRate, fineF = p.probeRate, depth = p.bossDepth, clear = p.bossClear;
   const retZ = p.retractDist, maxZ = p.maxZTravel;
   const platZ = probeIs3D() ? probeTipOffset3D() : p.plateThick;
-  const out = rad + clear, inSeek = clear + rad + 5, plunge = depth + retZ;
+  // Half-size per axis. Circular: both = bossDia/2. Rect: X=bossDia/2, Y=bossSizeY/2.
+  const radX = p.bossDia / 2;
+  const radY = (p.bossRect ? p.bossSizeY : p.bossDia) / 2;
+  const outX = radX + clear, inSeekX = clear + radX + 5;
+  const outY = radY + clear, inSeekY = clear + radY + 5;
+  const plunge = depth + retZ;
   probeActivateWcs();          // zero into the system shown on screen
   send_line("G21 G90");
   send_line("#<sx> = #5420");
@@ -185,16 +194,16 @@ function runProbeBoss() {
   send_line(`G0 Z${fmtF(retZ, 3)} F500`);
   send_line("G90");
   // X pair along Y = start, average to the centre X, then re-centre X.
-  bossWallStore(1.0, 0.0, out, inSeek, plunge, seekF, fineF, "#<ax>", true);
+  bossWallStore(1.0, 0.0, outX, inSeekX, plunge, seekF, fineF, "#<ax>", true);
   send_line("G90 G0 X#<sx> Y#<sy> F1000");
-  bossWallStore(-1.0, 0.0, out, inSeek, plunge, seekF, fineF, "#<cx>", true);
+  bossWallStore(-1.0, 0.0, outX, inSeekX, plunge, seekF, fineF, "#<cx>", true);
   send_line("G90 G0 X#<sx> Y#<sy> F1000");
   send_line("#<xc> = [[#<ax> + #<cx>] / 2]");
   send_line("G53 G0 X#<xc>");                   // re-centre X at safe Z (Y at start)
-  // Y pair through the centred X (true vertical diameter).
-  bossWallStore(0.0, 1.0, out, inSeek, plunge, seekF, fineF, "#<by>", false);
+  // Y pair through the centred X.
+  bossWallStore(0.0, 1.0, outY, inSeekY, plunge, seekF, fineF, "#<by>", false);
   send_line("G90 G0 Y#<sy> F1000");             // Y back to start (X stays centred)
-  bossWallStore(0.0, -1.0, out, inSeek, plunge, seekF, fineF, "#<dy>", false);
+  bossWallStore(0.0, -1.0, outY, inSeekY, plunge, seekF, fineF, "#<dy>", false);
   send_line("#<yc> = [[#<by> + #<dy>] / 2]");
   emitMoveCentreZero(pNum);   // sets X0 Y0; Z0 already set at the top
 }
@@ -219,6 +228,33 @@ function drawBossDiagram() {
   display.drawLine(76, 189, 80, 192, PROBE_C_GREEN);
 }
 
+// Top-down diagram of RECTANGULAR boss probing: boss outline (plan view) with
+// four inward arrows probing the ±X/±Y faces and a Z0 tick at the centre. The
+// top-down projection is the visual cue that rectangular mode is active.
+function drawBossDiagramRect() {
+  display.drawRect(40, 161, 41, 29, PROBE_C_LBLUE);   // boss outline (plan view)
+  // +X (from the right)
+  display.drawLine(94, 175, 83, 175, PROBE_C_GREEN);
+  display.drawLine(83, 175, 87, 172, PROBE_C_GREEN);
+  display.drawLine(83, 175, 87, 178, PROBE_C_GREEN);
+  // -X (from the left)
+  display.drawLine(26, 175, 37, 175, PROBE_C_GREEN);
+  display.drawLine(37, 175, 33, 172, PROBE_C_GREEN);
+  display.drawLine(37, 175, 33, 178, PROBE_C_GREEN);
+  // +Y (from the top)
+  display.drawLine(60, 145, 60, 158, PROBE_C_GREEN);
+  display.drawLine(60, 158, 57, 154, PROBE_C_GREEN);
+  display.drawLine(60, 158, 63, 154, PROBE_C_GREEN);
+  // -Y (from the bottom)
+  display.drawLine(60, 205, 60, 192, PROBE_C_GREEN);
+  display.drawLine(60, 192, 57, 196, PROBE_C_GREEN);
+  display.drawLine(60, 192, 63, 196, PROBE_C_GREEN);
+  // Z0 tick at the centre.
+  display.fillCircle(60, 175, 2, PROBE_C_YELLOW);
+  display.setTextSize(1); display.setTextColor(PROBE_C_YELLOW);
+  display.setCursor(64, 172); display.print("Z0");
+}
+
 function drawProbeBossScreen() {
   display.fillScreen(PROBE_BG_SCREEN);
   drawTitle("BOSS");
@@ -229,17 +265,27 @@ function drawProbeBossScreen() {
   drawSeqStep(8, 87, 1, "Touch top->Z0", true);
   drawSeqStep(8, 105, 2, "Probe 4 points", false);
   drawSeqStep(8, 123, 3, "Set X0 Y0", false);
-  drawBossDiagram();
+  if (pendantProbeV2.bossRect) drawBossDiagramRect();
+  else drawBossDiagram();
   display.setTextSize(1); display.setTextColor(PROBE_C_LBLUE);
   display.setCursor(122, 73); display.print("SETTINGS");
   const fo = pendantProbeV2.focusedField;
-  probeDrawKVTouch(122, 84, 111, 27, "Nominal dia.", pendantProbeV2.bossDia, "mm", PROBE_C_BLUE, fo === 0, 3);
-  probeDrawKVTouch(122, 113, 111, 27, "Probe depth", pendantProbeV2.bossDepth, "mm", PROBE_C_BLUE, fo === 1, 3);
-  probeDrawKVTouch(122, 142, 111, 27, "Clearance", pendantProbeV2.bossClear, "mm", PROBE_C_BLUE, fo === 2, 3);
+  if (pendantProbeV2.bossRect) {
+    // 0=X size (bossDia) 1=Y size (bossSizeY) 2=Probe depth Z 3=Clearance
+    probeDrawKVTouch(122, 84, 111, 27, "X size", pendantProbeV2.bossDia, "mm", PROBE_C_BLUE, fo === 0, 3);
+    probeDrawKVTouch(122, 113, 111, 27, "Y size", pendantProbeV2.bossSizeY, "mm", PROBE_C_BLUE, fo === 1, 3);
+    probeDrawKVTouch(122, 142, 111, 27, "Probe depth Z", pendantProbeV2.bossDepth, "mm", PROBE_C_BLUE, fo === 2, 3);
+    probeDrawKVTouch(122, 171, 111, 27, "Clearance", pendantProbeV2.bossClear, "mm", PROBE_C_BLUE, fo === 3, 3);
+  } else {
+    // 0=Nominal dia. (bossDia) 1=Probe depth Z 2=Clearance
+    probeDrawKVTouch(122, 84, 111, 27, "Nominal dia.", pendantProbeV2.bossDia, "mm", PROBE_C_BLUE, fo === 0, 3);
+    probeDrawKVTouch(122, 113, 111, 27, "Probe depth Z", pendantProbeV2.bossDepth, "mm", PROBE_C_BLUE, fo === 1, 3);
+    probeDrawKVTouch(122, 142, 111, 27, "Clearance", pendantProbeV2.bossClear, "mm", PROBE_C_BLUE, fo === 2, 3);
+  }
   {
     const s = "Sets X0 Y0 Z0";
     display.setTextSize(1); display.setTextColor(PROBE_C_GREEN);
-    display.setCursor(177 - (display.textWidth(s) / 2 | 0), 182);
+    display.setCursor(177 - (display.textWidth(s) / 2 | 0), pendantProbeV2.bossRect ? 205 : 182);
     display.print(s);
   }
   probeDrawWarn(220, "! Start above centre of boss");
@@ -261,11 +307,30 @@ function handleProbeBossTouch(x, y) {
     else if (isTouchInBounds(x, y, 114, 175, 98, 32)) { pendantProbeV2.confirmActive = false; runProbeBoss(); currentPendantScreen = PSCREEN_STATUS; }
     return;
   }
+  // Field 0 (Nominal dia. / X size) doubles as the shape toggle: triple-tap
+  // within 600 ms flips circular <-> rectangular. Single taps focus for editing.
   let redraw = false;
-  if (isTouchInBounds(x, y, 122, 84, 111, 27)) { pendantProbeV2.focusedField = pendantProbeV2.focusedField === 0 ? -1 : 0; redraw = true; }
-  if (isTouchInBounds(x, y, 122, 113, 111, 27)) { pendantProbeV2.focusedField = pendantProbeV2.focusedField === 1 ? -1 : 1; redraw = true; }
-  if (isTouchInBounds(x, y, 122, 142, 111, 27)) { pendantProbeV2.focusedField = pendantProbeV2.focusedField === 2 ? -1 : 2; redraw = true; }
-  if (isTouchInBounds(x, y, 122, 171, 111, 27)) { pendantProbeV2.focusedField = pendantProbeV2.focusedField === 3 ? -1 : 3; redraw = true; }
+  if (isTouchInBounds(x, y, 122, 84, 111, 27)) {
+    const now = (typeof millis === "function") ? millis() : Date.now();
+    _bossShapeTap.count = (now - _bossShapeTap.ms < 600) ? _bossShapeTap.count + 1 : 1;
+    _bossShapeTap.ms = now;
+    if (_bossShapeTap.count >= 3) {
+      _bossShapeTap.count = 0;
+      pendantProbeV2.bossRect = !pendantProbeV2.bossRect;
+      const maxField = pendantProbeV2.bossRect ? 3 : 2;
+      if (pendantProbeV2.focusedField > maxField) pendantProbeV2.focusedField = -1;
+      saveProbeSettings();
+      drawProbeBossScreen();
+      return;
+    }
+    pendantProbeV2.focusedField = pendantProbeV2.focusedField === 0 ? -1 : 0;
+    redraw = true;
+  } else {
+    _bossShapeTap.count = 0;   // any other tap breaks the triple-tap sequence
+    if (isTouchInBounds(x, y, 122, 113, 111, 27)) { pendantProbeV2.focusedField = pendantProbeV2.focusedField === 1 ? -1 : 1; redraw = true; }
+    if (isTouchInBounds(x, y, 122, 142, 111, 27)) { pendantProbeV2.focusedField = pendantProbeV2.focusedField === 2 ? -1 : 2; redraw = true; }
+    if (pendantProbeV2.bossRect && isTouchInBounds(x, y, 122, 171, 111, 27)) { pendantProbeV2.focusedField = pendantProbeV2.focusedField === 3 ? -1 : 3; redraw = true; }
+  }
   if (redraw) { drawProbeBossScreen(); return; }
   if (isTouchInBounds(x, y, 5, 239, 112, 38)) { pendantProbeV2.returnScreen = PSCREEN_PROBE_BOSS; currentPendantScreen = PSCREEN_PROBE; return; }
   if (isTouchInBounds(x, y, 123, 239, 112, 38)) { probeCycleWorkArea(); drawProbeBossScreen(); return; }

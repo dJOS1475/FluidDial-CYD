@@ -46,6 +46,8 @@ void saveProbeSettings() {
     preferences.putFloat("bossDepth",   pendantProbeV2.bossDepth);
     preferences.putFloat("bossClear",   pendantProbeV2.bossClear);
     preferences.putInt  ("bossPasses",  pendantProbeV2.bossPasses);
+    preferences.putBool ("bossRect",    pendantProbeV2.bossRect);
+    preferences.putFloat("bossSizeY",   pendantProbeV2.bossSizeY);
     preferences.end();
 }
 
@@ -75,6 +77,8 @@ void loadProbeSettings() {
     pendantProbeV2.bossDepth    = preferences.getFloat("bossDepth",    5.0f);
     pendantProbeV2.bossClear    = preferences.getFloat("bossClear",    5.0f);
     pendantProbeV2.bossPasses   = preferences.getInt  ("bossPasses",  2);
+    pendantProbeV2.bossRect     = preferences.getBool ("bossRect",    false);
+    pendantProbeV2.bossSizeY    = preferences.getFloat("bossSizeY",   60.0f);
     preferences.end();
 
     // Clamp integral fields

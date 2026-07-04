@@ -701,11 +701,19 @@ static void handleEncoderDelta(int32_t delta) {
             drawProbeBoreScreen();
 
         } else if (currentPendantScreen == PSCREEN_PROBE_BOSS) {
-            // 0=bossDia 1=bossDepth 2=bossClear
             float step = probeDialStep(delta, 0.1f);
-            if (fo == 0) p.bossDia   = constrain(p.bossDia   + delta * step, 0.1f, 500.0f);
-            if (fo == 1) p.bossDepth = constrain(p.bossDepth + delta * step, 0.1f, 100.0f);
-            if (fo == 2) p.bossClear = constrain(p.bossClear + delta * step, 0.1f,  50.0f);
+            if (p.bossRect) {
+                // 0=X size (bossDia) 1=Y size (bossSizeY) 2=bossDepth 3=bossClear
+                if (fo == 0) p.bossDia   = constrain(p.bossDia   + delta * step, 0.1f, 500.0f);
+                if (fo == 1) p.bossSizeY = constrain(p.bossSizeY + delta * step, 0.1f, 500.0f);
+                if (fo == 2) p.bossDepth = constrain(p.bossDepth + delta * step, 0.1f, 100.0f);
+                if (fo == 3) p.bossClear = constrain(p.bossClear + delta * step, 0.1f,  50.0f);
+            } else {
+                // 0=bossDia 1=bossDepth 2=bossClear
+                if (fo == 0) p.bossDia   = constrain(p.bossDia   + delta * step, 0.1f, 500.0f);
+                if (fo == 1) p.bossDepth = constrain(p.bossDepth + delta * step, 0.1f, 100.0f);
+                if (fo == 2) p.bossClear = constrain(p.bossClear + delta * step, 0.1f,  50.0f);
+            }
             drawProbeBossScreen();
         }
         return;

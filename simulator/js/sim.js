@@ -189,9 +189,18 @@ function handleEncoderDelta(delta) {
       drawProbeBoreScreen();
     } else if (currentPendantScreen === PSCREEN_PROBE_BOSS) {
       const step = probeDialStep(delta, 0.1);
-      if (fo === 0) p.bossDia = constrain(p.bossDia + delta * step, 0.1, 500);
-      if (fo === 1) p.bossDepth = constrain(p.bossDepth + delta * step, 0.1, 100);
-      if (fo === 2) p.bossClear = constrain(p.bossClear + delta * step, 0.1, 50);
+      if (p.bossRect) {
+        // 0=X size (bossDia) 1=Y size (bossSizeY) 2=bossDepth 3=bossClear
+        if (fo === 0) p.bossDia = constrain(p.bossDia + delta * step, 0.1, 500);
+        if (fo === 1) p.bossSizeY = constrain(p.bossSizeY + delta * step, 0.1, 500);
+        if (fo === 2) p.bossDepth = constrain(p.bossDepth + delta * step, 0.1, 100);
+        if (fo === 3) p.bossClear = constrain(p.bossClear + delta * step, 0.1, 50);
+      } else {
+        // 0=bossDia 1=bossDepth 2=bossClear
+        if (fo === 0) p.bossDia = constrain(p.bossDia + delta * step, 0.1, 500);
+        if (fo === 1) p.bossDepth = constrain(p.bossDepth + delta * step, 0.1, 100);
+        if (fo === 2) p.bossClear = constrain(p.bossClear + delta * step, 0.1, 50);
+      }
       drawProbeBossScreen();
     }
     return;
