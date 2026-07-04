@@ -10,6 +10,9 @@
 #define PROBE_C_BLUE      COLOR_CYAN          // 0x07FF — secondary values
 #define PROBE_C_LBLUE     COLOR_GRAY_TEXT     // 0x7BEF — section labels
 #define PROBE_C_DIMBLUE   0x4208              // dim gray — unit suffixes, hint text
+#define PROBE_C_TAPBDR    COLOR_GRAY_TEXT     // 0x7BEF — border of every TAPPABLE field
+                                              // (read-only panels are borderless; a
+                                              //  yellow border means focused/active)
 #define PROBE_BTN_GREEN   COLOR_DARK_GREEN    // 0x0360 — PROBE action button
 #define PROBE_BTN_YELLOW  COLOR_ORANGE        // 0xFD20
 #define PROBE_BTN_BLUE    COLOR_BLUE          // 0x1C9F — Main Menu / nav buttons
@@ -35,6 +38,16 @@ enum {
     PROBE_TYPE_COUNT    = 3,
 };
 inline bool probeIs3D()    { return pendantProbeV2.probeTypeIdx == PROBE_TYPE_3D; }
+
+// Effective 3D-probe tip offset: ball radius minus stylus deflection.  The
+// stylus flexes past first contact before the probe triggers, so the reported
+// position is `deflection` beyond the true surface — subtracting it corrects
+// the zero.  Deflection defaults to 0 (off); calibrate it for extra accuracy.
+// (Centre-finding is unaffected: deflection is radially symmetric and cancels.)
+inline float probeTipOffset3D() {
+    float o = pendantProbeV2.ballDia / 2.0f - pendantProbeV2.deflection;
+    return o > 0.0f ? o : 0.0f;
+}
 inline bool probeIsPlate() { return pendantProbeV2.probeTypeIdx != PROBE_TYPE_3D; }
 // Number of probe routines a given type exposes (Z, +Corner, +Bore/Boss).
 inline int  probeRoutineCount() {

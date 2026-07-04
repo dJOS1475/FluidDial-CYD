@@ -65,7 +65,9 @@ static void drawPlateXYZGraphic() {
 // ══════════════════════════════════════════════════════════════════════════════
 
 // focusedField mapping for SCR0a:
-//   0 = ball dia   1 = stylus len   2 = deflection   3 = pre-travel
+//   0 = ball dia   1 = deflection
+// (Stylus length / pre-travel were dropped: they never affected the generated
+//  moves.  Deflection IS applied — subtracted from the ball radius — default 0.)
 
 void enterProbeCfg3D() {
     spriteStatusBar.deleteSprite();
@@ -82,8 +84,7 @@ void exitProbeCfg3D() {}
 // Layout (240×320):
 //   drawTitle      y=0   h=35
 //   Hardware panel y=38  h=26   (static label: "3D Touch Probe")
-//   Stylus panel   y=67  h=98   (4 KV-touch fields in 2×2, h=40 each)
-//   sel bar        y=168 h=20
+//   Stylus panel   y=67  h=55   (2 KV-touch fields in one row, h=40)
 //   button pair    y=280 h=40
 
 void drawProbeCfg3DScreen() {
@@ -101,18 +102,19 @@ void drawProbeCfg3DScreen() {
     display.setCursor(10, 53);
     display.print("3D Touch Probe");
 
-    // ── Stylus panel (4 KV-touch fields) ─────────────────────────────────
-    display.fillRoundRect(5, 67, 230, 98, 4, PROBE_BG_PANEL);
+    // ── Stylus panel (2 KV-touch fields) ─────────────────────────────────
+    // Ball dia. is the trigger offset; Deflection (default 0) is subtracted
+    // from the ball radius to correct for stylus flex — an optional accuracy
+    // tune (see the Probing guide's Calibration section).
+    display.fillRoundRect(5, 67, 230, 55, 4, PROBE_BG_PANEL);
     display.setTextSize(1);
     display.setTextColor(PROBE_C_LBLUE);
     display.setCursor(10, 70);
     display.print("STYLUS");
 
     int fo = pendantProbeV2.focusedField;
-    probeDrawKVTouch( 7,  79, 112, 40, "Ball dia.",      pendantProbeV2.ballDia,    "mm", PROBE_C_BLUE,    fo==0, 3);
-    probeDrawKVTouch(122,  79, 111, 40, "Stylus length", pendantProbeV2.stylusLen,  "mm", PROBE_C_DIMBLUE, fo==1, 3);
-    probeDrawKVTouch( 7, 122, 112, 40, "Deflection",    pendantProbeV2.deflection, "mm", PROBE_C_BLUE,    fo==2, 3);
-    probeDrawKVTouch(122, 122, 111, 40, "Pre-travel",   pendantProbeV2.preTravel,  "mm", PROBE_C_BLUE,    fo==3, 3);
+    probeDrawKVTouch( 7,  79, 112, 40, "Ball dia.",  pendantProbeV2.ballDia,    "mm", PROBE_C_BLUE, fo==0, 3);
+    probeDrawKVTouch(122,  79, 111, 40, "Deflection", pendantProbeV2.deflection, "mm", PROBE_C_BLUE, fo==1, 3);
 
     // ── Illustration ──────────────────────────────────────────────────────
     drawProbe3DGraphic();
@@ -127,8 +129,6 @@ void handleProbeCfg3DTouch(int x, int y) {
     bool redraw = false;
     if (isTouchInBounds(x, y,  7,  79, 112, 40)) { pendantProbeV2.focusedField = (pendantProbeV2.focusedField == 0) ? -1 : 0; redraw = true; }
     if (isTouchInBounds(x, y, 122,  79, 111, 40)) { pendantProbeV2.focusedField = (pendantProbeV2.focusedField == 1) ? -1 : 1; redraw = true; }
-    if (isTouchInBounds(x, y,  7, 122, 112, 40)) { pendantProbeV2.focusedField = (pendantProbeV2.focusedField == 2) ? -1 : 2; redraw = true; }
-    if (isTouchInBounds(x, y, 122, 122, 111, 40)) { pendantProbeV2.focusedField = (pendantProbeV2.focusedField == 3) ? -1 : 3; redraw = true; }
     if (redraw) { drawProbeCfg3DScreen(); return; }
 
     // Setup — return to SCR0 without saving
@@ -198,7 +198,7 @@ void drawProbeCfgPlateScreen() {
     display.print(xyz ? "PLATE DIMENSIONS" : "PLATE THICKNESS");
 
     int fo = pendantProbeV2.focusedField;
-    probeDrawKVTouch(7, 79, 112, 40, "Thickness", pendantProbeV2.plateThick, "mm", PROBE_C_YELLOW, fo==0, 3);
+    probeDrawKVTouch(7, 79, 112, 40, "Thickness", pendantProbeV2.plateThick, "mm", PROBE_C_BLUE, fo==0, 3);
     if (xyz) {
         probeDrawKVTouch(122,  79, 111, 40, "Width",       pendantProbeV2.plateWidth, "mm", PROBE_C_DIMBLUE, fo==1, 3);
         probeDrawKVTouch(  7, 122, 112, 40, "XY offset X", pendantProbeV2.plateOffX,  "mm", PROBE_C_BLUE,    fo==2, 3);

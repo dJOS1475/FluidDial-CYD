@@ -9,7 +9,7 @@
 static void drawDialField(LovyanGFX* g, int ox, int oy, int w, int h,
                           int value, uint16_t valColor, bool active) {
     uint16_t bg  = active ? PROBE_SEL_BG   : PROBE_BG_SCREEN;
-    uint16_t bdr = active ? PROBE_C_YELLOW : PROBE_C_DIMBLUE;
+    uint16_t bdr = active ? PROBE_C_YELLOW : PROBE_C_TAPBDR;
     g->fillRect(ox, oy, w, h, COLOR_BACKGROUND);   // clear corners to screen bg
     g->fillRoundRect(ox, oy, w, h, 2, bg);
     g->drawRoundRect(ox, oy, w, h, 2, bdr);

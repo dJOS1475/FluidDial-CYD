@@ -554,6 +554,72 @@ static void handleEncoderDelta(int32_t delta) {
                 if (distance < -cap) distance = -cap;
             }
 
+            // Soft-limit clamp (absolute): keep the resulting MACHINE position
+            // inside the homed travel envelope so cumulative G91 jogs can't walk
+            // into a hard stop — the per-tick cap above only bounds a single tick.
+            // Envelope per axis (home = MPos 0): $23 bit clear → homes +, travel
+            // runs [-maxTravel, 0]; bit set → homes −, travel runs [0, +maxTravel].
+            // Only engages for a linear axis (X/Y/Z) once travel and the $23 mask
+            // are known and the machine isn't in Alarm (MPos unreferenced); until
+            // then it falls through to FluidNC's own soft limits unchanged.
+            //
+            // We clamp against a PREDICTED position, not the live MPos: successive
+            // G91 jogs queue in FluidNC's planner while the reported MPos lags, so
+            // clamping on MPos alone would let a fast continuous spin over-commit
+            // past the limit. predMm[] leads MPos by the queued-but-unexecuted
+            // distance; it is re-seeded from the real MPos whenever a jog burst
+            // ends and the machine settles to Idle (planner drained).
+            {
+                int axis = pendantJog.selectedAxis;
+                if (axis >= 0 && axis <= 2 &&
+                    pendantJog.maxTravel[axis] > 0 &&
+                    pendantJog.homingDirMask >= 0 &&
+                    !pendantMachine.status.startsWith("Alarm")) {
+
+                    static float predMm[3]  = { NAN, NAN, NAN };  // predicted MPos incl. queued jogs
+                    static int   lastAxis   = -1;
+
+                    bool  homesNeg  = (pendantJog.homingDirMask >> axis) & 1;
+                    float travelMm  = (float)pendantJog.maxTravel[axis];
+                    float loMm      = homesNeg ? 0.0f      : -travelMm;   // envelope bounds
+                    float hiMm      = homesNeg ? travelMm  :  0.0f;
+                    const float MARGIN_MM = 0.5f;                         // stay off the switch
+
+                    float mposDisp  = (axis == 0) ? pendantMachine.workX
+                                    : (axis == 1) ? pendantMachine.workY
+                                                  : pendantMachine.workZ;   // MPos, display units
+                    float mposMm    = pendantMachine.inInches ? mposDisp * 25.4f : mposDisp;
+                    float distMm    = pendantMachine.inInches ? distance * 25.4f : distance;
+
+                    // Re-seed the prediction from the real MPos at the start of a
+                    // burst (gap since last tick, or axis change) once the machine
+                    // has settled to Idle — and always on first use.
+                    bool newBurst = (interval > 400) || (axis != lastAxis);
+                    if (isnan(predMm[axis]) ||
+                        (newBurst && pendantMachine.status.startsWith("Idle"))) {
+                        predMm[axis] = mposMm;
+                    }
+                    lastAxis = axis;
+
+                    // Clamp against the predicted position; only ever REDUCE the
+                    // move toward the limit — never flip its sign.
+                    if (distMm > 0.0f) {
+                        float room = (hiMm - MARGIN_MM) - predMm[axis];
+                        if (room < 0.0f) room = 0.0f;
+                        if (distMm > room) distMm = room;
+                    } else if (distMm < 0.0f) {
+                        float room = (loMm + MARGIN_MM) - predMm[axis];
+                        if (room > 0.0f) room = 0.0f;
+                        if (distMm < room) distMm = room;
+                    }
+
+                    distance = pendantMachine.inInches ? distMm / 25.4f : distMm;
+                    // Fully blocked at the limit — drop the tick instead of emitting a no-op jog.
+                    if (fabsf(distance) < 1e-4f) return;
+                    predMm[axis] += distMm;   // commit the queued distance to the prediction
+                }
+            }
+
             char   cmd[64];
             if (pendantMachine.inInches) {
                 int maxIn = constrain((int)(pendantJog.maxFeedRate / 25.4f), 40, 400);
@@ -595,12 +661,10 @@ static void handleEncoderDelta(int32_t delta) {
             drawProbeScreen();
 
         } else if (currentPendantScreen == PSCREEN_PROBE_CFG_3D) {
-            // 0=ballDia 1=stylusLen 2=deflection 3=preTravel
-            float step = probeDialStep(delta, (fo <= 1) ? 0.1f : 0.001f);
+            // 0=ballDia 1=deflection
+            float step = probeDialStep(delta, (fo == 0) ? 0.1f : 0.001f);
             if (fo == 0) p.ballDia   = constrain(p.ballDia   + delta * step,  0.1f,  20.0f);
-            if (fo == 1) p.stylusLen = constrain(p.stylusLen + delta * step,  1.0f, 100.0f);
-            if (fo == 2) p.deflection= constrain(p.deflection+ delta * step,  0.0f,   1.0f);
-            if (fo == 3) p.preTravel = constrain(p.preTravel + delta * step,  0.0f,   1.0f);
+            if (fo == 1) p.deflection= constrain(p.deflection+ delta * step,  0.0f,   1.0f);
             drawProbeCfg3DScreen();
 
         } else if (currentPendantScreen == PSCREEN_PROBE_CFG_PLATE) {
@@ -757,6 +821,7 @@ static IntConfigItem jogMaxTravelX  ("$130");
 static IntConfigItem jogMaxTravelY  ("$131");
 static IntConfigItem jogMaxTravelZ  ("$132");
 static IntConfigItem jogMaxTravelA  ("$133");
+static IntConfigItem jogHomingDirMask("$23");   // homing direction invert mask (envelope sign, per axis)
 
 // Called from loop_pendant() when HwEvent::CONNECTED arrives.
 // FluidNC version, IP address, WiFi SSID arrive automatically via [VER:] / status
@@ -795,6 +860,7 @@ static void requestControllerConfig() {
     sendQueryRaw("$131");      // Y travel
     sendQueryRaw("$132");      // Z travel
     sendQueryRaw("$133");      // A travel
+    sendQueryRaw("$23");       // homing direction mask (per-axis envelope sign)
     rtcCore1Stage = 208;       // requestControllerConfig done
 }
 
@@ -1036,6 +1102,9 @@ public:
         if (jogMaxTravelY.known()) { int v = jogMaxTravelY.get(); if (v > 0) pendantJog.maxTravel[1] = v; }
         if (jogMaxTravelZ.known()) { int v = jogMaxTravelZ.get(); if (v > 0) pendantJog.maxTravel[2] = v; }
         if (jogMaxTravelA.known()) { int v = jogMaxTravelA.get(); if (v > 0) pendantJog.maxTravel[3] = v; }
+        // $23 homing direction mask — 0 is a valid value (all axes home +), so key
+        // off known() rather than a >0 guard.  Drives the per-axis jog envelope sign.
+        if (jogHomingDirMask.known()) pendantJog.homingDirMask = jogHomingDirMask.get();
 
         // Macro list is populated in onFilesList() when $File/SendJSON response arrives
         if (hwEventQueue) {

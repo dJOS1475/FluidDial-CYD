@@ -10,7 +10,7 @@ function exitProbeZ() {}
 function runProbeZ() {
   if (!pendantConnected) return;
   const pNum = pendantProbing.selectedCoordIndex + 1;
-  const zOffset = probeIs3D() ? pendantProbeV2.ballDia / 2.0 : pendantProbeV2.plateThick;
+  const zOffset = probeIs3D() ? probeTipOffset3D() : pendantProbeV2.plateThick;
   probeActivateWcs();          // zero into the system shown on screen
   send_line("G91 G21");
   // Two-pass: fast seek down to the surface, then slow re-probe for precision.
@@ -25,8 +25,8 @@ function runProbeZ() {
 function drawZParamButton(x, y, w, h, label, valueMm, focused) {
   const inInch = pendantMachine.inInches;
   const bg = focused ? PROBE_SEL_BG : PROBE_BG_SCREEN;
-  const bdr = focused ? PROBE_C_YELLOW : PROBE_C_DIMBLUE;
-  const vc = focused ? PROBE_C_YELLOW : PROBE_C_RED;
+  const bdr = focused ? PROBE_C_YELLOW : PROBE_C_TAPBDR;
+  const vc = focused ? PROBE_C_YELLOW : PROBE_C_BLUE;
   display.fillRoundRect(x, y, w, h, 8, bg);
   display.drawRoundRect(x, y, w, h, 8, bdr);
   display.setTextSize(1);

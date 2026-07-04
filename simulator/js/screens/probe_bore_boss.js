@@ -2,14 +2,11 @@
  *
  * Both find the XY centre of a round feature and set X0/Y0 only — Z work-zero is
  * handled by the Z Surface probe.  Every wall is reached with a G38.2 two-pass
- * (fast seek + slow re-probe), never a blind rapid, and the X centre is found
- * before the Y pair so Y runs through the true diameter. */
-
-// Three probe directions, 120° apart (unit vectors). Shared by bore (outward)
-// and boss (inward = negated).
-const kDir3 = [[0.0, 1.0], [-0.866025, -0.5], [0.866025, -0.5]];
-const kPX = ["#<ax>", "#<bx>", "#<cx>"];
-const kPY = ["#<ay>", "#<by>", "#<cy>"];
+ * (fast seek + slow re-probe), never a blind rapid.  Four points are probed at
+ * 90° (±X, ±Y); the centre is the midpoint of each opposed pair, which cancels
+ * the tip radius per axis and needs no division.  The X pair is probed first;
+ * the tool re-centres in X before the Y pair so the +Y/-Y probes run through the
+ * true vertical diameter and contact head-on even from an off-centre start. */
 
 // Two-pass probe along a unit direction (ux,uy): fast seek, back off, slow
 // re-probe. Ends at the fine trigger (machine pos in #5061/#5062). G91.
@@ -20,16 +17,16 @@ function probeRadial2Pass(ux, uy, seekDist, seekF, fineF) {
   send_line(`G38.2 G91 X${fmtF((BACKOFF + 1) * ux, 3)} Y${fmtF((BACKOFF + 1) * uy, 3)} F${fmtF(fineF, 0)}`);
 }
 
-// From the 3 saved machine-coord points, fit the circle circumcentre (determinant
-// form), G53-move to it, and zero X/Y there.
-function emitCircleCentreAndZero(pNum) {
-  send_line("#<a2> = [#<ax>*#<ax> + #<ay>*#<ay>]");
-  send_line("#<b2> = [#<bx>*#<bx> + #<by>*#<by>]");
-  send_line("#<c2> = [#<cx>*#<cx> + #<cy>*#<cy>]");
-  send_line("#<dd> = [2 * [#<ax>*[#<by>-#<cy>] + #<bx>*[#<cy>-#<ay>] + #<cx>*[#<ay>-#<by>]]]");
-  send_line("#<ux> = [[#<a2>*[#<by>-#<cy>] + #<b2>*[#<cy>-#<ay>] + #<c2>*[#<ay>-#<by>]] / #<dd>]");
-  send_line("#<uy> = [[#<a2>*[#<cx>-#<bx>] + #<b2>*[#<ax>-#<cx>] + #<c2>*[#<bx>-#<ax>]] / #<dd>]");
-  send_line("G53 G0 X#<ux> Y#<uy>");
+// Two-pass probe along (ux,uy), then store the along-axis machine-coord result:
+// axisX -> #5061 (X wall), else #5062 (Y wall).
+function probeWallStore(ux, uy, seek, seekF, fineF, storeVar, axisX) {
+  probeRadial2Pass(ux, uy, seek, seekF, fineF);
+  send_line(`${storeVar} = #${axisX ? "5061" : "5062"}`);
+}
+
+// Move to the found centre (machine #<xc>,#<yc>) and zero X/Y there.
+function emitMoveCentreZero(pNum) {
+  send_line("G53 G0 X#<xc> Y#<yc>");
   send_line(`G10 L20 P${pNum} X0 Y0`);
 }
 
@@ -51,13 +48,19 @@ function runProbeBore() {
   send_line("G21 G90");
   send_line("#<sx> = #5420");
   send_line("#<sy> = #5421");
-  for (let i = 0; i < 3; i++) {
-    probeRadial2Pass(kDir3[i][0], kDir3[i][1], d, seekF, fineF);
-    send_line(`${kPX[i]} = #5061`);
-    send_line(`${kPY[i]} = #5062`);
-    send_line("G90 G0 X#<sx> Y#<sy> F1000");
-  }
-  emitCircleCentreAndZero(pNum);
+  // X pair along Y = start, average to the centre X, then re-centre X.
+  probeWallStore(1.0, 0.0, d, seekF, fineF, "#<ax>", true);
+  send_line("G90 G0 X#<sx> Y#<sy> F1000");
+  probeWallStore(-1.0, 0.0, d, seekF, fineF, "#<cx>", true);
+  send_line("G90 G0 X#<sx> Y#<sy> F1000");
+  send_line("#<xc> = [[#<ax> + #<cx>] / 2]");
+  send_line("G53 G0 X#<xc>");                   // re-centre X (Y stays at start)
+  // Y pair through the centred X (true vertical diameter).
+  probeWallStore(0.0, 1.0, d, seekF, fineF, "#<by>", false);
+  send_line("G90 G0 Y#<sy> F1000");             // Y back to start (X stays centred)
+  probeWallStore(0.0, -1.0, d, seekF, fineF, "#<dy>", false);
+  send_line("#<yc> = [[#<by> + #<dy>] / 2]");
+  emitMoveCentreZero(pNum);
 }
 
 // Top-down diagram of bore probing: hole outline, outward arrows to the walls,
@@ -85,14 +88,14 @@ function drawProbeBoreScreen() {
   display.fillRoundRect(5, 70, 230, 146, 4, PROBE_BG_PANEL);
   display.setTextSize(1); display.setTextColor(PROBE_C_LBLUE);
   display.setCursor(10, 73); display.print("SEQUENCE");
-  drawSeqStep(8, 87, 1, "Probe 3 points", true);
+  drawSeqStep(8, 87, 1, "Probe 4 points", true);
   drawSeqStep(8, 105, 2, "Find centre", false);
   drawSeqStep(8, 123, 3, "Set X0 Y0", false);
   drawBoreDiagram();
   display.setTextSize(1); display.setTextColor(PROBE_C_LBLUE);
   display.setCursor(122, 73); display.print("SETTINGS");
   const fo = pendantProbeV2.focusedField;
-  probeDrawKVTouch(122, 84, 111, 27, "Nominal dia.", pendantProbeV2.boreDia, "mm", PROBE_C_YELLOW, fo === 0, 3);
+  probeDrawKVTouch(122, 84, 111, 27, "Nominal dia.", pendantProbeV2.boreDia, "mm", PROBE_C_BLUE, fo === 0, 3);
   probeDrawKVTouch(122, 113, 111, 27, "Wall offset", pendantProbeV2.boreOffset, "mm", PROBE_C_BLUE, fo === 1, 3);
   display.setTextSize(1);
   {
@@ -112,7 +115,7 @@ function drawProbeBoreScreen() {
     display.setCursor(177 - (display.textWidth(c) / 2 | 0), 196);
     display.print(c);
   }
-  probeDrawWarn(220, "! Place tip inside the bore", true);
+  probeDrawWarn(220, "! Place tip inside the bore");
   drawButton(5, 239, 112, 38, "Back", PROBE_BTN_BLUE, COLOR_WHITE, 2);
   probeDrawWorkAreaButton(123, 239, 112, 38);
   drawButton(5, 280, 112, 38, "Main Menu", PROBE_BTN_BLUE, COLOR_WHITE, 2);
@@ -152,13 +155,22 @@ function enterProbeBoss() {
 }
 function exitProbeBoss() {}
 
+// One boss wall: move clear along (ux,uy) at safe Z, plunge beside the boss,
+// two-pass probe INWARD (-ux,-uy), store the along-axis result, then lift.
+function bossWallStore(ux, uy, out, inSeek, plunge, seekF, fineF, storeVar, axisX) {
+  send_line(`G0 G91 X${fmtF(out * ux, 3)} Y${fmtF(out * uy, 3)} F1000`);
+  send_line(`G0 G91 Z-${fmtF(plunge, 3)} F500`);
+  probeWallStore(-ux, -uy, inSeek, seekF, fineF, storeVar, axisX);   // inward
+  send_line(`G0 G91 Z${fmtF(plunge, 3)} F500`);                      // lift
+}
+
 function runProbeBoss() {
   if (!pendantConnected) return;
   const p = pendantProbeV2;
   const pNum = pendantProbing.selectedCoordIndex + 1;
   const seekF = p.seekRate, fineF = p.probeRate, depth = p.bossDepth, rad = p.bossDia / 2, clear = p.bossClear;
   const retZ = p.retractDist, maxZ = p.maxZTravel;
-  const platZ = probeIs3D() ? p.ballDia / 2 : p.plateThick;
+  const platZ = probeIs3D() ? probeTipOffset3D() : p.plateThick;
   const out = rad + clear, inSeek = clear + rad + 5, plunge = depth + retZ;
   probeActivateWcs();          // zero into the system shown on screen
   send_line("G21 G90");
@@ -172,17 +184,19 @@ function runProbeBoss() {
   send_line("G91");
   send_line(`G0 Z${fmtF(retZ, 3)} F500`);
   send_line("G90");
-  for (let i = 0; i < 3; i++) {
-    const ux = kDir3[i][0], uy = kDir3[i][1];
-    send_line(`G0 G91 X${fmtF(out * ux, 3)} Y${fmtF(out * uy, 3)} F1000`);
-    send_line(`G0 G91 Z-${fmtF(plunge, 3)} F500`);
-    probeRadial2Pass(-ux, -uy, inSeek, seekF, fineF);
-    send_line(`${kPX[i]} = #5061`);
-    send_line(`${kPY[i]} = #5062`);
-    send_line(`G0 G91 Z${fmtF(plunge, 3)} F500`);
-    send_line("G90 G0 X#<sx> Y#<sy> F1000");
-  }
-  emitCircleCentreAndZero(pNum);   // sets X0 Y0; Z0 already set at the top
+  // X pair along Y = start, average to the centre X, then re-centre X.
+  bossWallStore(1.0, 0.0, out, inSeek, plunge, seekF, fineF, "#<ax>", true);
+  send_line("G90 G0 X#<sx> Y#<sy> F1000");
+  bossWallStore(-1.0, 0.0, out, inSeek, plunge, seekF, fineF, "#<cx>", true);
+  send_line("G90 G0 X#<sx> Y#<sy> F1000");
+  send_line("#<xc> = [[#<ax> + #<cx>] / 2]");
+  send_line("G53 G0 X#<xc>");                   // re-centre X at safe Z (Y at start)
+  // Y pair through the centred X (true vertical diameter).
+  bossWallStore(0.0, 1.0, out, inSeek, plunge, seekF, fineF, "#<by>", false);
+  send_line("G90 G0 Y#<sy> F1000");             // Y back to start (X stays centred)
+  bossWallStore(0.0, -1.0, out, inSeek, plunge, seekF, fineF, "#<dy>", false);
+  send_line("#<yc> = [[#<by> + #<dy>] / 2]");
+  emitMoveCentreZero(pNum);   // sets X0 Y0; Z0 already set at the top
 }
 
 // Side-view diagram of boss probing: stylus touching the raised top (Z0) and
@@ -213,14 +227,14 @@ function drawProbeBossScreen() {
   display.setTextSize(1); display.setTextColor(PROBE_C_LBLUE);
   display.setCursor(10, 73); display.print("SEQUENCE");
   drawSeqStep(8, 87, 1, "Touch top->Z0", true);
-  drawSeqStep(8, 105, 2, "Probe 3 points", false);
+  drawSeqStep(8, 105, 2, "Probe 4 points", false);
   drawSeqStep(8, 123, 3, "Set X0 Y0", false);
   drawBossDiagram();
   display.setTextSize(1); display.setTextColor(PROBE_C_LBLUE);
   display.setCursor(122, 73); display.print("SETTINGS");
   const fo = pendantProbeV2.focusedField;
-  probeDrawKVTouch(122, 84, 111, 27, "Nominal dia.", pendantProbeV2.bossDia, "mm", PROBE_C_YELLOW, fo === 0, 3);
-  probeDrawKVTouch(122, 113, 111, 27, "Probe depth", pendantProbeV2.bossDepth, "mm", PROBE_C_RED, fo === 1, 3);
+  probeDrawKVTouch(122, 84, 111, 27, "Nominal dia.", pendantProbeV2.bossDia, "mm", PROBE_C_BLUE, fo === 0, 3);
+  probeDrawKVTouch(122, 113, 111, 27, "Probe depth", pendantProbeV2.bossDepth, "mm", PROBE_C_BLUE, fo === 1, 3);
   probeDrawKVTouch(122, 142, 111, 27, "Clearance", pendantProbeV2.bossClear, "mm", PROBE_C_BLUE, fo === 2, 3);
   {
     const s = "Sets X0 Y0 Z0";

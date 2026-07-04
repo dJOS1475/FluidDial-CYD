@@ -14,10 +14,10 @@ function runProbeCorner() {
   const rate = p.probeRate, seekF = p.seekRate, depth = p.cornerDepth, over = p.cornerOver, retXY = p.cornerRetXY;
   const retZ = p.retractDist, maxZ = p.maxZTravel;
   const is3D = probeIs3D();
-  const platZ = is3D ? p.ballDia / 2 : p.plateThick;
+  const platZ = is3D ? probeTipOffset3D() : p.plateThick;
   // XY edge comp: ball radius (3D) or the XYZ plate's wall thickness per axis.
-  const edgeOfsX = is3D ? p.ballDia / 2 : p.plateOffX;
-  const edgeOfsY = is3D ? p.ballDia / 2 : p.plateOffY;
+  const edgeOfsX = is3D ? probeTipOffset3D() : p.plateOffX;
+  const edgeOfsY = is3D ? probeTipOffset3D() : p.plateOffY;
   const cIdx = p.cornerIdx;
   const xDir = cIdx === 0 || cIdx === 2 ? 1 : -1;
   const yDir = cIdx === 0 || cIdx === 1 ? 1 : -1;
@@ -86,23 +86,19 @@ function drawProbeCornerScreen() {
   // Right column: settings
   display.setTextSize(1); display.setTextColor(PROBE_C_LBLUE);
   display.setCursor(122, 73); display.print("SETTINGS");
-  // Corner selector (tap to cycle)
-  display.fillRoundRect(122, 84, 111, 27, 4, PROBE_BG_PANEL);
-  display.drawRoundRect(122, 84, 111, 27, 4, PROBE_C_YELLOW);
+  // Corner selector (tap to cycle) — shared tappable-field style; the result
+  // line was removed (sequence step 3 already reads "Set X0 Y0 Z0") so all four
+  // controls get taller, evenly spaced targets.
+  display.fillRoundRect(122, 84, 111, 31, 2, PROBE_BG_SCREEN);
+  display.drawRoundRect(122, 84, 111, 31, 2, PROBE_C_TAPBDR);
   display.setTextColor(PROBE_C_LBLUE);
-  display.setCursor(127, 87); display.print("CORNER");
-  display.setTextColor(PROBE_C_YELLOW);
-  display.setCursor(127, 98); display.print(cornerLabels[pendantProbeV2.cornerIdx]);
+  display.setCursor(125, 87); display.print("CORNER");
+  display.setTextColor(PROBE_C_BLUE);
+  display.setCursor(125, 101); display.print(cornerLabels[pendantProbeV2.cornerIdx]);
   const fo = pendantProbeV2.focusedField;
-  probeDrawKVTouch(122, 113, 111, 27, "Probe depth", pendantProbeV2.cornerDepth, "mm", PROBE_C_RED, fo === 0, 3);
-  probeDrawKVTouch(122, 142, 111, 27, "Overshoot", pendantProbeV2.cornerOver, "mm", PROBE_C_BLUE, fo === 1, 3);
-  probeDrawKVTouch(122, 171, 111, 27, "XY retract", pendantProbeV2.cornerRetXY, "mm", PROBE_C_BLUE, fo === 2, 3);
-  {
-    const s = "Sets X0 Y0 Z0";
-    display.setTextSize(1); display.setTextColor(PROBE_C_GREEN);
-    display.setCursor(177 - (display.textWidth(s) / 2 | 0), 203);
-    display.print(s);
-  }
+  probeDrawKVTouch(122, 117, 111, 31, "Probe depth", pendantProbeV2.cornerDepth, "mm", PROBE_C_BLUE, fo === 0, 3);
+  probeDrawKVTouch(122, 150, 111, 31, "Overshoot", pendantProbeV2.cornerOver, "mm", PROBE_C_BLUE, fo === 1, 3);
+  probeDrawKVTouch(122, 183, 111, 31, "XY retract", pendantProbeV2.cornerRetXY, "mm", PROBE_C_BLUE, fo === 2, 3);
   probeDrawWarn(220, "! Position probe above corner edge");
   drawButton(5, 239, 112, 38, "Back", PROBE_BTN_BLUE, COLOR_WHITE, 2);
   probeDrawWorkAreaButton(123, 239, 112, 38);
@@ -122,11 +118,11 @@ function handleProbeCornerTouch(x, y) {
     else if (isTouchInBounds(x, y, 114, 175, 98, 32)) { pendantProbeV2.confirmActive = false; runProbeCorner(); currentPendantScreen = PSCREEN_STATUS; }
     return;
   }
-  if (isTouchInBounds(x, y, 122, 84, 111, 27)) { pendantProbeV2.cornerIdx = (pendantProbeV2.cornerIdx + 1) % 4; drawProbeCornerScreen(); return; }
+  if (isTouchInBounds(x, y, 122, 84, 111, 31)) { pendantProbeV2.cornerIdx = (pendantProbeV2.cornerIdx + 1) % 4; drawProbeCornerScreen(); return; }
   let redraw = false;
-  if (isTouchInBounds(x, y, 122, 113, 111, 27)) { pendantProbeV2.focusedField = pendantProbeV2.focusedField === 0 ? -1 : 0; redraw = true; }
-  if (isTouchInBounds(x, y, 122, 142, 111, 27)) { pendantProbeV2.focusedField = pendantProbeV2.focusedField === 1 ? -1 : 1; redraw = true; }
-  if (isTouchInBounds(x, y, 122, 171, 111, 27)) { pendantProbeV2.focusedField = pendantProbeV2.focusedField === 2 ? -1 : 2; redraw = true; }
+  if (isTouchInBounds(x, y, 122, 117, 111, 31)) { pendantProbeV2.focusedField = pendantProbeV2.focusedField === 0 ? -1 : 0; redraw = true; }
+  if (isTouchInBounds(x, y, 122, 150, 111, 31)) { pendantProbeV2.focusedField = pendantProbeV2.focusedField === 1 ? -1 : 1; redraw = true; }
+  if (isTouchInBounds(x, y, 122, 183, 111, 31)) { pendantProbeV2.focusedField = pendantProbeV2.focusedField === 2 ? -1 : 2; redraw = true; }
   if (redraw) { drawProbeCornerScreen(); return; }
   if (isTouchInBounds(x, y, 5, 239, 112, 38)) { pendantProbeV2.returnScreen = PSCREEN_PROBE_CORNER; currentPendantScreen = PSCREEN_PROBE; return; }
   if (isTouchInBounds(x, y, 123, 239, 112, 38)) { probeCycleWorkArea(); drawProbeCornerScreen(); return; }

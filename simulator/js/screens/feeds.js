@@ -56,7 +56,7 @@ function updateFeedsSpeedsTopDisplay() {
 // highlight (yellow) while the dial is active.
 function drawDialField(g, ox, oy, w, h, value, valColor, active) {
   const bg = active ? PROBE_SEL_BG : PROBE_BG_SCREEN;
-  const bdr = active ? PROBE_C_YELLOW : PROBE_C_DIMBLUE;
+  const bdr = active ? PROBE_C_YELLOW : PROBE_C_TAPBDR;
   g.fillRect(ox, oy, w, h, COLOR_BACKGROUND);
   g.fillRoundRect(ox, oy, w, h, 2, bg);
   g.drawRoundRect(ox, oy, w, h, 2, bdr);

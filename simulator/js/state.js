@@ -41,7 +41,7 @@ const pendantMachine = {
   rotation: 2,
   spindleMaxRPM: 24000,
   spindleMinRPM: 0,
-  fluidDialVersion: "v2.1.2",
+  fluidDialVersion: "v2.1.3",
   fluidNCVersion: "v3.7.16",
   baudRate: "1000000",
   port: "UART0",
@@ -71,6 +71,7 @@ const pendantJog = {
   jogSpeedIn: 200,
   maxFeedRate: 10000,
   maxTravel: [0, 0, 0, 0],
+  homingDirMask: -1,   // $23 homing direction mask; -1 = unknown (see sim.js jog clamp)
 };
 
 const pendantSdCard = {
@@ -123,9 +124,7 @@ const pendantProbeV2 = {
   retractDist: 5.0,
   maxZTravel: 40.0,
   ballDia: 2.0,
-  stylusLen: 22.0,
-  deflection: 0.01,
-  preTravel: 0.005,
+  deflection: 0.0,
   plateThick: 10.0,
   plateWidth: 50.0,
   plateOffX: 0.0,

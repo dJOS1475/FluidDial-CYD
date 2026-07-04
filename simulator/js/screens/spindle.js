@@ -20,7 +20,7 @@ function fmtRPM(rpm) {
 function drawSpindleDialButton() {
   const active = pendantSpindle.dialMode;
   display.fillRoundRect(179, 163, 56, 37, 2, active ? PROBE_SEL_BG : PROBE_BG_SCREEN);
-  display.drawRoundRect(179, 163, 56, 37, 2, active ? PROBE_C_YELLOW : PROBE_C_DIMBLUE);
+  display.drawRoundRect(179, 163, 56, 37, 2, active ? PROBE_C_YELLOW : PROBE_C_TAPBDR);
   display.setTextSize(2);
   display.setTextColor(active ? PROBE_C_YELLOW : COLOR_TEAL_BRIGHT);
   const tw = display.textWidth("Dial");

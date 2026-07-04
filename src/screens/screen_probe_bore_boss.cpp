@@ -1,11 +1,18 @@
 /*
  * screen_probe_bore_boss.cpp  —  SCR3a: Bore / SCR3b: Boss
  *
- * Both routines find the XY centre of a round feature by probing THREE points
- * radially (120° apart) and fitting a circle through them (circumcentre).  Each
+ * Both routines find the XY centre of a round feature by probing FOUR points
+ * radially at 90° (±X, ±Y) and averaging the two opposed pairs: the centre is
+ * simply the midpoint of the +X/−X touches (X) and the +Y/−Y touches (Y).  Each
  * point is a crash-safe two-pass move (fast seek + slow re-probe) approaching the
- * wall RADIALLY, so contact is perpendicular to the curve — no tangential skid,
- * and it stays exact even if the operator didn't start dead-centre.
+ * wall RADIALLY, so contact is perpendicular to the curve — no tangential skid.
+ * Opposed pairs also cancel the probe tip radius / deflection per axis, so no
+ * ball-radius compensation is needed, and the maths is division-free (unlike a
+ * three-point circumcentre, which can divide by a near-zero triangle area).
+ *
+ * The X pair is probed first; the tool then RE-CENTRES in X before the Y pair, so
+ * the +Y/−Y probes run through the true vertical diameter and contact each wall
+ * head-on even if the operator started well off-centre.
  *
  * Coordinate frames: FluidNC returns G38 probe results (#5061/#5062) in MACHINE
  * coordinates, so the centre maths and the final move are done in machine coords
@@ -14,15 +21,16 @@
  *
  * BORE (inside circle):
  *   Operator places the probe tip INSIDE the bore at any comfortable depth.  No Z
- *   motion — Z work-zero is handled separately by the Z Surface probe.  Probe 3
- *   points outward, compute the centre, G53 move to it, G10 L20 sets X0 Y0.
+ *   motion — Z work-zero is handled separately by the Z Surface probe.  Probe 4
+ *   points outward, average the pairs, G53 move to the centre, G10 L20 sets X0 Y0.
  *
  * BOSS (outside circle):
  *   Operator starts above the boss centre.
  *   1. Touch the flat top and set Z0 there (the top is the natural Z datum).
- *   2. For each of 3 directions: move clear, plunge beside the boss, two-pass
+ *   2. For each of 4 directions: move clear, plunge beside the boss, two-pass
  *      probe inward.
- *   3. Compute the centre, G53 move to it, G10 L20 sets X0 Y0 (Z0 already set).
+ *   3. Average the opposed pairs, G53 move to the centre, G10 L20 sets X0 Y0
+ *      (Z0 already set).
  *
  * focusedField for bore:  0=boreDia  1=boreOffset
  * focusedField for boss:  0=bossDia  1=bossDepth  2=bossClear
@@ -31,12 +39,6 @@
 #include "pendant_shared.h"
 #include "screen_probe.h"
 #include "screen_probe_bore_boss.h"
-
-// Three probe directions, 120° apart (unit vectors).  Shared by bore (outward)
-// and boss (inward = negated).  Chosen so no two contact points coincide.
-static const float kDir3[3][2] = { { 0.0f, 1.0f }, { -0.866025f, -0.5f }, { 0.866025f, -0.5f } };
-static const char* kPX[3] = { "#<ax>", "#<bx>", "#<cx>" };
-static const char* kPY[3] = { "#<ay>", "#<by>", "#<cy>" };
 
 // Two-pass probe along a unit direction (ux,uy): fast seek to contact, back off,
 // slow re-probe.  Ends at the fine trigger (machine pos in #5061/#5062).  G91.
@@ -48,17 +50,20 @@ static void probeRadial2Pass(float ux, float uy, float seekDist, float seekF, fl
     snprintf(b, sizeof(b), "G38.2 G91 X%.3f Y%.3f F%.0f", (BACKOFF + 1.0f) * ux, (BACKOFF + 1.0f) * uy, fineF); send_line(b);
 }
 
-// From the three saved machine-coord points (#<ax>..#<cy>), compute the circle
-// circumcentre (determinant form — only divides by the triangle area, so no
-// horizontal-chord singularity), G53-move to it, and zero X/Y there.
-static void emitCircleCentreAndZero(int pNum) {
-    send_line("#<a2> = [#<ax>*#<ax> + #<ay>*#<ay>]");
-    send_line("#<b2> = [#<bx>*#<bx> + #<by>*#<by>]");
-    send_line("#<c2> = [#<cx>*#<cx> + #<cy>*#<cy>]");
-    send_line("#<dd> = [2 * [#<ax>*[#<by>-#<cy>] + #<bx>*[#<cy>-#<ay>] + #<cx>*[#<ay>-#<by>]]]");
-    send_line("#<ux> = [[#<a2>*[#<by>-#<cy>] + #<b2>*[#<cy>-#<ay>] + #<c2>*[#<ay>-#<by>]] / #<dd>]");
-    send_line("#<uy> = [[#<a2>*[#<cx>-#<bx>] + #<b2>*[#<ax>-#<cx>] + #<c2>*[#<bx>-#<ax>]] / #<dd>]");
-    send_line("G53 G0 X#<ux> Y#<uy>");
+// Two-pass probe along (ux,uy), then store the along-axis machine-coord result:
+// axisX -> #5061 (X wall), else #5062 (Y wall).  Only the coordinate on the
+// probe axis is needed for that pair's midpoint.
+static void probeWallStore(float ux, float uy, float seek, float seekF, float fineF,
+                           const char* storeVar, bool axisX) {
+    probeRadial2Pass(ux, uy, seek, seekF, fineF);
+    char b[64];
+    snprintf(b, sizeof(b), "%s = #%s", storeVar, axisX ? "5061" : "5062");
+    send_line(b);
+}
+
+// Move to the found centre (machine #<xc>,#<yc>) and zero X/Y there.
+static void emitMoveCentreZero(int pNum) {
+    send_line("G53 G0 X#<xc> Y#<yc>");
     char b[64];
     snprintf(b, sizeof(b), "G10 L20 P%d X0 Y0", pNum);
     send_line(b);
@@ -80,9 +85,10 @@ void enterProbeBore() {
 
 void exitProbeBore() {}
 
-// ── G-code: bore centre finding (3-point radial) ─────────────────────────────
-// No Z motion — the tip is pre-placed inside the bore.  Probe 3 points radially
-// outward (two-pass), fit the circle, G53-move to the centre and set X0/Y0.
+// ── G-code: bore centre finding (4-point radial) ─────────────────────────────
+// No Z motion — the tip is pre-placed inside the bore.  Probe the ±X pair, re-
+// centre X, then probe the ±Y pair through that centred X (true vertical
+// diameter), average each pair, G53-move to the centre and set X0/Y0.
 
 static void runProbeBore() {
     if (!pendantConnected) return;
@@ -96,20 +102,26 @@ static void runProbeBore() {
     // (the G38.2 stops on contact, so over-estimating is safe).
     float d = 2.0f * rad + wallOf + 3.0f;
 
-    char buf[64];
     probeActivateWcs();          // zero into the system shown on screen
     send_line("G21 G90");
     send_line("#<sx> = #5420");   // save start (work coords) to return between probes
     send_line("#<sy> = #5421");
 
-    for (int i = 0; i < 3; i++) {
-        probeRadial2Pass(kDir3[i][0], kDir3[i][1], d, seekF, fineF);   // outward
-        snprintf(buf, sizeof(buf), "%s = #5061", kPX[i]); send_line(buf);   // machine X
-        snprintf(buf, sizeof(buf), "%s = #5062", kPY[i]); send_line(buf);   // machine Y
-        send_line("G90 G0 X#<sx> Y#<sy> F1000");                            // back to start
-    }
+    // ── X pair: probe +X and −X along Y = start, average to the centre X ──
+    probeWallStore( 1.0f, 0.0f, d, seekF, fineF, "#<ax>", true);
+    send_line("G90 G0 X#<sx> Y#<sy> F1000");                 // back to start
+    probeWallStore(-1.0f, 0.0f, d, seekF, fineF, "#<cx>", true);
+    send_line("G90 G0 X#<sx> Y#<sy> F1000");                 // back to start
+    send_line("#<xc> = [[#<ax> + #<cx>] / 2]");              // machine X of centre
+    send_line("G53 G0 X#<xc>");                              // re-centre X (Y stays at start)
 
-    emitCircleCentreAndZero(pNum);
+    // ── Y pair: probe +Y and −Y through the centred X (true vertical diameter) ──
+    probeWallStore(0.0f,  1.0f, d, seekF, fineF, "#<by>", false);
+    send_line("G90 G0 Y#<sy> F1000");                        // Y back to start (X stays centred)
+    probeWallStore(0.0f, -1.0f, d, seekF, fineF, "#<dy>", false);
+    send_line("#<yc> = [[#<by> + #<dy>] / 2]");              // machine Y of centre
+
+    emitMoveCentreZero(pNum);
 }
 
 // ── Draw helpers (bore) ──────────────────────────────────────────────────────
@@ -148,7 +160,7 @@ void drawProbeBoreScreen() {
     display.setTextColor(PROBE_C_LBLUE);
     display.setCursor(10, 73);
     display.print("SEQUENCE");
-    drawSeqStep( 8, 87,  1, "Probe 3 points", true);
+    drawSeqStep( 8, 87,  1, "Probe 4 points", true);
     drawSeqStep( 8, 105, 2, "Find centre",    false);
     drawSeqStep( 8, 123, 3, "Set X0 Y0",      false);
     drawBoreDiagram();
@@ -160,7 +172,7 @@ void drawProbeBoreScreen() {
     display.print("SETTINGS");
 
     int fo = pendantProbeV2.focusedField;
-    probeDrawKVTouch(122, 84,  111, 27, "Nominal dia.", pendantProbeV2.boreDia,    "mm", PROBE_C_YELLOW,  fo==0, 3);
+    probeDrawKVTouch(122, 84,  111, 27, "Nominal dia.", pendantProbeV2.boreDia,    "mm", PROBE_C_BLUE,  fo==0, 3);
     probeDrawKVTouch(122, 113, 111, 27, "Wall offset",  pendantProbeV2.boreOffset, "mm", PROBE_C_BLUE,    fo==1, 3);
 
     // Right column, centred: result line, then the Z-Surface note.
@@ -183,7 +195,7 @@ void drawProbeBoreScreen() {
         display.print(c);
     }
 
-    probeDrawWarn(220, "! Place tip inside the bore", true);
+    probeDrawWarn(220, "! Place tip inside the bore");
 
     // Bottom-nav row: Back (left) | work-area selector (right)
     drawButton(5, 239, 112, 38, "Back", PROBE_BTN_BLUE, COLOR_WHITE, 2);
@@ -255,10 +267,23 @@ void enterProbeBoss() {
 
 void exitProbeBoss() {}
 
-// ── G-code: boss centre finding (3-point radial) ─────────────────────────────
-// Starts above the boss centre.  Touches the flat top and sets Z0 there.  For
-// each of 3 directions it moves clear, plunges beside the boss, and two-pass
-// probes inward; then fits the circle, G53-moves to the centre and sets X0/Y0.
+// One boss wall: move clear along (ux,uy) at safe Z, plunge beside the boss,
+// two-pass probe INWARD (−ux,−uy), store the along-axis result, then lift back
+// to safe Z.  Leaves XY at the probed wall for the caller to return home.
+static void bossWallStore(float ux, float uy, float out, float inSeek, float plunge,
+                          float seekF, float fineF, const char* storeVar, bool axisX) {
+    char b[80];
+    snprintf(b, sizeof(b), "G0 G91 X%.3f Y%.3f F1000", out * ux, out * uy); send_line(b);
+    snprintf(b, sizeof(b), "G0 G91 Z-%.3f F500", plunge);                   send_line(b);
+    probeWallStore(-ux, -uy, inSeek, seekF, fineF, storeVar, axisX);        // inward
+    snprintf(b, sizeof(b), "G0 G91 Z%.3f F500", plunge);                    send_line(b);  // lift
+}
+
+// ── G-code: boss centre finding (4-point radial) ─────────────────────────────
+// Starts above the boss centre.  Touches the flat top and sets Z0 there.  Probes
+// the ±X pair, re-centres X, then probes the ±Y pair through that centred X
+// (true vertical diameter); averages each pair, G53-moves to the centre and
+// sets X0/Y0.
 
 static void runProbeBoss() {
     if (!pendantConnected) return;
@@ -271,7 +296,7 @@ static void runProbeBoss() {
     float clear = pendantProbeV2.bossClear;
     float retZ  = pendantProbeV2.retractDist;
     float maxZ  = pendantProbeV2.maxZTravel;
-    float platZ = probeIs3D() ? pendantProbeV2.ballDia / 2.0f
+    float platZ = probeIs3D() ? probeTipOffset3D()
                               : pendantProbeV2.plateThick;
 
     float out    = rad + clear;             // radial move to clear the boss
@@ -293,20 +318,23 @@ static void runProbeBoss() {
     snprintf(buf, sizeof(buf), "G0 Z%.3f F500", retZ);             send_line(buf);  // to top+retZ
     send_line("G90");
 
-    // Each direction: move clear (at safe Z), plunge beside the boss, two-pass
-    // probe inward, lift straight up, return to start.
-    for (int i = 0; i < 3; i++) {
-        float ux = kDir3[i][0], uy = kDir3[i][1];
-        snprintf(buf, sizeof(buf), "G0 G91 X%.3f Y%.3f F1000", out * ux, out * uy); send_line(buf);
-        snprintf(buf, sizeof(buf), "G0 G91 Z-%.3f F500", plunge);                    send_line(buf);
-        probeRadial2Pass(-ux, -uy, inSeek, seekF, fineF);   // inward
-        snprintf(buf, sizeof(buf), "%s = #5061", kPX[i]); send_line(buf);
-        snprintf(buf, sizeof(buf), "%s = #5062", kPY[i]); send_line(buf);
-        snprintf(buf, sizeof(buf), "G0 G91 Z%.3f F500", plunge);                     send_line(buf);  // lift
-        send_line("G90 G0 X#<sx> Y#<sy> F1000");                                     // back to start
-    }
+    // Each wall: move clear (at safe Z), plunge beside the boss, two-pass probe
+    // inward, lift straight up, return home.
+    // ── X pair along Y = start ──
+    bossWallStore( 1.0f, 0.0f, out, inSeek, plunge, seekF, fineF, "#<ax>", true);
+    send_line("G90 G0 X#<sx> Y#<sy> F1000");                 // back to start
+    bossWallStore(-1.0f, 0.0f, out, inSeek, plunge, seekF, fineF, "#<cx>", true);
+    send_line("G90 G0 X#<sx> Y#<sy> F1000");                 // back to start
+    send_line("#<xc> = [[#<ax> + #<cx>] / 2]");              // machine X of centre
+    send_line("G53 G0 X#<xc>");                              // re-centre X at safe Z (Y at start)
 
-    emitCircleCentreAndZero(pNum);   // sets X0 Y0; Z0 already set at the top
+    // ── Y pair through the centred X (true vertical diameter) ──
+    bossWallStore(0.0f,  1.0f, out, inSeek, plunge, seekF, fineF, "#<by>", false);
+    send_line("G90 G0 Y#<sy> F1000");                        // Y back to start (X stays centred)
+    bossWallStore(0.0f, -1.0f, out, inSeek, plunge, seekF, fineF, "#<dy>", false);
+    send_line("#<yc> = [[#<by> + #<dy>] / 2]");              // machine Y of centre
+
+    emitMoveCentreZero(pNum);   // sets X0 Y0; Z0 already set at the top
 }
 
 // ── Layout SCR3b ─────────────────────────────────────────────────────────────
@@ -355,7 +383,7 @@ void drawProbeBossScreen() {
     display.setCursor(10, 73);
     display.print("SEQUENCE");
     drawSeqStep( 8, 87,  1, "Touch top->Z0",  true);
-    drawSeqStep( 8, 105, 2, "Probe 3 points", false);
+    drawSeqStep( 8, 105, 2, "Probe 4 points", false);
     drawSeqStep( 8, 123, 3, "Set X0 Y0",      false);
     drawBossDiagram();
 
@@ -366,8 +394,8 @@ void drawProbeBossScreen() {
     display.print("SETTINGS");
 
     int fo = pendantProbeV2.focusedField;
-    probeDrawKVTouch(122, 84,  111, 27, "Nominal dia.", pendantProbeV2.bossDia,   "mm", PROBE_C_YELLOW,  fo==0, 3);
-    probeDrawKVTouch(122, 113, 111, 27, "Probe depth",  pendantProbeV2.bossDepth, "mm", PROBE_C_RED,     fo==1, 3);
+    probeDrawKVTouch(122, 84,  111, 27, "Nominal dia.", pendantProbeV2.bossDia,   "mm", PROBE_C_BLUE,  fo==0, 3);
+    probeDrawKVTouch(122, 113, 111, 27, "Probe depth",  pendantProbeV2.bossDepth, "mm", PROBE_C_BLUE,     fo==1, 3);
     probeDrawKVTouch(122, 142, 111, 27, "Clearance",    pendantProbeV2.bossClear, "mm", PROBE_C_BLUE,    fo==2, 3);
 
     // Result line — what axes the probe will set (in the right column, below clearance)

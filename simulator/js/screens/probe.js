@@ -26,10 +26,10 @@ function drawSharedKVPanel() {
   display.setCursor(10, 84);
   display.print("SHARED SETTINGS");
   const fo = pendantProbeV2.focusedField;
-  probeDrawKVTouch(7, 94, 112, 33, "Probe rate", pendantProbeV2.probeRate, "mm/m", PROBE_C_GREEN, fo === 0, 0);
-  probeDrawKVTouch(122, 94, 111, 33, "Seek rate", pendantProbeV2.seekRate, "mm/m", PROBE_C_GREEN, fo === 1, 0);
+  probeDrawKVTouch(7, 94, 112, 33, "Probe rate", pendantProbeV2.probeRate, "mm/m", PROBE_C_BLUE, fo === 0, 0);
+  probeDrawKVTouch(122, 94, 111, 33, "Seek rate", pendantProbeV2.seekRate, "mm/m", PROBE_C_BLUE, fo === 1, 0);
   probeDrawKVTouch(7, 130, 112, 33, "Retract", pendantProbeV2.retractDist, "mm", PROBE_C_BLUE, fo === 2, 3);
-  probeDrawKVTouch(122, 130, 111, 33, "Max Z trvl", pendantProbeV2.maxZTravel, "mm", PROBE_C_RED, fo === 3, 3);
+  probeDrawKVTouch(122, 130, 111, 33, "Max Z trvl", pendantProbeV2.maxZTravel, "mm", PROBE_C_BLUE, fo === 3, 3);
 }
 
 function drawRoutineButtons() {

@@ -9,7 +9,7 @@
 static void drawSpindleDialButton() {
     bool     active = pendantSpindle.dialMode;
     uint16_t bg     = active ? PROBE_SEL_BG   : PROBE_BG_SCREEN;
-    uint16_t bdr    = active ? PROBE_C_YELLOW : PROBE_C_DIMBLUE;
+    uint16_t bdr    = active ? PROBE_C_YELLOW : PROBE_C_TAPBDR;
     display.fillRoundRect(179, 163, 56, 37, 2, bg);
     display.drawRoundRect(179, 163, 56, 37, 2, bdr);
     display.setTextSize(2);

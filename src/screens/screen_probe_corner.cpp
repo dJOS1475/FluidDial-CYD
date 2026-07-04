@@ -43,13 +43,13 @@ static void runProbeCorner() {
     float retZ    = pendantProbeV2.retractDist;
     float maxZ    = pendantProbeV2.maxZTravel;
     bool  is3D    = probeIs3D();
-    float platZ   = is3D ? (pendantProbeV2.ballDia / 2.0f) : pendantProbeV2.plateThick;
+    float platZ   = is3D ? probeTipOffset3D() : pendantProbeV2.plateThick;
     // XY edge compensation: the contact point sits outside the true workpiece
     // edge by the ball radius (3D probe) or the XYZ plate's wall thickness on
     // each axis (plate).  Both shift the edge the same way in the approach
     // direction, so they use the same sign convention below.
-    float edgeOfsX = is3D ? (pendantProbeV2.ballDia / 2.0f) : pendantProbeV2.plateOffX;
-    float edgeOfsY = is3D ? (pendantProbeV2.ballDia / 2.0f) : pendantProbeV2.plateOffY;
+    float edgeOfsX = is3D ? probeTipOffset3D() : pendantProbeV2.plateOffX;
+    float edgeOfsY = is3D ? probeTipOffset3D() : pendantProbeV2.plateOffY;
 
     int   cIdx    = pendantProbeV2.cornerIdx;   // 0=BotL 1=BotR 2=TopL 3=TopR
 
@@ -185,29 +185,23 @@ void drawProbeCornerScreen() {
     display.setCursor(122, 73);
     display.print("SETTINGS");
 
-    // Corner selector (tap to cycle) — top of the right column
-    display.fillRoundRect(122, 84, 111, 27, 4, PROBE_BG_PANEL);
-    display.drawRoundRect(122, 84, 111, 27, 4, PROBE_C_YELLOW);
+    // Corner selector (tap to cycle) — top of the right column, drawn in the
+    // shared tappable-field style (TAPBDR border; yellow is reserved for focus).
+    // The result line was removed: sequence step 3 already reads "Set X0 Y0 Z0",
+    // freeing the space so all four controls get taller, evenly spaced targets.
+    display.fillRoundRect(122, 84, 111, 31, 2, PROBE_BG_SCREEN);
+    display.drawRoundRect(122, 84, 111, 31, 2, PROBE_C_TAPBDR);
     display.setTextColor(PROBE_C_LBLUE);
-    display.setCursor(127, 87);
+    display.setCursor(125, 87);
     display.print("CORNER");
-    display.setTextColor(PROBE_C_YELLOW);
-    display.setCursor(127, 98);
+    display.setTextColor(PROBE_C_BLUE);
+    display.setCursor(125, 101);
     display.print(cornerLabels[pendantProbeV2.cornerIdx]);
 
     int fo = pendantProbeV2.focusedField;
-    probeDrawKVTouch(122, 113, 111, 27, "Probe depth", pendantProbeV2.cornerDepth, "mm", PROBE_C_RED,  fo==0, 3);
-    probeDrawKVTouch(122, 142, 111, 27, "Overshoot",   pendantProbeV2.cornerOver,  "mm", PROBE_C_BLUE, fo==1, 3);
-    probeDrawKVTouch(122, 171, 111, 27, "XY retract",  pendantProbeV2.cornerRetXY, "mm", PROBE_C_BLUE, fo==2, 3);
-
-    // Result line — what the probe will set
-    {
-        const char* s = "Sets X0 Y0 Z0";
-        display.setTextSize(1);
-        display.setTextColor(PROBE_C_GREEN);
-        display.setCursor(177 - display.textWidth(s) / 2, 203);
-        display.print(s);
-    }
+    probeDrawKVTouch(122, 117, 111, 31, "Probe depth", pendantProbeV2.cornerDepth, "mm", PROBE_C_BLUE, fo==0, 3);
+    probeDrawKVTouch(122, 150, 111, 31, "Overshoot",   pendantProbeV2.cornerOver,  "mm", PROBE_C_BLUE, fo==1, 3);
+    probeDrawKVTouch(122, 183, 111, 31, "XY retract",  pendantProbeV2.cornerRetXY, "mm", PROBE_C_BLUE, fo==2, 3);
 
     probeDrawWarn(220, "! Position probe above corner edge");
 
@@ -241,7 +235,7 @@ void handleProbeCornerTouch(int x, int y) {
     }
 
     // CORNER cycle button (top of right column)
-    if (isTouchInBounds(x, y, 122, 84, 111, 27)) {
+    if (isTouchInBounds(x, y, 122, 84, 111, 31)) {
         pendantProbeV2.cornerIdx = (pendantProbeV2.cornerIdx + 1) % 4;
         drawProbeCornerScreen();
         return;
@@ -249,9 +243,9 @@ void handleProbeCornerTouch(int x, int y) {
 
     // KV fields (right column)
     bool redraw = false;
-    if (isTouchInBounds(x, y, 122, 113, 111, 27)) { pendantProbeV2.focusedField = (pendantProbeV2.focusedField==0)?-1:0; redraw=true; }
-    if (isTouchInBounds(x, y, 122, 142, 111, 27)) { pendantProbeV2.focusedField = (pendantProbeV2.focusedField==1)?-1:1; redraw=true; }
-    if (isTouchInBounds(x, y, 122, 171, 111, 27)) { pendantProbeV2.focusedField = (pendantProbeV2.focusedField==2)?-1:2; redraw=true; }
+    if (isTouchInBounds(x, y, 122, 117, 111, 31)) { pendantProbeV2.focusedField = (pendantProbeV2.focusedField==0)?-1:0; redraw=true; }
+    if (isTouchInBounds(x, y, 122, 150, 111, 31)) { pendantProbeV2.focusedField = (pendantProbeV2.focusedField==1)?-1:1; redraw=true; }
+    if (isTouchInBounds(x, y, 122, 183, 111, 31)) { pendantProbeV2.focusedField = (pendantProbeV2.focusedField==2)?-1:2; redraw=true; }
     if (redraw) { drawProbeCornerScreen(); return; }
 
     // Back → config hub

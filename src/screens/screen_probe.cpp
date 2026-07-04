@@ -28,9 +28,7 @@ void saveProbeSettings() {
     preferences.putFloat("retractDist", pendantProbeV2.retractDist);
     preferences.putFloat("maxZTravel",  pendantProbeV2.maxZTravel);
     preferences.putFloat("ballDia",     pendantProbeV2.ballDia);
-    preferences.putFloat("stylusLen",   pendantProbeV2.stylusLen);
     preferences.putFloat("deflection",  pendantProbeV2.deflection);
-    preferences.putFloat("preTravel",   pendantProbeV2.preTravel);
     preferences.putFloat("plateThick",  pendantProbeV2.plateThick);
     preferences.putFloat("plateWidth",  pendantProbeV2.plateWidth);
     preferences.putFloat("plateOffX",   pendantProbeV2.plateOffX);
@@ -59,9 +57,7 @@ void loadProbeSettings() {
     pendantProbeV2.retractDist  = preferences.getFloat("retractDist", 20.0f);
     pendantProbeV2.maxZTravel   = preferences.getFloat("maxZTravel",  20.0f);
     pendantProbeV2.ballDia      = preferences.getFloat("ballDia",      2.0f);
-    pendantProbeV2.stylusLen    = preferences.getFloat("stylusLen",   22.0f);
-    pendantProbeV2.deflection   = preferences.getFloat("deflection",   0.010f);
-    pendantProbeV2.preTravel    = preferences.getFloat("preTravel",    0.005f);
+    pendantProbeV2.deflection   = preferences.getFloat("deflection",   0.0f);
     pendantProbeV2.plateThick   = preferences.getFloat("plateThick",  10.0f);
     pendantProbeV2.plateWidth   = preferences.getFloat("plateWidth",  50.0f);
     pendantProbeV2.plateOffX    = preferences.getFloat("plateOffX",    0.0f);
@@ -236,7 +232,7 @@ void probeDrawKVTouch(int x, int y, int w, int h,
                       const char* label, float value, const char* unit,
                       uint16_t valColor, bool focused, int decimals) {
     uint16_t bg  = focused ? PROBE_SEL_BG : PROBE_BG_SCREEN;
-    uint16_t bdr = focused ? PROBE_C_YELLOW : PROBE_C_DIMBLUE;
+    uint16_t bdr = focused ? PROBE_C_YELLOW : PROBE_C_TAPBDR;
     display.fillRoundRect(x, y, w, h, 2, bg);
     display.drawRoundRect(x, y, w, h, 2, bdr);
     display.setTextSize(1);
@@ -265,7 +261,7 @@ void probeDrawKVTouchInt(int x, int y, int w, int h,
                          const char* label, int value,
                          uint16_t valColor, bool focused) {
     uint16_t bg  = focused ? PROBE_SEL_BG : PROBE_BG_SCREEN;
-    uint16_t bdr = focused ? PROBE_C_YELLOW : PROBE_C_DIMBLUE;
+    uint16_t bdr = focused ? PROBE_C_YELLOW : PROBE_C_TAPBDR;
     display.fillRoundRect(x, y, w, h, 2, bg);
     display.drawRoundRect(x, y, w, h, 2, bdr);
     display.setTextSize(1);
@@ -348,7 +344,7 @@ void probeSeekFine(const char* axis, float seekDist, float seekF, float fineF) {
 // the probe zeroes can be cycled from each one.
 void probeDrawWorkAreaButton(int x, int y, int w, int h) {
     display.fillRoundRect(x, y, w, h, 8, PROBE_BG_SCREEN);
-    display.drawRoundRect(x, y, w, h, 8, PROBE_C_DIMBLUE);
+    display.drawRoundRect(x, y, w, h, 8, PROBE_C_TAPBDR);
     display.setTextSize(1);
     display.setTextColor(PROBE_C_LBLUE);
     const char* lbl = "WORK AREA";
@@ -445,10 +441,10 @@ static void drawSharedKVPanel() {
     // 2×2 grid: probe rate | seek rate
     //           retract    | max Z travel
     int fo = pendantProbeV2.focusedField;
-    probeDrawKVTouch( 7,  94, 112, 33, "Probe rate", pendantProbeV2.probeRate,   "mm/m", PROBE_C_GREEN, fo==0, 0);
-    probeDrawKVTouch(122,  94, 111, 33, "Seek rate", pendantProbeV2.seekRate,    "mm/m", PROBE_C_GREEN, fo==1, 0);
+    probeDrawKVTouch( 7,  94, 112, 33, "Probe rate", pendantProbeV2.probeRate,   "mm/m", PROBE_C_BLUE, fo==0, 0);
+    probeDrawKVTouch(122,  94, 111, 33, "Seek rate", pendantProbeV2.seekRate,    "mm/m", PROBE_C_BLUE, fo==1, 0);
     probeDrawKVTouch( 7, 130, 112, 33, "Retract",   pendantProbeV2.retractDist, "mm",   PROBE_C_BLUE,  fo==2, 3);
-    probeDrawKVTouch(122, 130, 111, 33, "Max Z trvl",pendantProbeV2.maxZTravel,  "mm",   PROBE_C_RED,   fo==3, 3);
+    probeDrawKVTouch(122, 130, 111, 33, "Max Z trvl",pendantProbeV2.maxZTravel,  "mm",   PROBE_C_BLUE,   fo==3, 3);
 }
 
 static void drawRoutineButtons() {

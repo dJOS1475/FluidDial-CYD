@@ -55,6 +55,8 @@ The 3 physical buttons always perform the same function regardless of the active
 * **Speed field** (bottom row, between Main Menu and Work Area) — a tap-to-edit field (same style as the Probe screens) showing the current jog speed; tap to adjust it with the dial in 100 mm/min steps (metric) or 10 ipm steps (imperial); the field highlights while active; tap any axis to return to jogging
 * Velocity scaling — turning the dial faster proportionally increases the jog feed rate up to 8× the base speed, giving a natural acceleration feel
 * Jog feed rate is capped at the controller's X-axis maximum (`$110`), read automatically on entry to the screen
+* **Soft-limit clamp** — once the machine is homed, the pendant clamps every jog so an axis's **absolute machine position can't leave its travel envelope**, preventing a fast or repeated jog from driving into a hard stop. The per-axis envelope is read from the controller's per-axis travel (`$130–$132`) and homing-direction mask (`$23`), so machines that home in different directions per axis work correctly. This engages only for homed X/Y/Z axes; it does not replace controller soft limits.
+  * **Recommended:** also enable FluidNC's own soft limits as the authoritative backstop — set `$20=1` (soft limits) with `$22=1` (homing) in your FluidNC config. With `$20=1`, FluidNC itself rejects any over-travel move regardless of source. FluidNC ships with `$20=0` (off) by default.
 
 **Work Area (Probing Work)**
 * Coordinate system selection (G54–G57)
@@ -70,7 +72,7 @@ The 3 physical buttons always perform the same function regardless of the active
   * **Boss** — finds the centre of an outside circle / round stock; touches the flat top for Z0 and sets X0/Y0/Z0 (3D Probe)
 * Probe G-code is **generated on the pendant** (`G38.2` straight-probe moves) — no probe macro files need to live on the controller. Every wall/surface is reached with a **crash-safe two-pass move** (a fast seek then a slow re-probe), so a wrong nominal size can't drive the tip into a wall; the trigger offset is computed automatically from the configured plate thickness or 3D-probe ball radius, so a routine zeroes correctly whichever probe you use
 * Each routine screen shows a **sequence list** and a **diagram** of the probe move, and a **Work Area** button to pick the coordinate system the probe will zero — tap it to cycle **G54–G57** right from the routine screen
-* **Configure** opens a per-type setup screen — stylus parameters for the 3D probe (ball dia, stylus length, deflection, pre-travel), or plate dimensions for a touch plate (thickness, plus width and XY offsets for the XYZ plate); a diagram of the selected probe type is shown for reference
+* **Configure** opens a per-type setup screen — for the 3D probe: ball diameter plus an optional deflection correction (subtracted from the ball radius; default 0); for a touch plate: plate dimensions (thickness, plus width and XY offsets for the XYZ plate); a diagram of the selected probe type is shown for reference
 * Shared settings (probe rate, seek rate, retract distance, max Z travel) apply to every routine; the default seek rate is 500 mm/min
 * **For more info** — see the [Probing Guide](Probing.md) for a detailed, per-screen breakdown of every probing screen, what each option does, and how each routine moves the machine
 

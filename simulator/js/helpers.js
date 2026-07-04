@@ -153,6 +153,10 @@ const PROBE_TYPE_ZPLATE = 0,
 function probeIs3D() {
   return pendantProbeV2.probeTypeIdx === PROBE_TYPE_3D;
 }
+function probeTipOffset3D() {
+  const o = pendantProbeV2.ballDia / 2 - pendantProbeV2.deflection;
+  return o > 0 ? o : 0;
+}
 function probeIsPlate() {
   return pendantProbeV2.probeTypeIdx !== PROBE_TYPE_3D;
 }
@@ -267,7 +271,7 @@ function probeDrawSelBarInt(y, fieldName, value) {
 
 function probeDrawKVTouch(x, y, w, h, label, value, unit, valColor, focused, decimals = 3) {
   const bg = focused ? PROBE_SEL_BG : PROBE_BG_SCREEN;
-  const bdr = focused ? PROBE_C_YELLOW : PROBE_C_DIMBLUE;
+  const bdr = focused ? PROBE_C_YELLOW : PROBE_C_TAPBDR;
   display.fillRoundRect(x, y, w, h, 2, bg);
   display.drawRoundRect(x, y, w, h, 2, bdr);
   display.setTextSize(1);
@@ -288,7 +292,7 @@ function probeDrawKVTouch(x, y, w, h, label, value, unit, valColor, focused, dec
 
 function probeDrawKVTouchInt(x, y, w, h, label, value, valColor, focused) {
   const bg = focused ? PROBE_SEL_BG : PROBE_BG_SCREEN;
-  const bdr = focused ? PROBE_C_YELLOW : PROBE_C_DIMBLUE;
+  const bdr = focused ? PROBE_C_YELLOW : PROBE_C_TAPBDR;
   display.fillRoundRect(x, y, w, h, 2, bg);
   display.drawRoundRect(x, y, w, h, 2, bdr);
   display.setTextSize(1);
@@ -358,7 +362,7 @@ function probeSeekFine(axis, seekDist, seekF, fineF) {
 // Work-area selector button — styled like the Z-Surface "Sets" box.
 function probeDrawWorkAreaButton(x, y, w, h) {
   display.fillRoundRect(x, y, w, h, 8, PROBE_BG_SCREEN);
-  display.drawRoundRect(x, y, w, h, 8, PROBE_C_DIMBLUE);
+  display.drawRoundRect(x, y, w, h, 8, PROBE_C_TAPBDR);
   display.setTextSize(1); display.setTextColor(PROBE_C_LBLUE);
   const lbl = "WORK AREA";
   display.setCursor(x + ((w - display.textWidth(lbl)) / 2 | 0), y + 5);

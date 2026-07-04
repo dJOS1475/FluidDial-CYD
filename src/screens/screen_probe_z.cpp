@@ -40,7 +40,7 @@ static void runProbeZ() {
     int pNum = pendantProbing.selectedCoordIndex + 1;
 
     // Z offset at trigger: ball radius (3D probe) or plate thickness (either plate)
-    float zOffset = probeIs3D() ? pendantProbeV2.ballDia / 2.0f
+    float zOffset = probeIs3D() ? probeTipOffset3D()
                                 : pendantProbeV2.plateThick;
 
     char buf[64];
@@ -73,8 +73,8 @@ static void drawZParamButton(int x, int y, int w, int h,
                               const char* label, float valueMm, bool focused) {
     bool inInch = pendantMachine.inInches;
     uint16_t bg  = focused ? PROBE_SEL_BG   : PROBE_BG_SCREEN;
-    uint16_t bdr = focused ? PROBE_C_YELLOW : PROBE_C_DIMBLUE;
-    uint16_t vc  = focused ? PROBE_C_YELLOW : PROBE_C_RED;
+    uint16_t bdr = focused ? PROBE_C_YELLOW : PROBE_C_TAPBDR;
+    uint16_t vc  = focused ? PROBE_C_YELLOW : PROBE_C_BLUE;
     display.fillRoundRect(x, y, w, h, 8, bg);
     display.drawRoundRect(x, y, w, h, 8, bdr);
 

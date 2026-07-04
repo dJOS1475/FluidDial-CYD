@@ -67,6 +67,10 @@ function handlePendantTouch(x, y) {
   }
 }
 
+// Persistent state for the jog soft-limit clamp's predicted position (mirrors
+// the function-static predMm/lastAxis/lastTickMs in CNC_Pendant_UI.cpp).
+const _jogClamp = { predMm: [NaN, NaN, NaN], lastTickMs: 0, lastAxis: -1 };
+
 // ===== Encoder delta (ported handleEncoderDelta) =====
 function handleEncoderDelta(delta) {
   if (currentPendantScreen === PSCREEN_SPINDLE_CONTROL && pendantSpindle.dialMode) {
@@ -87,13 +91,54 @@ function handleEncoderDelta(delta) {
       return;
     }
     if (pendantJog.selectedAxis < 0) return;
-    const distance = delta * pendantJog.increment;
+    let distance = delta * pendantJog.increment;
+
+    // Soft-limit clamp (absolute) — mirrors CNC_Pendant_UI.cpp: keep the resulting
+    // MACHINE position inside the homed envelope so cumulative G91 jogs can't walk
+    // into a hard stop. Home = MPos 0; $23 bit clear → homes +, envelope
+    // [-maxTravel, 0]; bit set → homes −, envelope [0, +maxTravel]. Engages only
+    // for X/Y/Z once travel + $23 are known and the machine isn't in Alarm.
+    // Clamps against a PREDICTED position (leads MPos by queued-but-unexecuted
+    // jogs) re-seeded from the real MPos when a burst ends and the machine idles.
+    {
+      const axis = pendantJog.selectedAxis;
+      if (axis >= 0 && axis <= 2 && pendantJog.maxTravel[axis] > 0 &&
+          pendantJog.homingDirMask >= 0 && !pendantMachine.status.startsWith("Alarm")) {
+        const homesNeg = (pendantJog.homingDirMask >> axis) & 1;
+        const travelMm = pendantJog.maxTravel[axis];
+        const loMm = homesNeg ? 0 : -travelMm;
+        const hiMm = homesNeg ? travelMm : 0;
+        const MARGIN_MM = 0.5;
+        const mposDisp = [pendantMachine.workX, pendantMachine.workY, pendantMachine.workZ][axis];
+        const mposMm = pendantMachine.inInches ? mposDisp * 25.4 : mposDisp;
+        let distMm = pendantMachine.inInches ? distance * 25.4 : distance;
+
+        const now = (typeof millis === "function") ? millis() : Date.now();
+        const interval = now - _jogClamp.lastTickMs; _jogClamp.lastTickMs = now;
+        const newBurst = interval > 400 || axis !== _jogClamp.lastAxis;
+        if (Number.isNaN(_jogClamp.predMm[axis]) ||
+            (newBurst && pendantMachine.status.startsWith("Idle"))) {
+          _jogClamp.predMm[axis] = mposMm;
+        }
+        _jogClamp.lastAxis = axis;
+
+        if (distMm > 0) { let room = (hiMm - MARGIN_MM) - _jogClamp.predMm[axis]; if (room < 0) room = 0; if (distMm > room) distMm = room; }
+        else if (distMm < 0) { let room = (loMm + MARGIN_MM) - _jogClamp.predMm[axis]; if (room > 0) room = 0; if (distMm < room) distMm = room; }
+        distance = pendantMachine.inInches ? distMm / 25.4 : distMm;
+        if (Math.abs(distance) < 1e-4) return;   // fully blocked at the limit
+        _jogClamp.predMm[axis] += distMm;         // commit the queued distance
+      }
+    }
+
     const an = ["X", "Y", "Z", "A"];
     const g21 = pendantMachine.inInches ? "G20" : "G21";
     send_line_nowait(`$J=G91 ${g21} ${an[pendantJog.selectedAxis]}${fmtF(distance, 3)} F${pendantJog.jogSpeedMm}`);
-    // sim convenience: reflect the jog in the DRO so the screen visibly responds
+    // sim convenience: reflect the jog in both the DRO (work) and the machine
+    // position so the Work Area screen and the soft-limit clamp stay consistent.
     const axisKey = ["posX", "posY", "posZ", "posA"][pendantJog.selectedAxis];
+    const machKey = ["workX", "workY", "workZ", "workA"][pendantJog.selectedAxis];
     pendantMachine[axisKey] += distance;
+    pendantMachine[machKey] += distance;
     syncControlsFromState();
     updateJogAxisDisplay();
     return;
@@ -114,11 +159,9 @@ function handleEncoderDelta(delta) {
       if (fo === 3) p.maxZTravel = constrain(p.maxZTravel + delta * step, 1, 200);
       drawProbeScreen();
     } else if (currentPendantScreen === PSCREEN_PROBE_CFG_3D) {
-      const step = probeDialStep(delta, fo <= 1 ? 0.1 : 0.001);
+      const step = probeDialStep(delta, fo === 0 ? 0.1 : 0.001);
       if (fo === 0) p.ballDia = constrain(p.ballDia + delta * step, 0.1, 20);
-      if (fo === 1) p.stylusLen = constrain(p.stylusLen + delta * step, 1, 100);
-      if (fo === 2) p.deflection = constrain(p.deflection + delta * step, 0, 1);
-      if (fo === 3) p.preTravel = constrain(p.preTravel + delta * step, 0, 1);
+      if (fo === 1) p.deflection = constrain(p.deflection + delta * step, 0, 1);
       drawProbeCfg3DScreen();
     } else if (currentPendantScreen === PSCREEN_PROBE_CFG_PLATE) {
       const step = probeDialStep(delta, 0.1);

@@ -25,13 +25,13 @@ The probe type gates which routines are offered (see the hub, below).
 **Trigger compensation.** When a probe triggers, the machine position is the
 *contact* point, not the workpiece surface/edge. The pendant offsets the zero it
 writes so the WCS lands on the real surface:
-- **3D probe** → offset = **ball radius** (`Ball dia ÷ 2`).
+- **3D probe** → offset = **ball radius − deflection** (`Ball dia ÷ 2 − Deflection`;
+  deflection defaults to 0, so out of the box the offset is simply the ball radius).
 - **Touch plate** → offset = **plate thickness**.
 
 > The **XYZ-plate XY offsets** are also applied — they compensate the corner probe
 > for the plate's wall thickness on each axis (see [Calibration](#calibration)).
-> The remaining config fields (stylus length, deflection, pre-travel, plate width)
-> are saved for reference but are **not currently applied** to the generated moves.
+> Plate **width** is saved for reference only and is not applied to the moves.
 
 **Two-pass, crash-safe probing.** Every wall/surface is found with two moves:
 a **fast seek** (at *Seek rate*) to make first contact, a small back-off, then a
@@ -97,10 +97,8 @@ dial to adjust.
 
 | Field | Meaning |
 |---|---|
-| **Ball dia.** | Diameter of the ruby ball. Its **radius** is the trigger offset applied to every routine, so this is the one field that affects results — set it accurately. |
-| **Stylus length** | Physical stylus length. Recorded; not applied to moves. |
-| **Deflection** | Stylus deflection allowance. Recorded; not applied to moves. |
-| **Pre-travel** | Probe pre-travel allowance. Recorded; not applied to moves. |
+| **Ball dia.** | Diameter of the ruby ball. Its **radius** is the trigger offset applied to every routine — set it accurately. |
+| **Deflection** | Stylus flex between first contact and the trigger. It is **subtracted from the ball radius** in every offset the routines apply (Z surface, corner edges, boss top). Default **0** (off) — an optional accuracy tune; see [Calibration](#calibration). Centre-finding (Bore/Boss XY) is unaffected: deflection is radially symmetric and cancels. |
 
 ### Touch Plate config (**PROBE CONFIG**)
 
@@ -176,7 +174,7 @@ motion at all** — set Z separately with the Z Surface routine.
 centred, at any comfortable depth. The warning on screen reads *"Place tip inside
 the bore."*
 
-**Left column** — Sequence: ① *Probe 3 points* → ② *Find centre* → ③ *Set X0 Y0*,
+**Left column** — Sequence: ① *Probe 4 points* → ② *Find centre* → ③ *Set X0 Y0*,
 with a cross-section diagram of the probe inside a pocket and outward arrows.
 
 **Right column — SETTINGS:**
@@ -190,14 +188,16 @@ The right column also notes that **Z work-zero is set via the Z Surface routine*
 
 **Result line:** *Sets X0 Y0*.
 
-**How it works:** probes **three points radially outward** (120° apart), each a
-two-pass move so contact is **perpendicular to the wall** (no tangential skid).
-It fits a circle through the three points (circumcentre), then moves to that
-centre and `G10 L20 P# X0 Y0`. The three points define the circle exactly, so it
-stays correct even if you didn't start dead-centre; because the points are equally
-compensated, the ball radius cancels — no edge offset is needed. The maths and the
-final move are done in **machine coordinates** (FluidNC returns G38 results in
-machine coords), so the result is correct under any work offset.
+**How it works:** probes **four points radially outward** at 90° (+X, +Y, −X, −Y),
+each a two-pass move so contact is **perpendicular to the wall** (no tangential
+skid). It probes the **±X pair first**, averages them to the centre X and
+**re-centres in X**, then probes the **±Y pair through that centred X** so the Y
+touches run through the true vertical diameter — accurate even from a well
+off-centre start. The centre is the **midpoint of each opposed pair**; it moves
+there and `G10 L20 P# X0 Y0`. Opposed pairs cancel the ball radius per axis (no
+edge offset needed) and keep the maths division-free. The maths and the final move
+are done in **machine coordinates** (FluidNC returns G38 results in machine
+coords), so the result is correct under any work offset.
 
 ---
 
@@ -208,7 +208,7 @@ Finds the **centre of an outside circle / round stock** and sets **X0, Y0 and Z0
 **Position before probing:** start with the probe **above the centre of the boss**.
 The warning reads *"Start above centre of boss."*
 
-**Left column** — Sequence: ① *Touch top→Z0* → ② *Probe 3 points* → ③ *Set X0 Y0*,
+**Left column** — Sequence: ① *Touch top→Z0* → ② *Probe 4 points* → ③ *Set X0 Y0*,
 with a cross-section diagram of the probe over a raised boss and inward arrows.
 
 **Right column — SETTINGS:**
@@ -221,13 +221,15 @@ with a cross-section diagram of the probe over a raised boss and inward arrows.
 
 **Result line:** *Sets X0 Y0 Z0*.
 
-**How it works:** touches the **flat top** to set **Z0** (with offset). Then for
-**three directions** (120° apart) it moves clear of the boss by *Clearance*,
-plunges to *Probe depth* beside it, and two-pass probes **radially inward** to the
-wall (perpendicular contact), lifting straight up between points. It fits a circle
-through the three points (circumcentre), moves there and `G10 L20 P# X0 Y0`; Z0
-from the top is preserved. The maths and final move use **machine coordinates**
-(what FluidNC returns for G38), so the result is correct under any work offset.
+**How it works:** touches the **flat top** to set **Z0** (with offset). Then, for
+each of **four directions** at 90° (+X, +Y, −X, −Y), it moves clear of the boss by
+*Clearance*, plunges to *Probe depth* beside it, and two-pass probes **radially
+inward** to the wall (perpendicular contact), lifting straight up between points.
+It does the **±X pair first**, **re-centres in X**, then probes the **±Y pair
+through that centred X** (true vertical diameter). The centre is the **midpoint of
+each opposed pair**, so it moves there and `G10 L20 P# X0 Y0`; Z0 from the top is
+preserved. The maths and final move use **machine coordinates** (what FluidNC
+returns for G38), so the result is correct under any work offset.
 
 ---
 
@@ -251,35 +253,40 @@ jogging to a known point).
 
 ## Calibration
 
-The only config values that change *where a zero lands* are the **ball radius**
-(3D probe) and the **plate thickness / XY offsets** (touch plate). Get these right
-and every routine is accurate — the rest (stylus length, deflection, pre-travel,
-plate width) don't affect the result.
+The config values that change *where a zero lands* are the **ball radius** and
+**deflection** (3D probe), and the **plate thickness / XY offsets** (touch plate).
+Get these right and every routine is accurate — plate width is reference-only.
 
-> Centre-finding (**Bore**, **Boss**) is self-calibrating for radius: the offset
-> cancels when opposing walls are averaged, so radius accuracy only matters for
-> **Z Surface** and the **Corner** edges.
+> Centre-finding (**Bore**, **Boss**) is self-calibrating for radius *and*
+> deflection: both cancel when the probed points are fitted to a circle, so their
+> accuracy only matters for **Z Surface** and the **Corner** edges.
 
-### 3D probe — effective ball radius
+### 3D probe — effective tip offset (ball radius − deflection)
 
-The number that matters is the *effective* radius — the nominal ball radius plus the
-probe's pre-travel (the tiny lag between contact and trigger). Calibrate it against a
-known reference rather than trusting the printed ball size:
+The offset the routines apply is **ball radius − deflection**. The stylus flexes a
+little between first contact and the trigger, so the reported position is slightly
+*past* the true surface — the deflection value corrects for that. Two ways to use it:
 
-1. Set **Ball dia.** to the manufacturer's nominal value.
+- **Simple (default):** leave **Deflection = 0** and calibrate **Ball dia.** alone.
+  The calibrated diameter then absorbs the flex — perfectly fine in practice.
+- **Separated:** keep **Ball dia.** at the manufacturer's nominal value and put the
+  measured flex in **Deflection**. Same net offset, but more transparent — the ball
+  size stays physically true, and if you change stylus or probing feed you re-measure
+  only the deflection.
+
+To calibrate (either way):
+
+1. Set **Ball dia.** to the manufacturer's nominal value (and Deflection to 0).
 2. Run **XYZ Corner** against a known straight edge / precision square at a known position.
 3. Check where the set **X0** (or Y0) actually landed versus the true edge — touch off
    with an edge finder/dowel, or sweep an indicator. Call that single-edge error **Δ**.
-4. Adjust **Ball dia.** by **2 × Δ** (the radius is half the diameter), in the
-   direction that moves the zero onto the true edge: if the zero sits *outside* the
-   material the probe over-compensated → **reduce** Ball dia.; if it's *inside* →
-   **increase** it.
+4. If the zero sits *inside* the material by Δ, that's the flex: enter **Δ as
+   Deflection** (or reduce Ball dia. by 2 × Δ — pick one method, not both).
+   If it sits *outside*, your Ball dia. is undersized — increase it by 2 × Δ.
 5. Re-probe and confirm; iterate once or twice. Keep the final pass slow (a low
-   **Probe rate**) so pre-travel stays small and repeatable.
+   **Probe rate**) so the flex stays small and repeatable.
 
-A ring/plug gauge or a 1-2-3 block makes a good reference. This single calibrated
-ball-diameter value absorbs pre-travel, which is why those fields aren't entered
-separately.
+A ring/plug gauge or a 1-2-3 block makes a good reference.
 
 ### XYZ touch plate — plate offsets
 
@@ -299,8 +306,8 @@ physical thickness:
 |---|---|---|---|
 | **Z Surface** | all | Z0 | probes down |
 | **XYZ Corner** | XYZ plate, 3D | X0 Y0 Z0 | top touch + side edges |
-| **Bore** | 3D | X0 Y0 | none — 3-point radial (Z via Z Surface) |
-| **Boss** | 3D | X0 Y0 Z0 | top touch + 3-point radial |
+| **Bore** | 3D | X0 Y0 | none — 4-point radial (Z via Z Surface) |
+| **Boss** | 3D | X0 Y0 Z0 | top touch + 4-point radial |
 
 Each routine **activates** the coordinate system shown on its **Work Area** button
 (G54–G57) and writes the zero there, so it's live immediately — no manual re-zero.

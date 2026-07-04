@@ -192,6 +192,13 @@ struct JogState {
     // Used to clamp per-tick jog distance so a fast wheel turn at a coarse increment
     // can't request a move larger than half the axis travel range.
     int          maxTravel[4]      = { 0, 0, 0, 0 };
+    // Homing direction invert mask from $23 (grbl/FluidNC).  Bit per axis:
+    // clear = axis homes toward + (switch at the max end, MPos 0 there, travel
+    // runs negative → envelope [-maxTravel, 0]); set = homes toward − (switch at
+    // the min end → envelope [0, +maxTravel]).  -1 = not yet reported.  Combined
+    // with the live machine position it lets the jog handler clamp each move so
+    // the ABSOLUTE machine position can never leave the homed travel envelope.
+    int          homingDirMask     = -1;
 };
 
 // Save jog preferences (fineIncrements + selectedIncrement) to NVS — defined in CNC_Pendant_UI.cpp
@@ -257,9 +264,8 @@ struct ProbeV2State {
 
     // ── SCR0a: 3D touch-probe hardware ───────────────────────────────────
     float ballDia      = 2.0f;     // mm — stylus ball diameter
-    float stylusLen    = 22.0f;    // mm — stylus length
-    float deflection   = 0.010f;   // mm — trigger deflection (fine cal)
-    float preTravel    = 0.005f;   // mm — pre-travel offset (fine cal)
+    float deflection   = 0.0f;     // mm — stylus flex before trigger; subtracted
+                                   // from the ball radius (0 = off, optional cal)
 
     // ── SCR0b: touch-plate ────────────────────────────────────────────────
     float plateThick   = 10.0f;    // mm — plate thickness (Z offset correction)
