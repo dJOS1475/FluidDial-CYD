@@ -215,9 +215,9 @@ The diagram reflects the mode: **circular** shows a cross-section of the probe o
 a raised boss with inward arrows; **rectangular** shows a **top-down** view of the
 boss outline with four inward arrows (±X, ±Y) and a *Z0* mark at the centre.
 
-**Shape toggle (triple-tap):** triple-tap the first settings field to switch
-between **Circular** and **Rectangular** boss. The label of that field and the
-diagram change to confirm the active mode (the top-down rectangle diagram is the
+**Shape toggle (tap the diagram):** tap the bordered diagram ("Tap: shape") to
+switch between **Circular** and **Rectangular** boss. The diagram and the settings
+labels change to confirm the active mode (the top-down rectangle diagram is the
 tell you're in rectangular mode).
 
 **Right column — SETTINGS (circular):**

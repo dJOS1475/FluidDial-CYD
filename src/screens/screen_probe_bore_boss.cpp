@@ -426,8 +426,17 @@ void drawProbeBossScreen() {
     drawSeqStep( 8, 87,  1, "Touch top->Z0",  true);
     drawSeqStep( 8, 105, 2, "Probe 4 points", false);
     drawSeqStep( 8, 123, 3, "Set X0 Y0",      false);
+    // Tappable diagram: a single tap cycles Circular <-> Rectangular boss.  The
+    // grey border marks it as a button (our tappable-field convention) and the
+    // diagram itself is the mode indicator, so tapping it to change shape reads
+    // naturally.  Replaces the old triple-tap on the first settings field.
+    display.drawRoundRect(6, 136, 112, 79, 3, PROBE_C_TAPBDR);
     if (pendantProbeV2.bossRect) drawBossDiagramRect();
     else                         drawBossDiagram();
+    display.setTextSize(1);
+    display.setTextColor(PROBE_C_LBLUE);
+    display.setCursor(10, 206);
+    display.print("Tap: shape");
 
     // Right: KV settings (h=27 so the value isn't clipped).  Rectangular mode
     // splits the nominal size into X-size / Y-size, so it shows one extra field.
@@ -490,36 +499,24 @@ void handleProbeBossTouch(int x, int y) {
         return;
     }
 
-    // Field 0 (Nominal dia. / X size) doubles as the shape toggle: triple-tap
-    // within 600 ms flips circular ↔ rectangular (mirrors the Jog screen's
-    // triple-tap gesture).  Single taps focus the field for dial editing.
-    static int           shapeTapCount = 0;
-    static unsigned long shapeTapMs    = 0;
-
-    bool redraw = false;
-    if (isTouchInBounds(x, y, 122, 84, 111, 27)) {
-        unsigned long now = millis();
-        shapeTapCount = (now - shapeTapMs < 600) ? shapeTapCount + 1 : 1;
-        shapeTapMs = now;
-        if (shapeTapCount >= 3) {
-            shapeTapCount = 0;
-            pendantProbeV2.bossRect = !pendantProbeV2.bossRect;
-            // Clamp focus to the field count of the new mode (rect=4, circ=3).
-            int maxField = pendantProbeV2.bossRect ? 3 : 2;
-            if (pendantProbeV2.focusedField > maxField) pendantProbeV2.focusedField = -1;
-            saveProbeSettings();
-            drawProbeBossScreen();
-            return;
-        }
-        pendantProbeV2.focusedField = (pendantProbeV2.focusedField == 0) ? -1 : 0;
-        redraw = true;
-    } else {
-        shapeTapCount = 0;   // any other tap breaks the triple-tap sequence
-        if (isTouchInBounds(x, y, 122, 113, 111, 27)) { pendantProbeV2.focusedField=(pendantProbeV2.focusedField==1)?-1:1; redraw=true; }
-        if (isTouchInBounds(x, y, 122, 142, 111, 27)) { pendantProbeV2.focusedField=(pendantProbeV2.focusedField==2)?-1:2; redraw=true; }
-        if (pendantProbeV2.bossRect &&
-            isTouchInBounds(x, y, 122, 171, 111, 27)) { pendantProbeV2.focusedField=(pendantProbeV2.focusedField==3)?-1:3; redraw=true; }
+    // Tappable diagram box — single tap cycles Circular <-> Rectangular boss.
+    if (isTouchInBounds(x, y, 6, 136, 112, 79)) {
+        pendantProbeV2.bossRect = !pendantProbeV2.bossRect;
+        // Clamp focus to the field count of the new mode (rect=4, circ=3).
+        int maxField = pendantProbeV2.bossRect ? 3 : 2;
+        if (pendantProbeV2.focusedField > maxField) pendantProbeV2.focusedField = -1;
+        saveProbeSettings();
+        drawProbeBossScreen();
+        return;
     }
+
+    // Settings fields — tap to focus for dial editing.
+    bool redraw = false;
+    if (isTouchInBounds(x, y, 122, 84,  111, 27)) { pendantProbeV2.focusedField=(pendantProbeV2.focusedField==0)?-1:0; redraw=true; }
+    if (isTouchInBounds(x, y, 122, 113, 111, 27)) { pendantProbeV2.focusedField=(pendantProbeV2.focusedField==1)?-1:1; redraw=true; }
+    if (isTouchInBounds(x, y, 122, 142, 111, 27)) { pendantProbeV2.focusedField=(pendantProbeV2.focusedField==2)?-1:2; redraw=true; }
+    if (pendantProbeV2.bossRect &&
+        isTouchInBounds(x, y, 122, 171, 111, 27)) { pendantProbeV2.focusedField=(pendantProbeV2.focusedField==3)?-1:3; redraw=true; }
     if (redraw) { drawProbeBossScreen(); return; }
 
     if (isTouchInBounds(x, y, 5, 239, 112, 38)) {

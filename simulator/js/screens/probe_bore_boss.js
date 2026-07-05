@@ -164,10 +164,6 @@ function bossWallStore(ux, uy, out, inSeek, plunge, seekF, fineF, storeVar, axis
   send_line(`G0 G91 Z${fmtF(plunge, 3)} F500`);                      // lift
 }
 
-// Persistent triple-tap state for the boss shape toggle (mirrors the firmware's
-// function-static shapeTapCount / shapeTapMs).
-const _bossShapeTap = { count: 0, ms: 0 };
-
 function runProbeBoss() {
   if (!pendantConnected) return;
   const p = pendantProbeV2;
@@ -265,8 +261,13 @@ function drawProbeBossScreen() {
   drawSeqStep(8, 87, 1, "Touch top->Z0", true);
   drawSeqStep(8, 105, 2, "Probe 4 points", false);
   drawSeqStep(8, 123, 3, "Set X0 Y0", false);
+  // Tappable diagram: single tap cycles Circular <-> Rectangular (grey border =
+  // button, per our tappable convention). Replaces the old triple-tap.
+  display.drawRoundRect(6, 136, 112, 79, 3, PROBE_C_TAPBDR);
   if (pendantProbeV2.bossRect) drawBossDiagramRect();
   else drawBossDiagram();
+  display.setTextSize(1); display.setTextColor(PROBE_C_LBLUE);
+  display.setCursor(10, 206); display.print("Tap: shape");
   display.setTextSize(1); display.setTextColor(PROBE_C_LBLUE);
   display.setCursor(122, 73); display.print("SETTINGS");
   const fo = pendantProbeV2.focusedField;
@@ -307,30 +308,21 @@ function handleProbeBossTouch(x, y) {
     else if (isTouchInBounds(x, y, 114, 175, 98, 32)) { pendantProbeV2.confirmActive = false; runProbeBoss(); currentPendantScreen = PSCREEN_STATUS; }
     return;
   }
-  // Field 0 (Nominal dia. / X size) doubles as the shape toggle: triple-tap
-  // within 600 ms flips circular <-> rectangular. Single taps focus for editing.
-  let redraw = false;
-  if (isTouchInBounds(x, y, 122, 84, 111, 27)) {
-    const now = (typeof millis === "function") ? millis() : Date.now();
-    _bossShapeTap.count = (now - _bossShapeTap.ms < 600) ? _bossShapeTap.count + 1 : 1;
-    _bossShapeTap.ms = now;
-    if (_bossShapeTap.count >= 3) {
-      _bossShapeTap.count = 0;
-      pendantProbeV2.bossRect = !pendantProbeV2.bossRect;
-      const maxField = pendantProbeV2.bossRect ? 3 : 2;
-      if (pendantProbeV2.focusedField > maxField) pendantProbeV2.focusedField = -1;
-      saveProbeSettings();
-      drawProbeBossScreen();
-      return;
-    }
-    pendantProbeV2.focusedField = pendantProbeV2.focusedField === 0 ? -1 : 0;
-    redraw = true;
-  } else {
-    _bossShapeTap.count = 0;   // any other tap breaks the triple-tap sequence
-    if (isTouchInBounds(x, y, 122, 113, 111, 27)) { pendantProbeV2.focusedField = pendantProbeV2.focusedField === 1 ? -1 : 1; redraw = true; }
-    if (isTouchInBounds(x, y, 122, 142, 111, 27)) { pendantProbeV2.focusedField = pendantProbeV2.focusedField === 2 ? -1 : 2; redraw = true; }
-    if (pendantProbeV2.bossRect && isTouchInBounds(x, y, 122, 171, 111, 27)) { pendantProbeV2.focusedField = pendantProbeV2.focusedField === 3 ? -1 : 3; redraw = true; }
+  // Tappable diagram box — single tap cycles Circular <-> Rectangular boss.
+  if (isTouchInBounds(x, y, 6, 136, 112, 79)) {
+    pendantProbeV2.bossRect = !pendantProbeV2.bossRect;
+    const maxField = pendantProbeV2.bossRect ? 3 : 2;
+    if (pendantProbeV2.focusedField > maxField) pendantProbeV2.focusedField = -1;
+    saveProbeSettings();
+    drawProbeBossScreen();
+    return;
   }
+  // Settings fields — tap to focus for dial editing.
+  let redraw = false;
+  if (isTouchInBounds(x, y, 122, 84, 111, 27)) { pendantProbeV2.focusedField = pendantProbeV2.focusedField === 0 ? -1 : 0; redraw = true; }
+  if (isTouchInBounds(x, y, 122, 113, 111, 27)) { pendantProbeV2.focusedField = pendantProbeV2.focusedField === 1 ? -1 : 1; redraw = true; }
+  if (isTouchInBounds(x, y, 122, 142, 111, 27)) { pendantProbeV2.focusedField = pendantProbeV2.focusedField === 2 ? -1 : 2; redraw = true; }
+  if (pendantProbeV2.bossRect && isTouchInBounds(x, y, 122, 171, 111, 27)) { pendantProbeV2.focusedField = pendantProbeV2.focusedField === 3 ? -1 : 3; redraw = true; }
   if (redraw) { drawProbeBossScreen(); return; }
   if (isTouchInBounds(x, y, 5, 239, 112, 38)) { pendantProbeV2.returnScreen = PSCREEN_PROBE_BOSS; currentPendantScreen = PSCREEN_PROBE; return; }
   if (isTouchInBounds(x, y, 123, 239, 112, 38)) { probeCycleWorkArea(); drawProbeBossScreen(); return; }

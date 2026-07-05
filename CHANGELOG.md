@@ -3,6 +3,11 @@
 **ChangeLog:**
 
 
+**2026-07-06**
+
+v2.1.7
+* Change: **Boss shape is now toggled by tapping the diagram** (a single tap cycles Circular ↔ Rectangular), replacing the hidden triple-tap on the first settings field. The diagram is bordered like a button with a "Tap: shape" hint — since the diagram is itself the mode indicator, tapping it to change the shape reads naturally, and the first settings field goes back to plain single-tap-to-focus (no more fighting the focus toggle).
+
 **2026-07-05**
 
 v2.1.6

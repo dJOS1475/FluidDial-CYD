@@ -12,10 +12,10 @@
   "screens/screen_probe.cpp": "2755c011e8346cd812749979e649d2584a2bf3f5",
   "screens/screen_probe_z.cpp": "047046fba1b2603bef11092baae73c252154bebc",
   "screens/screen_probe_corner.cpp": "7217fe1e7e91c06cb753941796469ffe4ce2ed54",
-  "screens/screen_probe_bore_boss.cpp": "a36be54bf8e4c0c7462dff04ab49718d14963a9a",
+  "screens/screen_probe_bore_boss.cpp": "63a2980a219de0d87a757ca3f1133220e2a8bdf2",
   "screens/screen_probe_cfg.cpp": "9e1569cbe6fe433d6a591a5326ee23f38f5d61a3",
   "CNC_Pendant_UI.cpp": "7b6a60c0e98a2159478dc513b95f095e4ec4733a",
   "screens/pendant_shared.h": "17267bfddf4a9519c50d3ccf9d84645278b510f7",
-  "cnc_pendant_config.h": "a0399d2cf9379504f1df298df4f53d80fac3b7fd",
+  "cnc_pendant_config.h": "1cf43bc6dae1aec8e99b057bbaaf788dd69ff435",
   "screens/screen_probe.h": "6b47641d62e7215f097f5f7688c35729de204d1b"
 }
