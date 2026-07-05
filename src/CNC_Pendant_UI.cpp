@@ -555,17 +555,6 @@ static void handleEncoderDelta(int32_t delta) {
     } else if (currentPendantScreen == PSCREEN_JOG_HOMING) {
         if (!pendantConnected) return;
 
-        // Jog flow control: if FluidNC's motion planner is full (many sends
-        // in flight without acks), skip this encoder event entirely.  The
-        // velFactor logic below already coalesces fast detents into larger
-        // single-command moves; skipping here is the last line of defence
-        // against overflowing FluidNC's TCP RX buffer and corrupting the
-        // command stream.  FluidNC's default planner is ~16 deep but we
-        // throttle earlier to leave room for status polls and other commands.
-        if (pending_nowait_sends >= 6) {
-            return;
-        }
-
         if (pendantJog.speedDialMode) {
             // Adjust jog speed cap — metric: 500 mm/min/step, imperial: 20 ipm/step
             int maxIn = constrain((int)(pendantJog.maxFeedRate / 25.4f), 40, 400);
@@ -580,24 +569,33 @@ static void handleEncoderDelta(int32_t delta) {
         }
         if (pendantJog.selectedAxis < 0) return;  // no axis selected — do nothing
 
+        // Continuous-jog cadence — record EVERY detent here, BEFORE the flow-control
+        // drop below.  A fast fine-increment spin generates far more jog sends than
+        // FluidNC's planner can take, so many get dropped; if we timed only the
+        // survivors the gaps between them would look "slow", the spin would never be
+        // recognised as continuous, and the dial-stop JogCancel would never arm —
+        // exactly why 1 mm and finer jogs kept coasting after the dial stopped.
+        unsigned long now = millis();
+        unsigned long interval = now - jogLastTickMs;
+        jogLastTickMs = now;
+        if (interval < JOG_CONTINUOUS_MS) {
+            if (++jogRapidCount >= 2) jogContinuous = true;
+        } else {
+            jogRapidCount = 1;
+            jogContinuous = false;
+        }
+
+        // Jog flow control: if FluidNC's motion planner is full (many sends in
+        // flight without acks), skip SENDING this jog — the tick is already timed
+        // above so the dial-stop watchdog stays accurate.  Last line of defence
+        // against overflowing FluidNC's RX buffer / corrupting the command stream.
+        if (pending_nowait_sends >= 6) return;
+
         // Send $J immediately per tick (like cyd_buttons) so FluidNC's planner buffer
         // stays populated and the deceleration ramp bridges the gap between ticks.
         // Time-based velocity scaling: fast turns send a proportionally larger distance.
         {
-            unsigned long now = millis();
-            unsigned long interval = now - jogLastTickMs;
-            jogLastTickMs = now;
             int velFactor = (interval < 80) ? 4 : (interval < 150) ? 2 : 1;
-
-            // Continuous-jog detection: two or more ticks in quick succession are a
-            // spin → arm the dial-stop watchdog (JogCancel on stop).  An isolated
-            // detent resets this, so deliberate single steps run to completion.
-            if (interval < JOG_CONTINUOUS_MS) {
-                if (++jogRapidCount >= 2) jogContinuous = true;
-            } else {
-                jogRapidCount = 1;
-                jogContinuous = false;
-            }
 
             String axisNames[] = { "X", "Y", "Z", "A" };
             float  distance    = (float)delta * velFactor * pendantJog.increment;

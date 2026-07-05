@@ -85,7 +85,6 @@ function handleEncoderDelta(delta) {
     return;
   } else if (currentPendantScreen === PSCREEN_JOG_HOMING) {
     if (!pendantConnected) return;
-    if (pending_nowait_sends >= 6) return;
     if (pendantJog.speedDialMode) {
       const maxIn = constrain((pendantJog.maxFeedRate / 25.4) | 0, 40, 400);
       if (pendantMachine.inInches) pendantJog.jogSpeedIn = constrain(pendantJog.jogSpeedIn + delta * 20, 40, maxIn);
@@ -95,12 +94,13 @@ function handleEncoderDelta(delta) {
       return;
     }
     if (pendantJog.selectedAxis < 0) return;
-    let distance = delta * pendantJog.increment;
 
     // Continuous-jog (MPG) detection + dial-stop watchdog (mirrors CNC_Pendant_UI.cpp):
     // rapid successive ticks are a spin; when the dial stops for JOG_STOP_MS, send a
     // real-time JogCancel so motion halts at once instead of coasting. A single
-    // deliberate detent stays below the threshold and completes fully.
+    // deliberate detent stays below the threshold and completes fully. Recorded for
+    // EVERY detent, BEFORE the flow-control drop below, so a fast fine-increment spin
+    // (whose sends are mostly dropped) is still recognised as continuous.
     {
       const now = (typeof millis === "function") ? millis() : Date.now();
       const gap = now - _jogMpg.lastTickMs; _jogMpg.lastTickMs = now;
@@ -116,6 +116,11 @@ function handleEncoderDelta(delta) {
         }
       }, JOG_STOP_MS);
     }
+
+    // Flow control: skip SENDING this jog if the planner's backed up (the tick is
+    // already timed above, so the dial-stop watchdog stays accurate).
+    if (pending_nowait_sends >= 6) return;
+    let distance = delta * pendantJog.increment;
 
     // Soft-limit clamp (absolute) — mirrors CNC_Pendant_UI.cpp: keep the resulting
     // MACHINE position inside the homed envelope so cumulative G91 jogs can't walk

@@ -5,6 +5,11 @@
 
 **2026-07-05**
 
+v2.1.6
+* Fix: **handwheel jog-stop now works at every increment.** In v2.1.5 the dial-stop JogCancel only fired for coarse (10 mm+) jogs; at **1 mm and finer** the axis kept coasting after the dial stopped. Cause: a fast fine-increment spin produces more jog sends than FluidNC's planner accepts, so many were dropped by the flow-control gate *before* the continuous-spin detector ran — making the spin look intermittent and never arming the stop. The dial cadence is now recorded for **every** detent (before the flow-control drop), so a continuous spin is recognised and stopped on dial-stop regardless of increment. Single deliberate detents still complete their full move.
+
+**2026-07-05**
+
 v2.1.5
 * Safety: **jogging now stops when the dial stops (handwheel/MPG behaviour).** A single deliberate detent completes its full move as before, but a **continuous spin** is halted the instant you stop turning — the pendant sends a real-time **JogCancel** (0x85) after ~150 ms of dial silence, which flushes FluidNC's queued jog moves so the axis stops where you stopped, instead of coasting through the commanded distance. Tunable via `JOG_CONTINUOUS_MS` / `JOG_STOP_MS`.
 * Fix: **spindle/feed override no longer floods the controller.** Reaching a target % previously reset to 100% and fired up to ~25–50 real-time bytes in a tight loop, which could overrun a Modbus VFD's queue (`VFD Queue Full`, wrong landing) or starve FluidNC into a task-watchdog reboot. It now **anchors off the current reported %** and walks to the target with **coarse (±10%) + fine (±1%)** steps, **one byte every 60 ms** — e.g. 100→75% is 7 gentle bytes instead of 26, with no jump to 100% first. Works during a running job (realtime bytes only). Applies to both spindle and feed, buttons and dial.
