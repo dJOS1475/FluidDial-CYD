@@ -181,7 +181,8 @@ A huge thank you to the following people who have supported this project:
 |---|---|
 | simrim1 | Discord |
 | Janusz  | Discord |
-
+| karlpe  | GitHub  |
+ 
 ---
 
 Firmware in Action (v1.0): 
