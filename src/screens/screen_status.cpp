@@ -155,11 +155,12 @@ void updateStatusCurrentFile() {
 void updateStatusAxisPositions() {
     if (currentPendantScreen != PSCREEN_STATUS) return;
 
+    // Status shows MACHINE coordinates (workX/Y/Z/A = MPos).  (posX/Y/Z are work.)
     float px, py, pz, pa;
     int   numAxes;
     if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) != pdTRUE) return;
-    px = pendantMachine.posX;  py = pendantMachine.posY;
-    pz = pendantMachine.posZ;  pa = pendantMachine.posA;
+    px = pendantMachine.workX;  py = pendantMachine.workY;
+    pz = pendantMachine.workZ;  pa = pendantMachine.workA;
     numAxes = pendantMachine.numAxes;
     xSemaphoreGive(stateMutex);
 
@@ -171,7 +172,7 @@ void updateStatusAxisPositions() {
     g->setTextColor(COLOR_GRAY_TEXT);
     g->setTextSize(1);
     g->setCursor(ox + 5, oy + 5);
-    g->print("AXIS POSITIONS");
+    g->print("MACHINE POSITION");
 
     const char* axisNames[] = { "X", "Y", "Z", "A" };
     float       positions[] = { px, py, pz, pa };

@@ -85,13 +85,14 @@ function updateStatusCurrentFile() {
 
 function updateStatusAxisPositions() {
   if (currentPendantScreen !== PSCREEN_STATUS) return;
-  const pos = [pendantMachine.posX, pendantMachine.posY, pendantMachine.posZ, pendantMachine.posA];
+  // MACHINE coordinates (workX/Y/Z/A = MPos); posX/Y/Z are work coords.
+  const pos = [pendantMachine.workX, pendantMachine.workY, pendantMachine.workZ, pendantMachine.workA];
   const numAxes = pendantMachine.numAxes;
   const P = panel(230, 65, 5, 140);
   const g = P.g, ox = P.ox, oy = P.oy;
   g.fillRoundRect(ox, oy, 230, 65, 5, COLOR_DARKER_BG);
   g.setTextColor(COLOR_GRAY_TEXT); g.setTextSize(1);
-  g.setCursor(ox + 5, oy + 5); g.print("AXIS POSITIONS");
+  g.setCursor(ox + 5, oy + 5); g.print("MACHINE POSITION");
   const axisNames = ["X", "Y", "Z", "A"];
   g.setTextColor(COLOR_ORANGE); g.setTextSize(2);
   for (let i = 0; i < numAxes; i++) {

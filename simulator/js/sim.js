@@ -12,7 +12,7 @@ const SCREENS = {
   [PSCREEN_JOG_HOMING]:    { enter: enterJogHoming,    exit: exitJogHoming,    draw: drawJogHomingScreen,     handle: handleJogHomingTouch,    update: [updateJogAxisDisplay] },
   [PSCREEN_PROBING_WORK]:  { enter: enterProbingWork,  exit: exitProbingWork,  draw: drawProbingWorkScreen,   handle: handleProbingWorkTouch,  update: [updateWorkMachinePos, updateWorkAreaPos] },
   [PSCREEN_PROBE]:         { enter: enterProbe,        exit: exitProbe,        draw: drawProbeScreen,         handle: handleProbeTouch,        update: [] },
-  [PSCREEN_PROBE_CFG_3D]:  { enter: enterProbeCfg3D,   exit: exitProbeCfg3D,   draw: drawProbeCfg3DScreen,    handle: handleProbeCfg3DTouch,   update: [] },
+  [PSCREEN_PROBE_CFG_3D]:  { enter: enterProbeCfg3D,   exit: exitProbeCfg3D,   draw: drawProbeCfg3DScreen,    handle: handleProbeCfg3DTouch,   update: [updateProbeCfg3DScreen] },
   [PSCREEN_PROBE_CFG_PLATE]:{ enter: enterProbeCfgPlate,exit: exitProbeCfgPlate,draw: drawProbeCfgPlateScreen, handle: handleProbeCfgPlateTouch,update: [] },
   [PSCREEN_PROBE_Z]:       { enter: enterProbeZ,       exit: exitProbeZ,       draw: drawProbeZScreen,        handle: handleProbeZTouch,       update: [updateProbeZScreen] },
   [PSCREEN_PROBE_CORNER]:  { enter: enterProbeCorner,  exit: exitProbeCorner,  draw: drawProbeCornerScreen,   handle: handleProbeCornerTouch,  update: [updateProbeCornerScreen] },
@@ -71,6 +71,10 @@ function handlePendantTouch(x, y) {
 // the function-static predMm/lastAxis/lastTickMs in CNC_Pendant_UI.cpp).
 const _jogClamp = { predMm: [NaN, NaN, NaN], lastTickMs: 0, lastAxis: -1 };
 
+// Continuous-jog (MPG-style) dial-stop tracking (mirrors CNC_Pendant_UI.cpp).
+const JOG_CONTINUOUS_MS = 100, JOG_STOP_MS = 150;
+const _jogMpg = { lastTickMs: 0, continuous: false, rapidCount: 0, timer: null };
+
 // ===== Encoder delta (ported handleEncoderDelta) =====
 function handleEncoderDelta(delta) {
   if (currentPendantScreen === PSCREEN_SPINDLE_CONTROL && pendantSpindle.dialMode) {
@@ -92,6 +96,26 @@ function handleEncoderDelta(delta) {
     }
     if (pendantJog.selectedAxis < 0) return;
     let distance = delta * pendantJog.increment;
+
+    // Continuous-jog (MPG) detection + dial-stop watchdog (mirrors CNC_Pendant_UI.cpp):
+    // rapid successive ticks are a spin; when the dial stops for JOG_STOP_MS, send a
+    // real-time JogCancel so motion halts at once instead of coasting. A single
+    // deliberate detent stays below the threshold and completes fully.
+    {
+      const now = (typeof millis === "function") ? millis() : Date.now();
+      const gap = now - _jogMpg.lastTickMs; _jogMpg.lastTickMs = now;
+      if (gap < JOG_CONTINUOUS_MS) { if (++_jogMpg.rapidCount >= 2) _jogMpg.continuous = true; }
+      else { _jogMpg.rapidCount = 1; _jogMpg.continuous = false; }
+      if (_jogMpg.timer) clearTimeout(_jogMpg.timer);
+      _jogMpg.timer = setTimeout(() => {
+        _jogMpg.timer = null;
+        if (_jogMpg.continuous) {
+          fnc_realtime(JogCancel);
+          _jogMpg.continuous = false; _jogMpg.rapidCount = 0;
+          _jogClamp.predMm = [NaN, NaN, NaN];   // flushed queue → resync prediction
+        }
+      }, JOG_STOP_MS);
+    }
 
     // Soft-limit clamp (absolute) — mirrors CNC_Pendant_UI.cpp: keep the resulting
     // MACHINE position inside the homed envelope so cumulative G91 jogs can't walk
@@ -159,9 +183,11 @@ function handleEncoderDelta(delta) {
       if (fo === 3) p.maxZTravel = constrain(p.maxZTravel + delta * step, 1, 200);
       drawProbeScreen();
     } else if (currentPendantScreen === PSCREEN_PROBE_CFG_3D) {
-      const step = probeDialStep(delta, fo === 0 ? 0.1 : 0.001);
+      if (p.calState !== 0) return;   // dial inert while a cal overlay is up
+      const step = probeDialStep(delta, fo === 1 ? 0.001 : 0.1);
       if (fo === 0) p.ballDia = constrain(p.ballDia + delta * step, 0.1, 20);
-      if (fo === 1) p.deflection = constrain(p.deflection + delta * step, 0, 1);
+      if (fo === 1) p.deflection = constrain(p.deflection + delta * step, -1, 1);   // signed
+      if (fo === 2) p.calGaugeWidth = constrain(p.calGaugeWidth + delta * step, 1, 300);
       drawProbeCfg3DScreen();
     } else if (currentPendantScreen === PSCREEN_PROBE_CFG_PLATE) {
       const step = probeDialStep(delta, 0.1);
@@ -207,12 +233,13 @@ function handleEncoderDelta(delta) {
   } else if (currentPendantScreen === PSCREEN_FEEDS_SPEEDS) {
     if (!pendantConnected) return;
     if (pendantFeeds.dialMode === 1) {
-      pendantMachine.feedOverride = constrain(pendantMachine.feedOverride + delta * 10, 10, 200);
-      for (let i = 0; i < Math.abs(delta) * 10; i++) fnc_realtime(delta > 0 ? FeedOvrFinePlus : FeedOvrFineMinus);
+      // 10% per detent, applied by the paced stepper (no burst).
+      const base = _feedOvr.target >= 0 ? _feedOvr.target : pendantMachine.feedOverride;
+      overrideSetFeedTarget(base + delta * 10);
       updateFeedOverrideDisplay();
     } else if (pendantFeeds.dialMode === 2) {
-      pendantMachine.spindleOverride = constrain(pendantMachine.spindleOverride + delta * 10, 10, 200);
-      for (let i = 0; i < Math.abs(delta) * 10; i++) fnc_realtime(delta > 0 ? SpindleOvrFinePlus : SpindleOvrFineMinus);
+      const base = _spindleOvr.target >= 0 ? _spindleOvr.target : pendantMachine.spindleOverride;
+      overrideSetSpindleTarget(base + delta * 10);
       updateSpindleOverrideDisplay();
     }
     return;

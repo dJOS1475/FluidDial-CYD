@@ -74,6 +74,61 @@ volatile bool pendantConnected = false;
 volatile bool        pendantSynced  = false;
 static unsigned long syncConnectMs  = 0;      // millis() at the connect edge
 
+// ── Continuous-jog (MPG-style) dial-stop tracking ─────────────────────────────
+// A rapid run of dial ticks is treated as a continuous jog; when the dial stops
+// (no tick for JOG_STOP_MS) the periodic loop sends a real-time JogCancel so
+// motion halts at once instead of coasting through the queued G91 moves — like a
+// full-size handwheel.  A single deliberate detent stays below the "continuous"
+// threshold, so it is never cancelled and completes its full commanded distance.
+// All of these are touched only on Core 1 (pendant_comms_task), so no mutex.
+static const unsigned long JOG_CONTINUOUS_MS = 100;   // ticks closer than this = a spin
+static const unsigned long JOG_STOP_MS       = 150;   // silence after last tick → cancel
+static unsigned long jogLastTickMs  = 0;
+static bool          jogContinuous  = false;
+static int           jogRapidCount  = 0;
+static bool          jogForceReseed = false;  // set on cancel → soft-limit predMm re-seeds
+
+// ── Paced feed/spindle override stepper ───────────────────────────────────────
+// FluidNC overrides are relative-only (reset / ±10% coarse / ±1% fine real-time
+// bytes); an absolute target is reached by stepping.  Firing all the steps in a
+// tight loop floods a Modbus VFD's command queue (→ "VFD Queue Full", wrong
+// landing) and can starve FluidNC's network task into a watchdog reboot.  So we
+// store a TARGET and walk toward it from the current REPORTED value — coarse then
+// fine — one real-time byte every OVR_STEP_MS from the periodic loop.  Uses only
+// realtime bytes, so it works during a running job; anchoring off the reported
+// value means no reset-to-100% spike and the fewest possible steps.
+static const unsigned long OVR_STEP_MS = 60;   // min gap between override bytes
+struct OvrStepper {
+    int           target     = -1;    // -1 = idle (no ramp in progress)
+    int           commanded  = 100;   // running estimate of the % last commanded
+    unsigned long lastSendMs = 0;
+    bool          active     = false;
+};
+static OvrStepper feedOvr;
+static OvrStepper spindleOvr;
+
+static void ovrSetTarget(OvrStepper& s, int reported, int target) {
+    target = constrain(target, 10, 200);
+    if (!s.active) { s.commanded = constrain(reported, 10, 200); s.active = true; }
+    s.target = target;
+}
+void overrideSetFeedTarget(int pct)    { ovrSetTarget(feedOvr,    pendantMachine.feedOverride,    pct); }
+void overrideSetSpindleTarget(int pct) { ovrSetTarget(spindleOvr, pendantMachine.spindleOverride, pct); }
+
+// One paced step toward the target: coarse (±10%) while ≥10 away, else fine (±1%).
+static void ovrStep(OvrStepper& s, unsigned long now, realtime_cmd_t cP,
+                    realtime_cmd_t cM, realtime_cmd_t fP, realtime_cmd_t fM) {
+    if (s.target < 0) return;
+    if (s.commanded == s.target) { s.target = -1; s.active = false; return; }
+    if (now - s.lastSendMs < OVR_STEP_MS) return;
+    s.lastSendMs = now;
+    int gap = s.target - s.commanded;
+    if      (gap >=  10) { fnc_realtime(cP); s.commanded += 10; }
+    else if (gap <= -10) { fnc_realtime(cM); s.commanded -= 10; }
+    else if (gap >   0)  { fnc_realtime(fP); s.commanded += 1;  }
+    else                 { fnc_realtime(fM); s.commanded -= 1;  }
+}
+
 // ===== Screen State =====
 PendantScreen currentPendantScreen = PSCREEN_MAIN_MENU;
 
@@ -529,11 +584,20 @@ static void handleEncoderDelta(int32_t delta) {
         // stays populated and the deceleration ramp bridges the gap between ticks.
         // Time-based velocity scaling: fast turns send a proportionally larger distance.
         {
-            static unsigned long lastTickMs = 0;
             unsigned long now = millis();
-            unsigned long interval = now - lastTickMs;
-            lastTickMs = now;
+            unsigned long interval = now - jogLastTickMs;
+            jogLastTickMs = now;
             int velFactor = (interval < 80) ? 4 : (interval < 150) ? 2 : 1;
+
+            // Continuous-jog detection: two or more ticks in quick succession are a
+            // spin → arm the dial-stop watchdog (JogCancel on stop).  An isolated
+            // detent resets this, so deliberate single steps run to completion.
+            if (interval < JOG_CONTINUOUS_MS) {
+                if (++jogRapidCount >= 2) jogContinuous = true;
+            } else {
+                jogRapidCount = 1;
+                jogContinuous = false;
+            }
 
             String axisNames[] = { "X", "Y", "Z", "A" };
             float  distance    = (float)delta * velFactor * pendantJog.increment;
@@ -593,12 +657,15 @@ static void handleEncoderDelta(int32_t delta) {
 
                     // Re-seed the prediction from the real MPos at the start of a
                     // burst (gap since last tick, or axis change) once the machine
-                    // has settled to Idle — and always on first use.
+                    // has settled to Idle — always on first use, and right after a
+                    // continuous-jog JogCancel flushed the queue (jogForceReseed),
+                    // since predMm then holds distance that will never execute.
                     bool newBurst = (interval > 400) || (axis != lastAxis);
-                    if (isnan(predMm[axis]) ||
+                    if (isnan(predMm[axis]) || jogForceReseed ||
                         (newBurst && pendantMachine.status.startsWith("Idle"))) {
                         predMm[axis] = mposMm;
                     }
+                    jogForceReseed = false;
                     lastAxis = axis;
 
                     // Clamp against the predicted position; only ever REDUCE the
@@ -661,10 +728,12 @@ static void handleEncoderDelta(int32_t delta) {
             drawProbeScreen();
 
         } else if (currentPendantScreen == PSCREEN_PROBE_CFG_3D) {
-            // 0=ballDia 1=deflection
-            float step = probeDialStep(delta, (fo == 0) ? 0.1f : 0.001f);
-            if (fo == 0) p.ballDia   = constrain(p.ballDia   + delta * step,  0.1f,  20.0f);
-            if (fo == 1) p.deflection= constrain(p.deflection+ delta * step,  0.0f,   1.0f);
+            if (p.calState != 0) { return; }   // dial inert while the cal overlay is up
+            // 0=ballDia 1=deflection 2=calGaugeWidth
+            float step = probeDialStep(delta, (fo == 1) ? 0.001f : 0.1f);
+            if (fo == 0) p.ballDia       = constrain(p.ballDia       + delta * step,  0.1f,  20.0f);
+            if (fo == 1) p.deflection    = constrain(p.deflection    + delta * step, -1.0f,   1.0f);  // signed
+            if (fo == 2) p.calGaugeWidth = constrain(p.calGaugeWidth + delta * step,  1.0f, 300.0f);
             drawProbeCfg3DScreen();
 
         } else if (currentPendantScreen == PSCREEN_PROBE_CFG_PLATE) {
@@ -721,16 +790,14 @@ static void handleEncoderDelta(int32_t delta) {
     } else if (currentPendantScreen == PSCREEN_FEEDS_SPEEDS) {
         if (!pendantConnected) return;
         if (pendantFeeds.dialMode == 1) {
-            // Feed override — 10% per detent via 10× fine steps
-            int steps = abs(delta) * 10;
-            for (int i = 0; i < steps; i++)
-                fnc_realtime(delta > 0 ? FeedOvrFinePlus : FeedOvrFineMinus);
+            // Feed override — 10% per detent, applied by the paced stepper.
+            int base = (feedOvr.target >= 0) ? feedOvr.target : pendantMachine.feedOverride;
+            overrideSetFeedTarget(base + delta * 10);
             updateFeedOverrideDisplay();
         } else if (pendantFeeds.dialMode == 2) {
-            // Spindle override — 10% per detent via 10× fine steps
-            int steps = abs(delta) * 10;
-            for (int i = 0; i < steps; i++)
-                fnc_realtime(delta > 0 ? SpindleOvrFinePlus : SpindleOvrFineMinus);
+            // Spindle override — 10% per detent, applied by the paced stepper.
+            int base = (spindleOvr.target >= 0) ? spindleOvr.target : pendantMachine.spindleOverride;
+            overrideSetSpindleTarget(base + delta * 10);
             updateSpindleOverrideDisplay();
         }
         return;
@@ -784,6 +851,7 @@ static void updateCurrentScreenSprites() {
             updateSpindleRPMDisplay();
             break;
         case PSCREEN_PROBE:            updateProbeScreen();       break;
+        case PSCREEN_PROBE_CFG_3D:     updateProbeCfg3DScreen();  break;
         case PSCREEN_PROBE_Z:          updateProbeZScreen();      break;
         case PSCREEN_PROBE_CORNER:     updateProbeCornerScreen(); break;
         case PSCREEN_PROBE_BORE:       updateProbeBoreScreen();   break;
@@ -1309,6 +1377,24 @@ void pendant_comms_task(void* /*pvParameters*/) {
         // so the $? realtime byte doesn't add UART load during active motion.
         // When idle/stopped/alarm, keep 200ms for snappy connection detection.
         unsigned long nowMs    = millis();
+
+        // Continuous-jog dial-stop watchdog: if the wheel was being spun and has
+        // now been still for JOG_STOP_MS, cancel the jog so motion halts at once
+        // (flushes the queued G91 moves) instead of coasting.  Harmless if no jog
+        // is active — FluidNC ignores JogCancel when not jogging.
+        if (jogContinuous && pendantConnected && (nowMs - jogLastTickMs > JOG_STOP_MS)) {
+            fnc_realtime(JogCancel);
+            jogContinuous  = false;
+            jogRapidCount  = 0;
+            jogForceReseed = true;   // predMm holds flushed distance — resync next tick
+        }
+
+        // Paced feed/spindle override ramp — one coarse/fine byte per OVR_STEP_MS.
+        if (pendantConnected) {
+            ovrStep(feedOvr,    nowMs, FeedOvrCoarsePlus,    FeedOvrCoarseMinus,    FeedOvrFinePlus,    FeedOvrFineMinus);
+            ovrStep(spindleOvr, nowMs, SpindleOvrCoarsePlus, SpindleOvrCoarseMinus, SpindleOvrFinePlus, SpindleOvrFineMinus);
+        }
+
         bool          running  = pendantMachine.status.startsWith("Run");
         unsigned long pingInterval = running ? 1000UL : 200UL;
         if (nowMs - lastPingMs >= pingInterval) {

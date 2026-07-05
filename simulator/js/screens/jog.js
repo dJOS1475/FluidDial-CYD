@@ -108,7 +108,8 @@ function drawJogHomingScreen() {
 
 function updateJogAxisDisplay() {
   if (currentPendantScreen !== PSCREEN_JOG_HOMING) return;
-  const pos = [pendantMachine.posX, pendantMachine.posY, pendantMachine.posZ, pendantMachine.posA];
+  // MACHINE coordinates (workX/Y/Z/A = MPos); posX/Y/Z are work coords.
+  const pos = [pendantMachine.workX, pendantMachine.workY, pendantMachine.workZ, pendantMachine.workA];
   const P = panel(230, 55, 5, 40);
   const g = P.g, ox = P.ox, oy = P.oy;
   g.fillRect(ox, oy, 230, 55, COLOR_DARKER_BG);

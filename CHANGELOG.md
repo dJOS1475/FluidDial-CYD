@@ -3,6 +3,14 @@
 **ChangeLog:**
 
 
+**2026-07-05**
+
+v2.1.5
+* Safety: **jogging now stops when the dial stops (handwheel/MPG behaviour).** A single deliberate detent completes its full move as before, but a **continuous spin** is halted the instant you stop turning — the pendant sends a real-time **JogCancel** (0x85) after ~150 ms of dial silence, which flushes FluidNC's queued jog moves so the axis stops where you stopped, instead of coasting through the commanded distance. Tunable via `JOG_CONTINUOUS_MS` / `JOG_STOP_MS`.
+* Fix: **spindle/feed override no longer floods the controller.** Reaching a target % previously reset to 100% and fired up to ~25–50 real-time bytes in a tight loop, which could overrun a Modbus VFD's queue (`VFD Queue Full`, wrong landing) or starve FluidNC into a task-watchdog reboot. It now **anchors off the current reported %** and walks to the target with **coarse (±10%) + fine (±1%)** steps, **one byte every 60 ms** — e.g. 100→75% is 7 gentle bytes instead of 26, with no jump to 100% first. Works during a running job (realtime bytes only). Applies to both spindle and feed, buttons and dial.
+* Add: **3D-probe deflection calibration on the Probe Config screen.** A new **Deflection Cal** panel with a **Gauge width** field (default 50.8 mm = the 2″ face of a 1-2-3 block) and a **Calibrate** button (with a confirm prompt). It touches the gauge top for a safe depth, probes the ±X faces from outside (10 mm clear, 5 mm below top — never plunging onto the part), and computes the deflection, showing the result to Apply/Cancel. It **never changes your work zero**. Deflection is now **added** to the ball radius (may be negative) and can also be entered manually.
+* Change: **the Jog & Homing and Status DROs now show MACHINE coordinates** (MPos), matching the Work Area screen — homing and travel reasoning live in machine space. The Status position panel is relabelled **MACHINE POSITION**.
+
 **2026-07-04**
 
 v2.1.4

@@ -43,11 +43,16 @@ let pending_nowait_sends = 0;
 
 // FluidNC realtime override byte names — we only need the identifiers; log them.
 const FeedOvrReset = "FeedOvrReset",
+  FeedOvrCoarsePlus = "FeedOvrCoarse+",
+  FeedOvrCoarseMinus = "FeedOvrCoarse-",
   FeedOvrFinePlus = "FeedOvrFine+",
   FeedOvrFineMinus = "FeedOvrFine-",
   SpindleOvrReset = "SpindleOvrReset",
+  SpindleOvrCoarsePlus = "SpindleOvrCoarse+",
+  SpindleOvrCoarseMinus = "SpindleOvrCoarse-",
   SpindleOvrFinePlus = "SpindleOvrFine+",
-  SpindleOvrFineMinus = "SpindleOvrFine-";
+  SpindleOvrFineMinus = "SpindleOvrFine-",
+  JogCancel = "JogCancel";   // realtime 0x85 — flush + stop a jog
 function fnc_realtime(b) {
   logLine("RT  " + b);
 }

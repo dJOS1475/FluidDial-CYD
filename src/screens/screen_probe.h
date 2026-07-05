@@ -39,13 +39,15 @@ enum {
 };
 inline bool probeIs3D()    { return pendantProbeV2.probeTypeIdx == PROBE_TYPE_3D; }
 
-// Effective 3D-probe tip offset: ball radius minus stylus deflection.  The
-// stylus flexes past first contact before the probe triggers, so the reported
-// position is `deflection` beyond the true surface — subtracting it corrects
-// the zero.  Deflection defaults to 0 (off); calibrate it for extra accuracy.
-// (Centre-finding is unaffected: deflection is radially symmetric and cancels.)
+// Effective 3D-probe tip offset: ball radius PLUS stylus deflection.  Deflection
+// is the lateral over-run measured by the calibration routine (the ball centre
+// at trigger sits `deflection` outside the true face); adding it to the radius
+// corrects an edge zero.  Deflection defaults to 0 (no change from a plain ball
+// radius) and may be NEGATIVE for a probe that under-reads — the calibration
+// stores whichever sign makes an edge probe land true.  (Centre-finding —
+// Bore/Boss — is unaffected: the offset cancels across opposed faces.)
 inline float probeTipOffset3D() {
-    float o = pendantProbeV2.ballDia / 2.0f - pendantProbeV2.deflection;
+    float o = pendantProbeV2.ballDia / 2.0f + pendantProbeV2.deflection;
     return o > 0.0f ? o : 0.0f;
 }
 inline bool probeIsPlate() { return pendantProbeV2.probeTypeIdx != PROBE_TYPE_3D; }

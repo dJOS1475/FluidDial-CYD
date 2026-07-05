@@ -204,6 +204,11 @@ struct JogState {
 // Save jog preferences (fineIncrements + selectedIncrement) to NVS — defined in CNC_Pendant_UI.cpp
 extern void saveJogPrefs();
 
+// Request a feed/spindle override % — reached by a paced coarse+fine stepper in
+// the periodic loop (see CNC_Pendant_UI.cpp), not an immediate burst of bytes.
+extern void overrideSetFeedTarget(int pct);
+extern void overrideSetSpindleTarget(int pct);
+
 struct SDCardState {
     int    selectedFile  = 0;
     int    scrollOffset  = 0;
@@ -296,7 +301,16 @@ struct ProbeV2State {
     bool  bossRect     = false;    // false = circular boss, true = rectangular (X size + Y size)
     float bossSizeY    = 60.0f;    // mm — rect-boss Y-axis size (X-axis size reuses bossDia)
 
+    // ── SCR0a: deflection calibration ─────────────────────────────────────
+    float calGaugeWidth = 50.8f;   // mm — reference gauge width for deflection cal
+                                   // (default = 2.0" face of a 1-2-3 block)
+
     // ── UI runtime state (not persisted) ─────────────────────────────────
+    // Deflection-calibration flow state (SCR0a Calibrate button):
+    //   0 = idle, 1 = running (probing), 2 = result/confirm, 3 = error
+    int   calState   = 0;
+    float calResult  = 0.0f;       // measured deflection (mm), pending Apply
+    unsigned long calStartMs = 0;  // millis() at run start — for timeout
     // focusedField: screen-relative index of the field the dial currently adjusts.
     // -1 = no field focused.
     int  focusedField   = -1;
@@ -319,6 +333,15 @@ extern SpindleState  pendantSpindle;
 extern FeedsState    pendantFeeds;
 extern ProbingState  pendantProbing;
 extern ProbeV2State  pendantProbeV2;
+
+// ===== Deflection-calibration probe capture (defined in FluidNCModel.cpp) =====
+// show_probe() (fired on every [PRB:] report) records the machine X of each probe
+// here while g_calCapture is true, so the calibration flow can read x1/x2 back.
+// int32/bool are 32-bit atomic on Xtensa LX6 — no mutex needed for these.
+extern volatile bool    g_calCapture;         // UI arms this before a run
+extern volatile int     g_calCount;           // number of probes captured
+extern volatile bool    g_calAllOk;           // false if any probe missed contact
+extern volatile int32_t g_calProbeXe4[8];     // per-probe machine X, e4 (×10000), report units
 
 extern PendantScreen currentPendantScreen;
 

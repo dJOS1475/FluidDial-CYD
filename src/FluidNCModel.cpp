@@ -151,6 +151,24 @@ extern "C" void show_control_pins(const char* pins) {
     myCtrlPins = pins;
 }
 
+// ── Deflection-calibration probe capture ──────────────────────────────────────
+// The UI arms g_calCapture before running the calibration program; every [PRB:]
+// report then lands here (machine coords, e4 fixed-point) and we stash the X of
+// each probe in order.  The UI reads the last two as x1/x2.  (See screen_probe_cfg.)
+volatile bool    g_calCapture      = false;
+volatile int     g_calCount        = 0;
+volatile bool    g_calAllOk        = true;
+volatile int32_t g_calProbeXe4[8]  = { 0 };
+
+extern "C" void show_probe(const pos_t* axes, const bool probe_success, size_t n_axis) {
+    if (!g_calCapture) return;
+    if (!probe_success) g_calAllOk = false;
+    if (g_calCount < 8 && n_axis > 0) {
+        g_calProbeXe4[g_calCount] = (int32_t)axes[0];   // machine X, e4 (report units)
+        g_calCount++;
+    }
+}
+
 #ifdef E4_POS_T
 extern "C" void show_dro(const pos_t* axes, const pos_t* wco, bool isMpos, bool* limits, size_t n_axis) {
     n_axes = (int)n_axis;

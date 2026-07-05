@@ -181,22 +181,18 @@ void redrawSpindleOverrideButtons() {
     updateSpindleOverrideDisplay();
 }
 
-// Send realtime commands to reach a target feed override %.
-// Resets to 100% first, then applies fine ±1% steps.
+// Request a feed/spindle override %.  The actual real-time bytes are emitted by a
+// paced coarse+fine stepper in the periodic loop (see CNC_Pendant_UI.cpp) — not a
+// tight burst — so a Modbus VFD isn't flooded and FluidNC's task watchdog can't
+// be starved.  The stepper anchors off the reported value (no reset-to-100%).
 static void applyFeedOverride(int targetPct) {
     if (!pendantConnected) return;
-    fnc_realtime(FeedOvrReset);
-    int delta = targetPct - 100;
-    for (int i = 0; i < abs(delta); i++)
-        fnc_realtime(delta > 0 ? FeedOvrFinePlus : FeedOvrFineMinus);
+    overrideSetFeedTarget(targetPct);
 }
 
 static void applySpindleOverride(int targetPct) {
     if (!pendantConnected) return;
-    fnc_realtime(SpindleOvrReset);
-    int delta = targetPct - 100;
-    for (int i = 0; i < abs(delta); i++)
-        fnc_realtime(delta > 0 ? SpindleOvrFinePlus : SpindleOvrFineMinus);
+    overrideSetSpindleTarget(targetPct);
 }
 
 void handleFeedsSpeedsTouch(int x, int y) {
@@ -207,11 +203,7 @@ void handleFeedsSpeedsTouch(int x, int y) {
         if (isTouchInBounds(x, y, 5 + i * 78, 95, 72, 37)) {
             pendantFeeds.dialMode             = 0;
             pendantFeeds.selectedFeedOverride = i;
-            if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
-                pendantMachine.feedOverride = pcts[i];
-                xSemaphoreGive(stateMutex);
-            }
-            applyFeedOverride(pcts[i]);
+            applyFeedOverride(pcts[i]);   // readout tracks the live reported ramp
             redrawFeedOverrideButtons();
             updateSpindleOverrideDisplay();  // deactivate spindle dial visual
             return;
@@ -220,10 +212,6 @@ void handleFeedsSpeedsTouch(int x, int y) {
     if (isTouchInBounds(x, y, 5, 137, 72, 37)) {
         pendantFeeds.dialMode             = 0;
         pendantFeeds.selectedFeedOverride = 3;
-        if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
-            pendantMachine.feedOverride = 125;
-            xSemaphoreGive(stateMutex);
-        }
         applyFeedOverride(125);
         redrawFeedOverrideButtons();
         updateSpindleOverrideDisplay();
@@ -241,10 +229,6 @@ void handleFeedsSpeedsTouch(int x, int y) {
     if (isTouchInBounds(x, y, 161, 137, 72, 37)) {
         pendantFeeds.dialMode             = 0;
         pendantFeeds.selectedFeedOverride = 4;
-        if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
-            pendantMachine.feedOverride = 150;
-            xSemaphoreGive(stateMutex);
-        }
         applyFeedOverride(150);
         redrawFeedOverrideButtons();
         updateSpindleOverrideDisplay();
@@ -256,11 +240,7 @@ void handleFeedsSpeedsTouch(int x, int y) {
         if (isTouchInBounds(x, y, 5 + i * 78, 194, 72, 37)) {
             pendantFeeds.dialMode                = 0;
             pendantFeeds.selectedSpindleOverride = i;
-            if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
-                pendantMachine.spindleOverride = pcts[i];
-                xSemaphoreGive(stateMutex);
-            }
-            applySpindleOverride(pcts[i]);
+            applySpindleOverride(pcts[i]);   // readout tracks the live reported ramp
             redrawSpindleOverrideButtons();
             updateFeedOverrideDisplay();  // deactivate feed dial visual
             return;
@@ -269,10 +249,6 @@ void handleFeedsSpeedsTouch(int x, int y) {
     if (isTouchInBounds(x, y, 5, 236, 72, 37)) {
         pendantFeeds.dialMode                = 0;
         pendantFeeds.selectedSpindleOverride = 3;
-        if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
-            pendantMachine.spindleOverride = 125;
-            xSemaphoreGive(stateMutex);
-        }
         applySpindleOverride(125);
         redrawSpindleOverrideButtons();
         updateFeedOverrideDisplay();
@@ -290,10 +266,6 @@ void handleFeedsSpeedsTouch(int x, int y) {
     if (isTouchInBounds(x, y, 161, 236, 72, 37)) {
         pendantFeeds.dialMode                = 0;
         pendantFeeds.selectedSpindleOverride = 4;
-        if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
-            pendantMachine.spindleOverride = 150;
-            xSemaphoreGive(stateMutex);
-        }
         applySpindleOverride(150);
         redrawSpindleOverrideButtons();
         updateFeedOverrideDisplay();

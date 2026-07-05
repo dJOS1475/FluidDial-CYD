@@ -4,6 +4,7 @@ void enterProbeCfg3D();
 void exitProbeCfg3D();
 void drawProbeCfg3DScreen();
 void handleProbeCfg3DTouch(int x, int y);
+void updateProbeCfg3DScreen();
 
 // SCR0b — touch-plate config
 void enterProbeCfgPlate();

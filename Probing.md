@@ -25,7 +25,7 @@ The probe type gates which routines are offered (see the hub, below).
 **Trigger compensation.** When a probe triggers, the machine position is the
 *contact* point, not the workpiece surface/edge. The pendant offsets the zero it
 writes so the WCS lands on the real surface:
-- **3D probe** → offset = **ball radius − deflection** (`Ball dia ÷ 2 − Deflection`;
+- **3D probe** → offset = **ball radius + deflection** (`Ball dia ÷ 2 + Deflection`;
   deflection defaults to 0, so out of the box the offset is simply the ball radius).
 - **Touch plate** → offset = **plate thickness**.
 
@@ -98,7 +98,7 @@ dial to adjust.
 | Field | Meaning |
 |---|---|
 | **Ball dia.** | Diameter of the ruby ball. Its **radius** is the trigger offset applied to every routine — set it accurately. |
-| **Deflection** | Stylus flex between first contact and the trigger. It is **subtracted from the ball radius** in every offset the routines apply (Z surface, corner edges, boss top). Default **0** (off) — an optional accuracy tune; see [Calibration](#calibration). Centre-finding (Bore/Boss XY) is unaffected: deflection is radially symmetric and cancels. |
+| **Deflection** | Stylus flex measured at an edge. It is **added to the ball radius** in every edge offset the routines apply (Z surface, corner edges, boss top). Default **0** (off), may be negative; measure it with **Deflection Cal** (see [Calibration](#calibration)). Centre-finding (Bore/Boss XY) is unaffected: it cancels across opposed faces. |
 
 ### Touch Plate config (**PROBE CONFIG**)
 
@@ -277,32 +277,46 @@ Get these right and every routine is accurate — plate width is reference-only.
 > deflection: both cancel when the probed points are fitted to a circle, so their
 > accuracy only matters for **Z Surface** and the **Corner** edges.
 
-### 3D probe — effective tip offset (ball radius − deflection)
+### 3D probe — effective tip offset (ball radius + deflection)
 
-The offset the routines apply is **ball radius − deflection**. The stylus flexes a
-little between first contact and the trigger, so the reported position is slightly
-*past* the true surface — the deflection value corrects for that. Two ways to use it:
+The offset an edge routine applies is **ball radius + deflection**. The stylus
+flexes laterally before the probe triggers, so the reported edge position sits a
+little *outside* the true face — **Deflection** adds that back. It defaults to **0**
+(a plain ball radius) and may be **negative** for a probe that reads the other way.
+Two ways to use it:
 
-- **Simple (default):** leave **Deflection = 0** and calibrate **Ball dia.** alone.
-  The calibrated diameter then absorbs the flex — perfectly fine in practice.
-- **Separated:** keep **Ball dia.** at the manufacturer's nominal value and put the
-  measured flex in **Deflection**. Same net offset, but more transparent — the ball
-  size stays physically true, and if you change stylus or probing feed you re-measure
-  only the deflection.
+- **Simple (default):** leave **Deflection = 0** and calibrate **Ball dia.** alone —
+  the calibrated diameter absorbs the flex. Perfectly fine in practice.
+- **Separated:** keep **Ball dia.** at the nominal value and put the measured flex in
+  **Deflection**. More transparent, and if you change stylus/feed you re-measure only
+  the deflection.
 
-To calibrate (either way):
+#### Automatic calibration (on the pendant)
 
-1. Set **Ball dia.** to the manufacturer's nominal value (and Deflection to 0).
-2. Run **XYZ Corner** against a known straight edge / precision square at a known position.
-3. Check where the set **X0** (or Y0) actually landed versus the true edge — touch off
-   with an edge finder/dowel, or sweep an indicator. Call that single-edge error **Δ**.
-4. If the zero sits *inside* the material by Δ, that's the flex: enter **Δ as
-   Deflection** (or reduce Ball dia. by 2 × Δ — pick one method, not both).
-   If it sits *outside*, your Ball dia. is undersized — increase it by 2 × Δ.
-5. Re-probe and confirm; iterate once or twice. Keep the final pass slow (a low
-   **Probe rate**) so the flex stays small and repeatable.
+**Probe Config → Deflection Cal** measures deflection for you against a gauge of
+known width — most people use the **2″ face of a 1-2-3 block** (the default
+**Gauge width** = 50.8 mm):
 
-A ring/plug gauge or a 1-2-3 block makes a good reference.
+1. Set **Ball dia.** first, and enter the **Gauge width** (default 2″).
+2. Place the gauge on the table and jog the probe **roughly over its centre**, a few
+   mm above the top.
+3. Tap **Calibrate**. The routine touches the top (to find a safe depth), then probes
+   the **+X and −X faces** from outside — moving 10 mm past each assumed face before
+   lowering 5 mm and probing, so it never plunges onto the part. It computes
+   `deflection = ((x2 − x1) − gauge width − ball dia) / 2` and shows the result.
+4. Tap **Apply** to store it (or **Cancel**). Calibration **never changes your work
+   zero** — it only measures.
+
+> The final edge accuracy still depends on a good **Ball dia.** and a slow **Probe
+> rate**. Because deflection is a lateral edge correction, **Bore/Boss centre-finding
+> is unaffected** — it cancels across opposed faces.
+
+#### Manual calibration (alternative)
+
+1. Set **Ball dia.** to nominal (Deflection 0). Run **XYZ Corner** against a known edge.
+2. Measure where **X0** landed versus the true edge — call the single-edge error **Δ**.
+3. Enter **Δ as Deflection** (or adjust Ball dia. by 2 × Δ — pick one, not both).
+4. Re-probe and confirm; keep the final pass slow.
 
 ### XYZ touch plate — plate offsets
 

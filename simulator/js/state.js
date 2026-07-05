@@ -41,7 +41,7 @@ const pendantMachine = {
   rotation: 2,
   spindleMaxRPM: 24000,
   spindleMinRPM: 0,
-  fluidDialVersion: "v2.1.4",
+  fluidDialVersion: "v2.1.5",
   fluidNCVersion: "v3.7.16",
   baudRate: "1000000",
   port: "UART0",
@@ -144,6 +144,10 @@ const pendantProbeV2 = {
   bossPasses: 2,
   bossRect: false,   // false = circular boss, true = rectangular (X size + Y size)
   bossSizeY: 60.0,   // mm — rect-boss Y size (X size reuses bossDia)
+  calGaugeWidth: 50.8,  // mm — deflection-cal reference (2" face of a 1-2-3 block)
+  calState: 0,          // 0 idle, 1 running, 2 result, 3 error
+  calResult: 0.0,       // measured deflection pending Apply
+  calStartMs: 0,
   focusedField: -1,
   confirmActive: false,
   returnScreen: PSCREEN_PROBE,

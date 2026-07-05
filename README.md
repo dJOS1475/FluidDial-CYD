@@ -42,7 +42,8 @@ The 3 physical buttons always perform the same function regardless of the active
 **Status** — live DRO showing machine position, feed rate, spindle RPM, active file, and machine state. Axis count is detected automatically from the connected controller. Alarm states show a human-readable description in red. When an SD job is running, the status row splits into two columns — left shows machine state (Run / Hold / etc.), right shows live job progress as a percentage in green. When a file has been queued via the SD Card Load button, the screen shows "READY — press green to run" with the filename highlighted in green until the job starts.
 
 **Jog & Homing**
-* Jog dial moves the selected axis by the chosen increment
+* Jog dial moves the selected axis by the chosen increment; the DRO shows **machine coordinates** (MPos)
+* **Handwheel stop** — a single deliberate detent completes its full move, but during a **continuous spin** the axis stops the moment you stop turning (the pendant sends a real-time jog-cancel), so it doesn't coast through queued moves — like a full-size MPG
 * Two increment sets — **Fine** (default) and **Coarse** — triple-tap the rightmost increment button to switch between them; the active set and selected increment are saved to flash and restored on reboot
   * Fine metric: 0.01 / 0.1 / 1 / 10 mm — Fine imperial: .0001 / .001 / .010 / .100 in
   * Coarse metric: 1 / 10 / 50 / 100 mm — Coarse imperial: .05 / .5 / 2.0 / 4.0 in
@@ -72,13 +73,14 @@ The 3 physical buttons always perform the same function regardless of the active
   * **Boss** — finds the centre of a raised feature; touches the flat top for Z0 and sets X0/Y0/Z0 (3D Probe). Triple-tap the first settings field to switch between **circular** boss (one nominal diameter) and **rectangular/square** boss (independent X size / Y size); the diagram and field labels change to show the active mode
 * Probe G-code is **generated on the pendant** (`G38.2` straight-probe moves) — no probe macro files need to live on the controller. Every wall/surface is reached with a **crash-safe two-pass move** (a fast seek then a slow re-probe), so a wrong nominal size can't drive the tip into a wall; the trigger offset is computed automatically from the configured plate thickness or 3D-probe ball radius, so a routine zeroes correctly whichever probe you use
 * Each routine screen shows a **sequence list** and a **diagram** of the probe move, and a **Work Area** button to pick the coordinate system the probe will zero — tap it to cycle **G54–G57** right from the routine screen
-* **Configure** opens a per-type setup screen — for the 3D probe: ball diameter plus an optional deflection correction (subtracted from the ball radius; default 0); for a touch plate: plate dimensions (thickness, plus width and XY offsets for the XYZ plate); a diagram of the selected probe type is shown for reference
+* **Configure** opens a per-type setup screen — for the 3D probe: ball diameter plus an optional deflection correction (added to the ball radius; default 0) with an on-pendant **Deflection Cal** routine that measures it against a known gauge (e.g. the 2″ face of a 1-2-3 block); for a touch plate: plate dimensions (thickness, plus width and XY offsets for the XYZ plate)
 * Shared settings (probe rate, seek rate, retract distance, max Z travel) apply to every routine; the default seek rate is 500 mm/min
 * **For more info** — see the [Probing Guide](Probing.md) for a detailed, per-screen breakdown of every probing screen, what each option does, and how each routine moves the machine
 
 **Feeds & Speeds**
 * Feed and spindle override preset buttons (50% / 75% / 100% / 125% / 150%)
 * **Dial mode** — tap the live percentage field to activate dial mode (the field highlights, matching the Probe screens' tap-to-edit style); the jog dial then adjusts that override in 10% increments; only one (feed or spindle) can be active at a time; tapping a preset or the other field deactivates it
+* Overrides ramp to the target with **paced coarse+fine steps** anchored off the current value (one realtime byte every ~60 ms) rather than a burst — gentle on a Modbus VFD and safe to use during a running job
 
 **Spindle Control**
 * Direction selection (Forward / Reverse → M3 / M4)
