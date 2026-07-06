@@ -6,6 +6,8 @@ Feedback is welcome - If you find an issue or have a request for improvements, p
 **Updates:**
 See [CHANGELOG.md](https://github.com/dJOS1475/FluidDial-CYD/blob/main/CHANGELOG.md)
 
+<img src="https://raw.githubusercontent.com/dJOS1475/FluidDial-CYD/refs/heads/main/new_ui/Pendant5.jpeg" alt="CYD Dial Pendant With Buttons and Jog Dial" height="500">
+
 **Web Installer** (use Chrome/Edge): 
 https://djos1475.github.io/FluidDial-CYD/
 
@@ -30,8 +32,6 @@ The 3 physical buttons always perform the same function regardless of the active
 * **Yellow:** Pause — holds current motion (Feed Hold). Spindle remains running. Green will resume.
 * **Green:** Start / Resume — starts a new job or resumes after a Yellow pause.
 * **Red (held 5 seconds): Power Off** — draws a shutdown screen, dims the backlight, and enters deep sleep. Press Red once to wake and resume normal operation.
-
-<img src="https://raw.githubusercontent.com/dJOS1475/FluidDial-CYD/refs/heads/main/new_ui/Pendant4.jpeg" alt="CYD Dial Pendant With Buttons and Jog Dial" height="500">
 
 ---
 
