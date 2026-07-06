@@ -6,7 +6,7 @@
     {
       "chipFamily": "ESP32",
       "parts": [
-        { "path": "merged-flash.bin", "offset": 0 }
+        { "path": "https://github.com/dJOS1475/FluidDial-CYD/releases/latest/download/merged-flash.bin", "offset": 0 }
       ]
     }
   ]
