@@ -93,6 +93,11 @@
       color: #8b949e;
     }
 
+    .install-count {
+      font-size: 0.8rem;
+      color: #6e7681;
+    }
+
     .requirements {
       list-style: none;
       padding: 0;
@@ -166,6 +171,7 @@
     <h2>Install Firmware</h2>
     <div class="install-section">
       <div class="version-badge">v2.1.7 — Latest Release</div>
+      <div id="install-count" class="install-count" style="display:none;"></div>
       <p style="text-align:center;">
         Connect your CYD to USB, then click one of the buttons below.<br />
         Select the correct COM port when prompted.
@@ -212,5 +218,38 @@
     </p>
   </footer>
 
+  <script>
+    // Install counter — fetches jsDelivr CDN stats for the current release and
+    // shows the number of installs (firmware.bin ≈ Update, merged-flash.bin ≈
+    // Factory; each install fetches exactly one of them, so the sum is an
+    // accurate per-version install count). Version is read from the badge, so
+    // there is one source of truth. Stays hidden on any error / before data
+    // exists (jsDelivr stats lag ~1–2 days), so the page never shows "0".
+    (async () => {
+      const el = document.getElementById('install-count');
+      if (!el) return;
+      try {
+        const badge = document.querySelector('.version-badge')?.textContent || '';
+        const v = (badge.match(/(\d+\.\d+\.\d+)/) || [])[1];
+        if (!v) return;
+        const url = 'https://data.jsdelivr.com/v1/stats/packages/gh/dJOS1475/FluidDial-CYD@'
+                  + v + '/files?period=year';
+        const res = await fetch(url);
+        if (!res.ok) return;
+        const files = await res.json();
+        let n = 0;
+        for (const f of (files || [])) {
+          const name = f.name || '';
+          if (name.endsWith('/firmware.bin') || name.endsWith('/merged-flash.bin')) {
+            n += (f.hits && f.hits.total) || 0;
+          }
+        }
+        if (n > 0) {
+          el.textContent = '⬇ ' + n.toLocaleString() + ' installs of v' + v;
+          el.style.display = '';
+        }
+      } catch (_) { /* leave hidden */ }
+    })();
+  </script>
 </body>
 </html>
