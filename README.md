@@ -187,9 +187,9 @@ A huge thank you to the following people who have supported this project:
 
 [![Donate](https://img.shields.io/badge/Donate-PayPal-blue?logo=paypal)](https://paypal.me/derekjosborn)
 
-Firmware in Action (v1.0): 
+Firmware in Action on my CNC Machine Simulator (v1.0): 
 [![Watch the video](https://img.youtube.com/vi/d5PogiUiiaw/maxresdefault.jpg)](https://youtu.be/d5PogiUiiaw)
 
-Firmware in Action (v2.1.7): 
+Firmware in Action on my CNC Machine Simulator (v2.1.7): 
 [![Watch the video](https://img.youtube.com/vi/rT5MI35Bp68/maxresdefault.jpg)](https://youtu.be/rT5MI35Bp68)
 
