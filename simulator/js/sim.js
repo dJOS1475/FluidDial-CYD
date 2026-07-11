@@ -186,38 +186,38 @@ function handleEncoderDelta(delta) {
       if (fo === 1) p.seekRate = constrain(p.seekRate + delta * step, 10, 3000);
       if (fo === 2) p.retractDist = constrain(p.retractDist + delta * step, 0.1, 50);
       if (fo === 3) p.maxZTravel = constrain(p.maxZTravel + delta * step, 1, 200);
-      drawProbeScreen();
+      updateProbeSharedFields();
     } else if (currentPendantScreen === PSCREEN_PROBE_CFG_3D) {
       if (p.calState !== 0) return;   // dial inert while a cal overlay is up
       const step = probeDialStep(delta, fo === 1 ? 0.001 : 0.1);
       if (fo === 0) p.ballDia = constrain(p.ballDia + delta * step, 0.1, 20);
       if (fo === 1) p.deflection = constrain(p.deflection + delta * step, -1, 1);   // signed
       if (fo === 2) p.calGaugeWidth = constrain(p.calGaugeWidth + delta * step, 1, 300);
-      drawProbeCfg3DScreen();
+      updateProbeCfg3DFields();
     } else if (currentPendantScreen === PSCREEN_PROBE_CFG_PLATE) {
       const step = probeDialStep(delta, 0.1);
       if (fo === 0) p.plateThick = constrain(p.plateThick + delta * step, 0.1, 50);
       if (fo === 1) p.plateWidth = constrain(p.plateWidth + delta * step, 1, 200);
       if (fo === 2) p.plateOffX = constrain(p.plateOffX + delta * step, -50, 50);
       if (fo === 3) p.plateOffY = constrain(p.plateOffY + delta * step, -50, 50);
-      drawProbeCfgPlateScreen();
+      updateProbeCfgPlateFields();
     } else if (currentPendantScreen === PSCREEN_PROBE_Z) {
       const base = pendantMachine.inInches ? 1 / 25.4 : 1;
       const step = probeDialStep(delta, base);
       if (fo === 0) p.maxZTravel = constrain(p.maxZTravel + delta * step, 1, 200);
       if (fo === 1) p.retractDist = constrain(p.retractDist + delta * step, 1, 50);
-      drawProbeZScreen();
+      updateProbeZFields();
     } else if (currentPendantScreen === PSCREEN_PROBE_CORNER) {
       const step = probeDialStep(delta, 0.1);
       if (fo === 0) p.cornerDepth = constrain(p.cornerDepth + delta * step, 0.1, 50);
       if (fo === 1) p.cornerOver = constrain(p.cornerOver + delta * step, 0.1, 20);
       if (fo === 2) p.cornerRetXY = constrain(p.cornerRetXY + delta * step, 0.1, 20);
-      drawProbeCornerScreen();
+      updateProbeCornerFields();
     } else if (currentPendantScreen === PSCREEN_PROBE_BORE) {
       const step = probeDialStep(delta, 0.1);
       if (fo === 0) p.boreDia = constrain(p.boreDia + delta * step, 0.1, 500);
       if (fo === 1) p.boreOffset = constrain(p.boreOffset + delta * step, 0.1, 50);
-      drawProbeBoreScreen();
+      updateProbeBoreFields();
     } else if (currentPendantScreen === PSCREEN_PROBE_BOSS) {
       const step = probeDialStep(delta, 0.1);
       if (p.bossRect) {
@@ -232,7 +232,7 @@ function handleEncoderDelta(delta) {
         if (fo === 1) p.bossDepth = constrain(p.bossDepth + delta * step, 0.1, 100);
         if (fo === 2) p.bossClear = constrain(p.bossClear + delta * step, 0.1, 50);
       }
-      drawProbeBossScreen();
+      updateProbeBossFields();
     }
     return;
   } else if (currentPendantScreen === PSCREEN_FEEDS_SPEEDS) {

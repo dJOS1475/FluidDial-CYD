@@ -53,10 +53,17 @@ function drawZDiagram() {
   display.drawLine(42, 184, 45, 180, PROBE_C_GREEN);
 }
 
+// Redraw ONLY the Z-Surface KV fields (opaque) — full draw + dial handler use it.
+function updateProbeZFields() {
+  if (currentPendantScreen !== PSCREEN_PROBE_Z) return;
+  const fo = pendantProbeV2.focusedField;
+  drawZParamButton(122, 84, 111, 33, "Max Z travel", pendantProbeV2.maxZTravel, fo === 0);
+  drawZParamButton(122, 120, 111, 33, "Retract dist", pendantProbeV2.retractDist, fo === 1);
+}
+
 function drawProbeZScreen() {
   display.fillScreen(PROBE_BG_SCREEN);
   drawTitle("Z SURFACE");
-  const fo = pendantProbeV2.focusedField;
   probeDrawPosPanel(38);
   display.fillRoundRect(5, 70, 230, 146, 4, PROBE_BG_PANEL);
   display.setTextSize(1); display.setTextColor(PROBE_C_LBLUE);
@@ -67,8 +74,7 @@ function drawProbeZScreen() {
   drawZDiagram();
   display.setTextSize(1); display.setTextColor(PROBE_C_LBLUE);
   display.setCursor(122, 73); display.print("SETTINGS");
-  drawZParamButton(122, 84, 111, 33, "Max Z travel", pendantProbeV2.maxZTravel, fo === 0);
-  drawZParamButton(122, 120, 111, 33, "Retract dist", pendantProbeV2.retractDist, fo === 1);
+  updateProbeZFields();
   {
     const s = "Sets Z0";
     display.setTextSize(1); display.setTextColor(PROBE_C_GREEN);

@@ -111,10 +111,18 @@ static void drawZDiagram() {
     display.drawLine(42, 184, 45, 180, PROBE_C_GREEN);
 }
 
+// Redraws ONLY the Z-Surface settings fields (opaque boxes) — used by the full
+// draw and the dial handler so a jog-dial edit doesn't do a full-screen redraw.
+void updateProbeZFields() {
+    if (currentPendantScreen != PSCREEN_PROBE_Z) return;
+    int fo = pendantProbeV2.focusedField;
+    drawZParamButton(122, 84,  111, 33, "Max Z travel", pendantProbeV2.maxZTravel,  fo==0);
+    drawZParamButton(122, 120, 111, 33, "Retract dist", pendantProbeV2.retractDist, fo==1);
+}
+
 void drawProbeZScreen() {
     display.fillScreen(PROBE_BG_SCREEN);
     drawTitle("Z SURFACE");
-    int fo = pendantProbeV2.focusedField;
     probeDrawPosPanel(38);
 
     // Combined panel: sequence + diagram (left) / settings (right) — boss style.
@@ -135,8 +143,7 @@ void drawProbeZScreen() {
     display.setTextColor(PROBE_C_LBLUE);
     display.setCursor(122, 73);
     display.print("SETTINGS");
-    drawZParamButton(122, 84,  111, 33, "Max Z travel", pendantProbeV2.maxZTravel,  fo==0);
-    drawZParamButton(122, 120, 111, 33, "Retract dist", pendantProbeV2.retractDist, fo==1);
+    updateProbeZFields();
 
     // Result line — what the probe will set
     {

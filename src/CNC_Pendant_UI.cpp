@@ -723,7 +723,7 @@ static void handleEncoderDelta(int32_t delta) {
             if (fo == 1) p.seekRate    = constrain(p.seekRate    + delta * step, 10.0f, 3000.0f);
             if (fo == 2) p.retractDist = constrain(p.retractDist + delta * step,  0.1f,   50.0f);
             if (fo == 3) p.maxZTravel  = constrain(p.maxZTravel  + delta * step,  1.0f,  200.0f);
-            drawProbeScreen();
+            updateProbeSharedFields();   // redraw only the field — no full-screen flash
 
         } else if (currentPendantScreen == PSCREEN_PROBE_CFG_3D) {
             if (p.calState != 0) { return; }   // dial inert while the cal overlay is up
@@ -732,7 +732,7 @@ static void handleEncoderDelta(int32_t delta) {
             if (fo == 0) p.ballDia       = constrain(p.ballDia       + delta * step,  0.1f,  20.0f);
             if (fo == 1) p.deflection    = constrain(p.deflection    + delta * step, -1.0f,   1.0f);  // signed
             if (fo == 2) p.calGaugeWidth = constrain(p.calGaugeWidth + delta * step,  1.0f, 300.0f);
-            drawProbeCfg3DScreen();
+            updateProbeCfg3DFields();
 
         } else if (currentPendantScreen == PSCREEN_PROBE_CFG_PLATE) {
             // 0=plateThick 1=plateWidth 2=plateOffX 3=plateOffY
@@ -741,7 +741,7 @@ static void handleEncoderDelta(int32_t delta) {
             if (fo == 1) p.plateWidth = constrain(p.plateWidth + delta * step,  1.0f, 200.0f);
             if (fo == 2) p.plateOffX  = constrain(p.plateOffX  + delta * step,-50.0f,  50.0f);
             if (fo == 3) p.plateOffY  = constrain(p.plateOffY  + delta * step,-50.0f,  50.0f);
-            drawProbeCfgPlateScreen();
+            updateProbeCfgPlateFields();
 
         } else if (currentPendantScreen == PSCREEN_PROBE_Z) {
             // fo==0 → maxZTravel, fo==1 → retractDist
@@ -750,7 +750,7 @@ static void handleEncoderDelta(int32_t delta) {
             float step = probeDialStep(delta, base);
             if (fo == 0) p.maxZTravel  = constrain(p.maxZTravel  + delta * step,  1.0f, 200.0f);
             if (fo == 1) p.retractDist = constrain(p.retractDist + delta * step,  1.0f,  50.0f);
-            drawProbeZScreen();
+            updateProbeZFields();
 
         } else if (currentPendantScreen == PSCREEN_PROBE_CORNER) {
             // 0=cornerDepth 1=cornerOver 2=cornerRetXY
@@ -758,14 +758,14 @@ static void handleEncoderDelta(int32_t delta) {
             if (fo == 0) p.cornerDepth = constrain(p.cornerDepth + delta * step, 0.1f, 50.0f);
             if (fo == 1) p.cornerOver  = constrain(p.cornerOver  + delta * step, 0.1f, 20.0f);
             if (fo == 2) p.cornerRetXY = constrain(p.cornerRetXY + delta * step, 0.1f, 20.0f);
-            drawProbeCornerScreen();
+            updateProbeCornerFields();
 
         } else if (currentPendantScreen == PSCREEN_PROBE_BORE) {
             // 0=boreDia 1=boreOffset
             float step = probeDialStep(delta, 0.1f);
             if (fo == 0) p.boreDia    = constrain(p.boreDia    + delta * step, 0.1f, 500.0f);
             if (fo == 1) p.boreOffset = constrain(p.boreOffset + delta * step, 0.1f,  50.0f);
-            drawProbeBoreScreen();
+            updateProbeBoreFields();
 
         } else if (currentPendantScreen == PSCREEN_PROBE_BOSS) {
             float step = probeDialStep(delta, 0.1f);
@@ -781,7 +781,7 @@ static void handleEncoderDelta(int32_t delta) {
                 if (fo == 1) p.bossDepth = constrain(p.bossDepth + delta * step, 0.1f, 100.0f);
                 if (fo == 2) p.bossClear = constrain(p.bossClear + delta * step, 0.1f,  50.0f);
             }
-            drawProbeBossScreen();
+            updateProbeBossFields();
         }
         return;
 

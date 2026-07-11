@@ -437,13 +437,10 @@ static void drawProbeTypeRow() {
     }
 }
 
-static void drawSharedKVPanel() {
-    display.fillRoundRect(5, 82, 230, 84, 4, PROBE_BG_PANEL);
-    display.setTextSize(1);
-    display.setTextColor(PROBE_C_LBLUE);
-    display.setCursor(10, 84);
-    display.print("SHARED SETTINGS");
-
+// Redraws ONLY the shared-settings KV fields (opaque boxes) — used by the panel
+// draw and the dial handler so a jog-dial edit doesn't do a full-screen redraw.
+void updateProbeSharedFields() {
+    if (currentPendantScreen != PSCREEN_PROBE) return;
     // 2×2 grid: probe rate | seek rate
     //           retract    | max Z travel
     int fo = pendantProbeV2.focusedField;
@@ -451,6 +448,15 @@ static void drawSharedKVPanel() {
     probeDrawKVTouch(122,  94, 111, 33, "Seek rate", pendantProbeV2.seekRate,    "mm/m", PROBE_C_BLUE, fo==1, 0);
     probeDrawKVTouch( 7, 130, 112, 33, "Retract",   pendantProbeV2.retractDist, "mm",   PROBE_C_BLUE,  fo==2, 3);
     probeDrawKVTouch(122, 130, 111, 33, "Max Z trvl",pendantProbeV2.maxZTravel,  "mm",   PROBE_C_BLUE,   fo==3, 3);
+}
+
+static void drawSharedKVPanel() {
+    display.fillRoundRect(5, 82, 230, 84, 4, PROBE_BG_PANEL);
+    display.setTextSize(1);
+    display.setTextColor(PROBE_C_LBLUE);
+    display.setCursor(10, 84);
+    display.print("SHARED SETTINGS");
+    updateProbeSharedFields();
 }
 
 static void drawRoutineButtons() {

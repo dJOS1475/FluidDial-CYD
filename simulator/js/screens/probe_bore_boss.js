@@ -81,6 +81,14 @@ function drawBoreDiagram() {
   display.drawLine(72, 188, 68, 191, PROBE_C_GREEN);
 }
 
+// Redraw ONLY the bore KV fields (opaque) — full draw + dial handler use it.
+function updateProbeBoreFields() {
+  if (currentPendantScreen !== PSCREEN_PROBE_BORE) return;
+  const fo = pendantProbeV2.focusedField;
+  probeDrawKVTouch(122, 84, 111, 27, "Nominal dia.", pendantProbeV2.boreDia, "mm", PROBE_C_BLUE, fo === 0, 3);
+  probeDrawKVTouch(122, 113, 111, 27, "Wall offset", pendantProbeV2.boreOffset, "mm", PROBE_C_BLUE, fo === 1, 3);
+}
+
 function drawProbeBoreScreen() {
   display.fillScreen(PROBE_BG_SCREEN);
   drawTitle("BORE");
@@ -94,9 +102,7 @@ function drawProbeBoreScreen() {
   drawBoreDiagram();
   display.setTextSize(1); display.setTextColor(PROBE_C_LBLUE);
   display.setCursor(122, 73); display.print("SETTINGS");
-  const fo = pendantProbeV2.focusedField;
-  probeDrawKVTouch(122, 84, 111, 27, "Nominal dia.", pendantProbeV2.boreDia, "mm", PROBE_C_BLUE, fo === 0, 3);
-  probeDrawKVTouch(122, 113, 111, 27, "Wall offset", pendantProbeV2.boreOffset, "mm", PROBE_C_BLUE, fo === 1, 3);
+  updateProbeBoreFields();
   display.setTextSize(1);
   {
     const s = "Sets X0 Y0";
@@ -251,6 +257,22 @@ function drawBossDiagramRect() {
   display.setCursor(64, 172); display.print("Z0");
 }
 
+// Redraw ONLY the boss KV fields (opaque) — full draw + dial handler use it.
+function updateProbeBossFields() {
+  if (currentPendantScreen !== PSCREEN_PROBE_BOSS) return;
+  const fo = pendantProbeV2.focusedField;
+  if (pendantProbeV2.bossRect) {
+    probeDrawKVTouch(122, 84, 111, 27, "X size", pendantProbeV2.bossDia, "mm", PROBE_C_BLUE, fo === 0, 3);
+    probeDrawKVTouch(122, 113, 111, 27, "Y size", pendantProbeV2.bossSizeY, "mm", PROBE_C_BLUE, fo === 1, 3);
+    probeDrawKVTouch(122, 142, 111, 27, "Probe depth Z", pendantProbeV2.bossDepth, "mm", PROBE_C_BLUE, fo === 2, 3);
+    probeDrawKVTouch(122, 171, 111, 27, "Clearance", pendantProbeV2.bossClear, "mm", PROBE_C_BLUE, fo === 3, 3);
+  } else {
+    probeDrawKVTouch(122, 84, 111, 27, "Nominal dia.", pendantProbeV2.bossDia, "mm", PROBE_C_BLUE, fo === 0, 3);
+    probeDrawKVTouch(122, 113, 111, 27, "Probe depth Z", pendantProbeV2.bossDepth, "mm", PROBE_C_BLUE, fo === 1, 3);
+    probeDrawKVTouch(122, 142, 111, 27, "Clearance", pendantProbeV2.bossClear, "mm", PROBE_C_BLUE, fo === 2, 3);
+  }
+}
+
 function drawProbeBossScreen() {
   display.fillScreen(PROBE_BG_SCREEN);
   drawTitle("BOSS");
@@ -270,19 +292,7 @@ function drawProbeBossScreen() {
   display.setCursor(10, 206); display.print("Tap: shape");
   display.setTextSize(1); display.setTextColor(PROBE_C_LBLUE);
   display.setCursor(122, 73); display.print("SETTINGS");
-  const fo = pendantProbeV2.focusedField;
-  if (pendantProbeV2.bossRect) {
-    // 0=X size (bossDia) 1=Y size (bossSizeY) 2=Probe depth Z 3=Clearance
-    probeDrawKVTouch(122, 84, 111, 27, "X size", pendantProbeV2.bossDia, "mm", PROBE_C_BLUE, fo === 0, 3);
-    probeDrawKVTouch(122, 113, 111, 27, "Y size", pendantProbeV2.bossSizeY, "mm", PROBE_C_BLUE, fo === 1, 3);
-    probeDrawKVTouch(122, 142, 111, 27, "Probe depth Z", pendantProbeV2.bossDepth, "mm", PROBE_C_BLUE, fo === 2, 3);
-    probeDrawKVTouch(122, 171, 111, 27, "Clearance", pendantProbeV2.bossClear, "mm", PROBE_C_BLUE, fo === 3, 3);
-  } else {
-    // 0=Nominal dia. (bossDia) 1=Probe depth Z 2=Clearance
-    probeDrawKVTouch(122, 84, 111, 27, "Nominal dia.", pendantProbeV2.bossDia, "mm", PROBE_C_BLUE, fo === 0, 3);
-    probeDrawKVTouch(122, 113, 111, 27, "Probe depth Z", pendantProbeV2.bossDepth, "mm", PROBE_C_BLUE, fo === 1, 3);
-    probeDrawKVTouch(122, 142, 111, 27, "Clearance", pendantProbeV2.bossClear, "mm", PROBE_C_BLUE, fo === 2, 3);
-  }
+  updateProbeBossFields();
   {
     const s = "Sets X0 Y0 Z0";
     display.setTextSize(1); display.setTextColor(PROBE_C_GREEN);

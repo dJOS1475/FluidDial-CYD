@@ -19,17 +19,23 @@ function drawProbeTypeRow() {
   }
 }
 
+// Redraw ONLY the shared-settings KV fields (opaque) — full draw + dial handler use it.
+function updateProbeSharedFields() {
+  if (currentPendantScreen !== PSCREEN_PROBE) return;
+  const fo = pendantProbeV2.focusedField;
+  probeDrawKVTouch(7, 94, 112, 33, "Probe rate", pendantProbeV2.probeRate, "mm/m", PROBE_C_BLUE, fo === 0, 0);
+  probeDrawKVTouch(122, 94, 111, 33, "Seek rate", pendantProbeV2.seekRate, "mm/m", PROBE_C_BLUE, fo === 1, 0);
+  probeDrawKVTouch(7, 130, 112, 33, "Retract", pendantProbeV2.retractDist, "mm", PROBE_C_BLUE, fo === 2, 3);
+  probeDrawKVTouch(122, 130, 111, 33, "Max Z trvl", pendantProbeV2.maxZTravel, "mm", PROBE_C_BLUE, fo === 3, 3);
+}
+
 function drawSharedKVPanel() {
   display.fillRoundRect(5, 82, 230, 84, 4, PROBE_BG_PANEL);
   display.setTextSize(1);
   display.setTextColor(PROBE_C_LBLUE);
   display.setCursor(10, 84);
   display.print("SHARED SETTINGS");
-  const fo = pendantProbeV2.focusedField;
-  probeDrawKVTouch(7, 94, 112, 33, "Probe rate", pendantProbeV2.probeRate, "mm/m", PROBE_C_BLUE, fo === 0, 0);
-  probeDrawKVTouch(122, 94, 111, 33, "Seek rate", pendantProbeV2.seekRate, "mm/m", PROBE_C_BLUE, fo === 1, 0);
-  probeDrawKVTouch(7, 130, 112, 33, "Retract", pendantProbeV2.retractDist, "mm", PROBE_C_BLUE, fo === 2, 3);
-  probeDrawKVTouch(122, 130, 111, 33, "Max Z trvl", pendantProbeV2.maxZTravel, "mm", PROBE_C_BLUE, fo === 3, 3);
+  updateProbeSharedFields();
 }
 
 function drawRoutineButtons() {

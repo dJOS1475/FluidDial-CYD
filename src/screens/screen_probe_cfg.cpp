@@ -120,6 +120,16 @@ static void drawCalOverlay(const char* l1, const char* l2, uint16_t l2col, int b
 //   Cal panel       y=128 h=142  (Gauge width · Calibrate + hint)
 //   button pair     y=280 h=40
 
+// Redraws ONLY the 3D-config KV fields (opaque boxes) — used by the full draw and
+// the dial handler so a jog-dial edit doesn't do a full-screen redraw.
+void updateProbeCfg3DFields() {
+    if (currentPendantScreen != PSCREEN_PROBE_CFG_3D) return;
+    int fo = pendantProbeV2.focusedField;
+    probeDrawKVTouch( 7,  79, 112, 40, "Ball dia.",   pendantProbeV2.ballDia,       "mm", PROBE_C_BLUE, fo==0, 3);
+    probeDrawKVTouch(122,  79, 111, 40, "Deflection",  pendantProbeV2.deflection,    "mm", PROBE_C_BLUE, fo==1, 3);
+    probeDrawKVTouch(  7, 140, 112, 40, "Gauge width", pendantProbeV2.calGaugeWidth, "mm", PROBE_C_BLUE, fo==2, 1);
+}
+
 void drawProbeCfg3DScreen() {
     display.fillScreen(PROBE_BG_SCREEN);
     drawTitle("PROBE CONFIG");
@@ -141,10 +151,6 @@ void drawProbeCfg3DScreen() {
     display.setCursor(10, 70);
     display.print("STYLUS");
 
-    int fo = pendantProbeV2.focusedField;
-    probeDrawKVTouch( 7,  79, 112, 40, "Ball dia.",  pendantProbeV2.ballDia,    "mm", PROBE_C_BLUE, fo==0, 3);
-    probeDrawKVTouch(122,  79, 111, 40, "Deflection", pendantProbeV2.deflection, "mm", PROBE_C_BLUE, fo==1, 3);
-
     // ── Deflection-calibration panel (field spaced like the Stylus panel) ─
     display.fillRoundRect(5, 128, 230, 55, 4, PROBE_BG_PANEL);
     display.setTextSize(1);
@@ -152,8 +158,11 @@ void drawProbeCfg3DScreen() {
     display.setCursor(10, 131);
     display.print("DEFLECTION CAL");
 
-    probeDrawKVTouch(7, 140, 112, 40, "Gauge width", pendantProbeV2.calGaugeWidth, "mm", PROBE_C_BLUE, fo==2, 1);
     drawButton(122, 140, 111, 40, "Calibrate", PROBE_BTN_BLUE, COLOR_WHITE, 2);
+
+    // KV fields last (both panel backgrounds now drawn) — the dial handler also
+    // calls this alone, so turning the dial updates a value without a full redraw.
+    updateProbeCfg3DFields();
 
     // ── Illustration ──────────────────────────────────────────────────────
     drawProbe3DGraphic();
@@ -352,6 +361,20 @@ void exitProbeCfgPlate() {}
 //   warn banner    y=...
 //   button pair    y=280 h=40
 
+// Redraws ONLY the plate-config KV fields (opaque boxes) — used by the full draw
+// and the dial handler so a jog-dial edit doesn't do a full-screen redraw.
+void updateProbeCfgPlateFields() {
+    if (currentPendantScreen != PSCREEN_PROBE_CFG_PLATE) return;
+    bool xyz = (pendantProbeV2.probeTypeIdx == PROBE_TYPE_XYZPLATE);
+    int fo = pendantProbeV2.focusedField;
+    probeDrawKVTouch(7, 79, 112, 40, "Thickness", pendantProbeV2.plateThick, "mm", PROBE_C_BLUE, fo==0, 3);
+    if (xyz) {
+        probeDrawKVTouch(122,  79, 111, 40, "Width",       pendantProbeV2.plateWidth, "mm", PROBE_C_DIMBLUE, fo==1, 3);
+        probeDrawKVTouch(  7, 122, 112, 40, "XY offset X", pendantProbeV2.plateOffX,  "mm", PROBE_C_BLUE,    fo==2, 3);
+        probeDrawKVTouch(122, 122, 111, 40, "XY offset Y", pendantProbeV2.plateOffY,  "mm", PROBE_C_BLUE,    fo==3, 3);
+    }
+}
+
 void drawProbeCfgPlateScreen() {
     display.fillScreen(PROBE_BG_SCREEN);
     drawTitle("PROBE CONFIG");
@@ -377,13 +400,7 @@ void drawProbeCfgPlateScreen() {
     display.setCursor(10, 70);
     display.print(xyz ? "PLATE DIMENSIONS" : "PLATE THICKNESS");
 
-    int fo = pendantProbeV2.focusedField;
-    probeDrawKVTouch(7, 79, 112, 40, "Thickness", pendantProbeV2.plateThick, "mm", PROBE_C_BLUE, fo==0, 3);
-    if (xyz) {
-        probeDrawKVTouch(122,  79, 111, 40, "Width",       pendantProbeV2.plateWidth, "mm", PROBE_C_DIMBLUE, fo==1, 3);
-        probeDrawKVTouch(  7, 122, 112, 40, "XY offset X", pendantProbeV2.plateOffX,  "mm", PROBE_C_BLUE,    fo==2, 3);
-        probeDrawKVTouch(122, 122, 111, 40, "XY offset Y", pendantProbeV2.plateOffY,  "mm", PROBE_C_BLUE,    fo==3, 3);
-    }
+    updateProbeCfgPlateFields();
 
     // ── Illustration (replaces the old clip warning) ──────────────────────
     if (xyz) drawPlateXYZGraphic();

@@ -147,6 +147,15 @@ static void drawBoreDiagram() {
     display.drawLine(72, 188, 68, 191, PROBE_C_GREEN);
 }
 
+// Redraws ONLY the bore settings fields (opaque boxes) — used by the full draw
+// and by the dial handler so a jog-dial edit doesn't trigger a full-screen redraw.
+void updateProbeBoreFields() {
+    if (currentPendantScreen != PSCREEN_PROBE_BORE) return;
+    int fo = pendantProbeV2.focusedField;
+    probeDrawKVTouch(122, 84,  111, 27, "Nominal dia.", pendantProbeV2.boreDia,    "mm", PROBE_C_BLUE, fo==0, 3);
+    probeDrawKVTouch(122, 113, 111, 27, "Wall offset",  pendantProbeV2.boreOffset, "mm", PROBE_C_BLUE, fo==1, 3);
+}
+
 void drawProbeBoreScreen() {
     display.fillScreen(PROBE_BG_SCREEN);
     drawTitle("BORE");
@@ -171,9 +180,7 @@ void drawProbeBoreScreen() {
     display.setCursor(122, 73);
     display.print("SETTINGS");
 
-    int fo = pendantProbeV2.focusedField;
-    probeDrawKVTouch(122, 84,  111, 27, "Nominal dia.", pendantProbeV2.boreDia,    "mm", PROBE_C_BLUE,  fo==0, 3);
-    probeDrawKVTouch(122, 113, 111, 27, "Wall offset",  pendantProbeV2.boreOffset, "mm", PROBE_C_BLUE,    fo==1, 3);
+    updateProbeBoreFields();
 
     // Right column, centred: result line, then the Z-Surface note.
     display.setTextSize(1);
@@ -410,6 +417,26 @@ static void drawBossDiagramRect() {
     display.print("Z0");
 }
 
+// Redraws ONLY the boss settings fields (opaque boxes, no screen/panel clear) —
+// called by the full draw and, crucially, by the dial handler so turning the jog
+// dial updates the focused value without a flicker-inducing full-screen redraw.
+void updateProbeBossFields() {
+    if (currentPendantScreen != PSCREEN_PROBE_BOSS) return;
+    int fo = pendantProbeV2.focusedField;
+    if (pendantProbeV2.bossRect) {
+        // 0=X size (bossDia) 1=Y size (bossSizeY) 2=Probe depth Z 3=Clearance
+        probeDrawKVTouch(122, 84,  111, 27, "X size",       pendantProbeV2.bossDia,   "mm", PROBE_C_BLUE, fo==0, 3);
+        probeDrawKVTouch(122, 113, 111, 27, "Y size",       pendantProbeV2.bossSizeY, "mm", PROBE_C_BLUE, fo==1, 3);
+        probeDrawKVTouch(122, 142, 111, 27, "Probe depth Z", pendantProbeV2.bossDepth, "mm", PROBE_C_BLUE, fo==2, 3);
+        probeDrawKVTouch(122, 171, 111, 27, "Clearance",    pendantProbeV2.bossClear, "mm", PROBE_C_BLUE, fo==3, 3);
+    } else {
+        // 0=Nominal dia. (bossDia) 1=Probe depth Z 2=Clearance
+        probeDrawKVTouch(122, 84,  111, 27, "Nominal dia.",  pendantProbeV2.bossDia,   "mm", PROBE_C_BLUE, fo==0, 3);
+        probeDrawKVTouch(122, 113, 111, 27, "Probe depth Z", pendantProbeV2.bossDepth, "mm", PROBE_C_BLUE, fo==1, 3);
+        probeDrawKVTouch(122, 142, 111, 27, "Clearance",     pendantProbeV2.bossClear, "mm", PROBE_C_BLUE, fo==2, 3);
+    }
+}
+
 void drawProbeBossScreen() {
     display.fillScreen(PROBE_BG_SCREEN);
     drawTitle("BOSS");
@@ -445,19 +472,7 @@ void drawProbeBossScreen() {
     display.setCursor(122, 73);
     display.print("SETTINGS");
 
-    int fo = pendantProbeV2.focusedField;
-    if (pendantProbeV2.bossRect) {
-        // 0=X size (bossDia) 1=Y size (bossSizeY) 2=Probe depth Z 3=Clearance
-        probeDrawKVTouch(122, 84,  111, 27, "X size",       pendantProbeV2.bossDia,   "mm", PROBE_C_BLUE, fo==0, 3);
-        probeDrawKVTouch(122, 113, 111, 27, "Y size",       pendantProbeV2.bossSizeY, "mm", PROBE_C_BLUE, fo==1, 3);
-        probeDrawKVTouch(122, 142, 111, 27, "Probe depth Z", pendantProbeV2.bossDepth, "mm", PROBE_C_BLUE, fo==2, 3);
-        probeDrawKVTouch(122, 171, 111, 27, "Clearance",    pendantProbeV2.bossClear, "mm", PROBE_C_BLUE, fo==3, 3);
-    } else {
-        // 0=Nominal dia. (bossDia) 1=Probe depth Z 2=Clearance
-        probeDrawKVTouch(122, 84,  111, 27, "Nominal dia.",  pendantProbeV2.bossDia,   "mm", PROBE_C_BLUE, fo==0, 3);
-        probeDrawKVTouch(122, 113, 111, 27, "Probe depth Z", pendantProbeV2.bossDepth, "mm", PROBE_C_BLUE, fo==1, 3);
-        probeDrawKVTouch(122, 142, 111, 27, "Clearance",     pendantProbeV2.bossClear, "mm", PROBE_C_BLUE, fo==2, 3);
-    }
+    updateProbeBossFields();
 
     // Result line — what axes the probe will set (below the last field)
     {

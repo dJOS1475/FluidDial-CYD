@@ -162,6 +162,16 @@ static void drawCornerDiagram() {
 //   Back         y=239 h=38
 //   Btn pair     y=280 h=38
 
+// Redraws ONLY the corner settings fields (opaque boxes) — used by the full draw
+// and the dial handler so a jog-dial edit doesn't do a full-screen redraw.
+void updateProbeCornerFields() {
+    if (currentPendantScreen != PSCREEN_PROBE_CORNER) return;
+    int fo = pendantProbeV2.focusedField;
+    probeDrawKVTouch(122, 117, 111, 31, "Probe depth", pendantProbeV2.cornerDepth, "mm", PROBE_C_BLUE, fo==0, 3);
+    probeDrawKVTouch(122, 150, 111, 31, "Overshoot",   pendantProbeV2.cornerOver,  "mm", PROBE_C_BLUE, fo==1, 3);
+    probeDrawKVTouch(122, 183, 111, 31, "XY retract",  pendantProbeV2.cornerRetXY, "mm", PROBE_C_BLUE, fo==2, 3);
+}
+
 void drawProbeCornerScreen() {
     display.fillScreen(PROBE_BG_SCREEN);
     drawTitle("XYZ CORNER");
@@ -198,10 +208,7 @@ void drawProbeCornerScreen() {
     display.setCursor(125, 101);
     display.print(cornerLabels[pendantProbeV2.cornerIdx]);
 
-    int fo = pendantProbeV2.focusedField;
-    probeDrawKVTouch(122, 117, 111, 31, "Probe depth", pendantProbeV2.cornerDepth, "mm", PROBE_C_BLUE, fo==0, 3);
-    probeDrawKVTouch(122, 150, 111, 31, "Overshoot",   pendantProbeV2.cornerOver,  "mm", PROBE_C_BLUE, fo==1, 3);
-    probeDrawKVTouch(122, 183, 111, 31, "XY retract",  pendantProbeV2.cornerRetXY, "mm", PROBE_C_BLUE, fo==2, 3);
+    updateProbeCornerFields();
 
     probeDrawWarn(220, "! Position probe above corner edge");
 

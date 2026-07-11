@@ -63,6 +63,7 @@ void enterProbe();
 void exitProbe();
 void drawProbeScreen();
 void updateProbeScreen();
+void updateProbeSharedFields();   // redraw only the shared KV fields (flicker-free dial edit)
 void handleProbeTouch(int x, int y);
 
 // NVS persistence — shared across all probe screens

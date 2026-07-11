@@ -71,6 +71,15 @@ function drawCornerDiagram() {
   display.drawLine(40, 177, 43, 173, PROBE_C_GREEN);
 }
 
+// Redraw ONLY the corner KV fields (opaque) — full draw + dial handler use it.
+function updateProbeCornerFields() {
+  if (currentPendantScreen !== PSCREEN_PROBE_CORNER) return;
+  const fo = pendantProbeV2.focusedField;
+  probeDrawKVTouch(122, 117, 111, 31, "Probe depth", pendantProbeV2.cornerDepth, "mm", PROBE_C_BLUE, fo === 0, 3);
+  probeDrawKVTouch(122, 150, 111, 31, "Overshoot", pendantProbeV2.cornerOver, "mm", PROBE_C_BLUE, fo === 1, 3);
+  probeDrawKVTouch(122, 183, 111, 31, "XY retract", pendantProbeV2.cornerRetXY, "mm", PROBE_C_BLUE, fo === 2, 3);
+}
+
 function drawProbeCornerScreen() {
   display.fillScreen(PROBE_BG_SCREEN);
   drawTitle("XYZ CORNER");
@@ -95,10 +104,7 @@ function drawProbeCornerScreen() {
   display.setCursor(125, 87); display.print("CORNER");
   display.setTextColor(PROBE_C_BLUE);
   display.setCursor(125, 101); display.print(cornerLabels[pendantProbeV2.cornerIdx]);
-  const fo = pendantProbeV2.focusedField;
-  probeDrawKVTouch(122, 117, 111, 31, "Probe depth", pendantProbeV2.cornerDepth, "mm", PROBE_C_BLUE, fo === 0, 3);
-  probeDrawKVTouch(122, 150, 111, 31, "Overshoot", pendantProbeV2.cornerOver, "mm", PROBE_C_BLUE, fo === 1, 3);
-  probeDrawKVTouch(122, 183, 111, 31, "XY retract", pendantProbeV2.cornerRetXY, "mm", PROBE_C_BLUE, fo === 2, 3);
+  updateProbeCornerFields();
   probeDrawWarn(220, "! Position probe above corner edge");
   drawButton(5, 239, 112, 38, "Back", PROBE_BTN_BLUE, COLOR_WHITE, 2);
   probeDrawWorkAreaButton(123, 239, 112, 38);

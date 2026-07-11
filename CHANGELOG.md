@@ -3,6 +3,11 @@
 **ChangeLog:**
 
 
+**2026-07-11**
+
+v2.1.8
+* Fix: **probe screens no longer flash when you turn the jog-dial.** Adjusting a focused setting (probe rate, retract, corner depth, bore/boss dimensions, etc.) previously redrew the entire screen on every encoder detent, blanking and repainting the whole display each tick. Dial input now redraws only the affected field boxes in place, across all 7 probe screens (hub, Z Surface, Corner, Bore, Boss, and both Config screens).
+
 **2026-07-06**
 
 v2.1.7

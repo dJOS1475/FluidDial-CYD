@@ -109,6 +109,15 @@ function updateProbeCfg3DScreen() {
   // (Firmware polls probe results here; the sim resolves synchronously in runProbeCalibration.)
 }
 
+// Redraw ONLY the 3D-config KV fields (opaque) — full draw + dial handler use it.
+function updateProbeCfg3DFields() {
+  if (currentPendantScreen !== PSCREEN_PROBE_CFG_3D) return;
+  const fo = pendantProbeV2.focusedField;
+  probeDrawKVTouch(7, 79, 112, 40, "Ball dia.", pendantProbeV2.ballDia, "mm", PROBE_C_BLUE, fo === 0, 3);
+  probeDrawKVTouch(122, 79, 111, 40, "Deflection", pendantProbeV2.deflection, "mm", PROBE_C_BLUE, fo === 1, 3);
+  probeDrawKVTouch(7, 140, 112, 40, "Gauge width", pendantProbeV2.calGaugeWidth, "mm", PROBE_C_BLUE, fo === 2, 1);
+}
+
 function drawProbeCfg3DScreen() {
   display.fillScreen(PROBE_BG_SCREEN);
   drawTitle("PROBE CONFIG");
@@ -121,16 +130,13 @@ function drawProbeCfg3DScreen() {
   display.fillRoundRect(5, 67, 230, 55, 4, PROBE_BG_PANEL);
   display.setTextSize(1); display.setTextColor(PROBE_C_LBLUE);
   display.setCursor(10, 70); display.print("STYLUS");
-  const fo = pendantProbeV2.focusedField;
-  probeDrawKVTouch(7, 79, 112, 40, "Ball dia.", pendantProbeV2.ballDia, "mm", PROBE_C_BLUE, fo === 0, 3);
-  probeDrawKVTouch(122, 79, 111, 40, "Deflection", pendantProbeV2.deflection, "mm", PROBE_C_BLUE, fo === 1, 3);
 
   // Deflection-calibration panel (field spaced like the Stylus panel)
   display.fillRoundRect(5, 128, 230, 55, 4, PROBE_BG_PANEL);
   display.setTextSize(1); display.setTextColor(PROBE_C_LBLUE);
   display.setCursor(10, 131); display.print("DEFLECTION CAL");
-  probeDrawKVTouch(7, 140, 112, 40, "Gauge width", pendantProbeV2.calGaugeWidth, "mm", PROBE_C_BLUE, fo === 2, 1);
   drawButton(122, 140, 111, 40, "Calibrate", PROBE_BTN_BLUE, COLOR_WHITE, 2);
+  updateProbeCfg3DFields();   // both panel bgs drawn — fields last
 
   drawProbe3DGraphic();
 
@@ -184,6 +190,19 @@ function enterProbeCfgPlate() {
 }
 function exitProbeCfgPlate() {}
 
+// Redraw ONLY the plate-config KV fields (opaque) — full draw + dial handler use it.
+function updateProbeCfgPlateFields() {
+  if (currentPendantScreen !== PSCREEN_PROBE_CFG_PLATE) return;
+  const xyz = (pendantProbeV2.probeTypeIdx === PROBE_TYPE_XYZPLATE);
+  const fo = pendantProbeV2.focusedField;
+  probeDrawKVTouch(7, 79, 112, 40, "Thickness", pendantProbeV2.plateThick, "mm", PROBE_C_BLUE, fo === 0, 3);
+  if (xyz) {
+    probeDrawKVTouch(122, 79, 111, 40, "Width", pendantProbeV2.plateWidth, "mm", PROBE_C_DIMBLUE, fo === 1, 3);
+    probeDrawKVTouch(7, 122, 112, 40, "XY offset X", pendantProbeV2.plateOffX, "mm", PROBE_C_BLUE, fo === 2, 3);
+    probeDrawKVTouch(122, 122, 111, 40, "XY offset Y", pendantProbeV2.plateOffY, "mm", PROBE_C_BLUE, fo === 3, 3);
+  }
+}
+
 function drawProbeCfgPlateScreen() {
   display.fillScreen(PROBE_BG_SCREEN);
   drawTitle("PROBE CONFIG");
@@ -199,13 +218,7 @@ function drawProbeCfgPlateScreen() {
   display.fillRoundRect(5, 67, 230, panelH, 4, PROBE_BG_PANEL);
   display.setTextSize(1); display.setTextColor(PROBE_C_LBLUE);
   display.setCursor(10, 70); display.print(xyz ? "PLATE DIMENSIONS" : "PLATE THICKNESS");
-  const fo = pendantProbeV2.focusedField;
-  probeDrawKVTouch(7, 79, 112, 40, "Thickness", pendantProbeV2.plateThick, "mm", PROBE_C_BLUE, fo === 0, 3);
-  if (xyz) {
-    probeDrawKVTouch(122, 79, 111, 40, "Width", pendantProbeV2.plateWidth, "mm", PROBE_C_DIMBLUE, fo === 1, 3);
-    probeDrawKVTouch(7, 122, 112, 40, "XY offset X", pendantProbeV2.plateOffX, "mm", PROBE_C_BLUE, fo === 2, 3);
-    probeDrawKVTouch(122, 122, 111, 40, "XY offset Y", pendantProbeV2.plateOffY, "mm", PROBE_C_BLUE, fo === 3, 3);
-  }
+  updateProbeCfgPlateFields();
   if (xyz) drawPlateXYZGraphic();
   else drawPlateZGraphic();
   drawButton(5, 280, 112, 40, "Back", PROBE_BTN_BLUE, COLOR_WHITE, 2);
