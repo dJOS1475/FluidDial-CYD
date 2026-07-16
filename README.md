@@ -189,9 +189,9 @@ A huge thank you to the following people who have supported this project:
 
 FluidDial-CYD Firmware in Action connected to my CNC Machine Simulator: 
 
-v1.0: 
+FluidDial-CYD v1.0.0: 
 [![Watch the video](https://img.youtube.com/vi/d5PogiUiiaw/maxresdefault.jpg)](https://youtu.be/d5PogiUiiaw)
 
-v2.1.7: 
+FluidDial-CYD v2.1.7: 
 [![Watch the video](https://img.youtube.com/vi/rT5MI35Bp68/maxresdefault.jpg)](https://youtu.be/rT5MI35Bp68)
 
