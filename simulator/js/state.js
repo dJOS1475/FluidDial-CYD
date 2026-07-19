@@ -41,7 +41,7 @@ const pendantMachine = {
   rotation: 2,
   spindleMaxRPM: 24000,
   spindleMinRPM: 0,
-  fluidDialVersion: "v2.1.8",
+  fluidDialVersion: "v2.1.9",
   fluidNCVersion: "v3.7.16",
   baudRate: "1000000",
   port: "UART0",

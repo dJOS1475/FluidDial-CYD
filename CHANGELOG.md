@@ -3,6 +3,11 @@
 **ChangeLog:**
 
 
+**2026-07-19**
+
+v2.1.9
+* Fix: **the pendant now reports its own version correctly.** v2.1.8 shipped with `FIRMWARE_VERSION` left at `v2.1.7`, so the FluidNC screen read v2.1.7 on an otherwise-correct v2.1.8 build. The firmware itself was unaffected — the probe-screen flicker fix and everything else in v2.1.8 were present and working; only the displayed label was wrong. No functional changes in this release.
+
 **2026-07-11**
 
 v2.1.8

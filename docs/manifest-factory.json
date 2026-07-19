@@ -1,6 +1,6 @@
 {
   "name": "FluidDial-CYD (Factory Reset — wipes everything)",
-  "version": "2.1.8",
+  "version": "2.1.9",
   "new_install_prompt_erase": true,
   "builds": [
     {
