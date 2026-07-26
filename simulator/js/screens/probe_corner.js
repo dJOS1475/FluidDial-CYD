@@ -75,9 +75,9 @@ function drawCornerDiagram() {
 function updateProbeCornerFields() {
   if (currentPendantScreen !== PSCREEN_PROBE_CORNER) return;
   const fo = pendantProbeV2.focusedField;
-  probeDrawKVTouch(122, 117, 111, 31, "Probe depth", pendantProbeV2.cornerDepth, "mm", PROBE_C_BLUE, fo === 0, 3);
-  probeDrawKVTouch(122, 150, 111, 31, "Overshoot", pendantProbeV2.cornerOver, "mm", PROBE_C_BLUE, fo === 1, 3);
-  probeDrawKVTouch(122, 183, 111, 31, "XY retract", pendantProbeV2.cornerRetXY, "mm", PROBE_C_BLUE, fo === 2, 3);
+  probeDrawKVTouch(122, 117, 111, 31, "Probe depth", pendantProbeV2.cornerDepth, "mm", PROBE_C_BLUE, fo === 0, 1);
+  probeDrawKVTouch(122, 150, 111, 31, "Overshoot", pendantProbeV2.cornerOver, "mm", PROBE_C_BLUE, fo === 1, 1);
+  probeDrawKVTouch(122, 183, 111, 31, "XY retract", pendantProbeV2.cornerRetXY, "mm", PROBE_C_BLUE, fo === 2, 1);
 }
 
 function drawProbeCornerScreen() {

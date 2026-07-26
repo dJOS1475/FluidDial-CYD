@@ -181,8 +181,13 @@ struct JogState {
     // to the jog-selected axis without disturbing selectedAxis.
     int          homingAxis        = -1;
     float        increment         = 0.01f;
-    int          selectedIncrement = 1;     // index within the active increment set
-    bool         fineIncrements    = true;  // true=fine set, false=coarse; triple-tap rightmost button
+    int          selectedIncrement = 1;     // index within the active increment set (0..3)
+    // Slot 3 of the increment row is a dial box rather than a fixed value: it holds
+    // the coarse increments (10/50/100 mm, .5/2.0/4.0 in) and the jog dial steps
+    // between them while incDialMode is on.  This replaced a hidden triple-tap that
+    // swapped the whole row between a fine and a coarse set.
+    int          coarseIdx         = 0;     // 0..2 — which coarse value slot 3 holds
+    bool         incDialMode       = false; // true = encoder steps the coarse value, not the axis
     bool         speedDialMode     = false; // true = encoder adjusts jog speed, not axis
     int          jogSpeedMm        = 5000;  // mm/min cap, step 100 (used to limit $J feed rate)
     int          jogSpeedIn        = 200;   // ipm cap,    step  10
@@ -201,7 +206,7 @@ struct JogState {
     int          homingDirMask     = -1;
 };
 
-// Save jog preferences (fineIncrements + selectedIncrement) to NVS — defined in CNC_Pendant_UI.cpp
+// Save jog preferences (coarseIdx + selectedIncrement) to NVS — defined in CNC_Pendant_UI.cpp
 extern void saveJogPrefs();
 
 // Request a feed/spindle override % — reached by a paced coarse+fine stepper in

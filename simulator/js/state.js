@@ -41,7 +41,7 @@ const pendantMachine = {
   rotation: 2,
   spindleMaxRPM: 24000,
   spindleMinRPM: 0,
-  fluidDialVersion: "v2.1.9",
+  fluidDialVersion: "v2.1.10",
   fluidNCVersion: "v3.7.16",
   baudRate: "1000000",
   port: "UART0",
@@ -65,7 +65,10 @@ const pendantJog = {
   homingAxis: -1,
   increment: 0.01,
   selectedIncrement: 1,
-  fineIncrements: true,
+  // Slot 3 of the increment row is a dial box holding the coarse increments
+  // (10/50/100 mm, .5/2.0/4.0 in); coarseIdx picks which one.
+  coarseIdx: 0,
+  incDialMode: false,
   speedDialMode: false,
   jogSpeedMm: 5000,
   jogSpeedIn: 200,

@@ -158,10 +158,12 @@ void updateStatusAxisPositions() {
     // Status shows MACHINE coordinates (workX/Y/Z/A = MPos).  (posX/Y/Z are work.)
     float px, py, pz, pa;
     int   numAxes;
+    bool  inInch;
     if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) != pdTRUE) return;
     px = pendantMachine.workX;  py = pendantMachine.workY;
     pz = pendantMachine.workZ;  pa = pendantMachine.workA;
     numAxes = pendantMachine.numAxes;
+    inInch  = pendantMachine.inInches;
     xSemaphoreGive(stateMutex);
 
     int ox, oy;
@@ -174,15 +176,40 @@ void updateStatusAxisPositions() {
     g->setCursor(ox + 5, oy + 5);
     g->print("MACHINE POSITION");
 
+    // Unit hint, dim, top-right — drawn once rather than per-axis so it costs no
+    // column width.  Without it the panel gave no clue whether it was showing mm
+    // or inches, and the two differ by 25x.  Matches probeDrawPosPanel().
+    g->setTextColor(COLOR_GRAY_TEXT);
+    g->setCursor(ox + 212, oy + 5);
+    g->print(inInch ? "in" : "mm");
+
+    // Resolution must follow the unit: this used to print 1 decimal always, which
+    // in inch mode is 0.1" = 2.54 mm — far too coarse to read a position from.
+    // 0.1 mm is the right grain for an at-a-glance monitoring DRO, so inch gets
+    // 3dp (0.025 mm) to land at the same real-world resolution rather than a
+    // finer one.  Same pairing as probeDrawPosPanel().
+    // A long coordinate can still outrun a column (a >1 m machine homed to max,
+    // e.g. "X:-1234.56", or inch on the same machine), so drop a decimal until it
+    // fits rather than letting it run into the neighbouring axis.
+    const int   colW    = 112;   // narrowest of the two columns (118..230)
+    const int   prefDec = inInch ? 3 : 1;
+    char        posBuf[20];
+
     const char* axisNames[] = { "X", "Y", "Z", "A" };
     float       positions[] = { px, py, pz, pa };
     g->setTextColor(COLOR_ORANGE);
     g->setTextSize(2);
     for (int i = 0; i < numAxes; i++) {
-        g->setCursor(ox + ((i % 2) ? 125 : 5), oy + 20 + (i / 2) * 23);
-        g->print(axisNames[i]);
-        g->print(":");
-        g->print(positions[i], 1);
+        int dec = prefDec;
+        snprintf(posBuf, sizeof(posBuf), "%s:%.*f", axisNames[i], dec, positions[i]);
+        while (dec > 0 && g->textWidth(posBuf) > colW) {
+            --dec;
+            snprintf(posBuf, sizeof(posBuf), "%s:%.*f", axisNames[i], dec, positions[i]);
+        }
+        // Right column starts at 118 (was 125): the extra decimal needs the width,
+        // e.g. "Y:-145.60" is 108 px and the old 105 px column would have clipped it.
+        g->setCursor(ox + ((i % 2) ? 118 : 5), oy + 20 + (i / 2) * 23);
+        g->print(posBuf);
     }
 
     endPanelSprite(230, 65, 5, 140);

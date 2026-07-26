@@ -3,6 +3,15 @@
 **ChangeLog:**
 
 
+**2026-07-26**
+
+v2.1.10
+* Fix: **turning the jog dial while the "CONFIRM PROBE?" prompt was up corrupted the prompt and silently changed the probe settings underneath it.** Introduced in v2.1.8: the flicker fix redrew only the settings fields on each detent, and those fields overlap the dialog, so they painted straight over it — while the value you were about to confirm moved without you seeing it. On Bore/Boss a nominal diameter that drifted mid-prompt could drive the probe into the part. The dial is now inert whenever the prompt is showing (Z Surface, XYZ Corner, Bore, Boss), matching the existing behaviour of the calibration overlay.
+* Change: **the jog increment row drops the hidden triple-tap.** The fine/coarse sets are gone; the first three slots are fixed and the fourth is a **DIAL box** holding the coarse values — **10 / 50 / 100 mm** (metric) or **.5 / 2.0 / 4.0 in** (imperial). Tap it to hand the encoder over to stepping that value (the DRO reads "JOG INCREMENT" while it's live), then tap any axis to go back to jogging with the coarse value still selected. Same pattern as the Speed field, so nothing is hidden behind a gesture and the 600 ms tap window is gone.
+* Fix: **the Status screen's position readout was wrong in inch mode.** It printed one decimal regardless of units — 0.1" is 2.54 mm, far too coarse to read a position from — and carried no unit label at all. It now shows 3 decimals in inches (0.025 mm, the same real-world grain as 0.1 mm) and adds a dim **mm**/**in** hint, matching the probe screens' position panel. Metric stays at 1 decimal.
+* UI: **colour cleanup.** The **XYZ Corner** routine button was drawn in the exact colour that means "selected" everywhere else, so it read as active when it wasn't — it's now indigo. The **main menu** is grouped by what each destination is for (machine · cutting parameters · jobs) so you can land on the right button without reading it; nothing moved. On **Feeds & Speeds** the DIAL box moves to the end of each row so the presets read 50 → 150 in order, matching Spindle Control.
+* UI: **probe settings no longer show decimals they can't produce.** Fields the dial steps in 0.1 mm displayed three decimals, so the last two digits were always zeros — now one decimal. **Deflection** keeps its three (it steps in 0.001 mm and the calibration routine writes a measured value).
+
 **2026-07-19**
 
 v2.1.9

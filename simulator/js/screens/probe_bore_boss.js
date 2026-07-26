@@ -85,8 +85,8 @@ function drawBoreDiagram() {
 function updateProbeBoreFields() {
   if (currentPendantScreen !== PSCREEN_PROBE_BORE) return;
   const fo = pendantProbeV2.focusedField;
-  probeDrawKVTouch(122, 84, 111, 27, "Nominal dia.", pendantProbeV2.boreDia, "mm", PROBE_C_BLUE, fo === 0, 3);
-  probeDrawKVTouch(122, 113, 111, 27, "Wall offset", pendantProbeV2.boreOffset, "mm", PROBE_C_BLUE, fo === 1, 3);
+  probeDrawKVTouch(122, 84, 111, 27, "Nominal dia.", pendantProbeV2.boreDia, "mm", PROBE_C_BLUE, fo === 0, 1);
+  probeDrawKVTouch(122, 113, 111, 27, "Wall offset", pendantProbeV2.boreOffset, "mm", PROBE_C_BLUE, fo === 1, 1);
 }
 
 function drawProbeBoreScreen() {
@@ -262,14 +262,14 @@ function updateProbeBossFields() {
   if (currentPendantScreen !== PSCREEN_PROBE_BOSS) return;
   const fo = pendantProbeV2.focusedField;
   if (pendantProbeV2.bossRect) {
-    probeDrawKVTouch(122, 84, 111, 27, "X size", pendantProbeV2.bossDia, "mm", PROBE_C_BLUE, fo === 0, 3);
-    probeDrawKVTouch(122, 113, 111, 27, "Y size", pendantProbeV2.bossSizeY, "mm", PROBE_C_BLUE, fo === 1, 3);
-    probeDrawKVTouch(122, 142, 111, 27, "Probe depth Z", pendantProbeV2.bossDepth, "mm", PROBE_C_BLUE, fo === 2, 3);
-    probeDrawKVTouch(122, 171, 111, 27, "Clearance", pendantProbeV2.bossClear, "mm", PROBE_C_BLUE, fo === 3, 3);
+    probeDrawKVTouch(122, 84, 111, 27, "X size", pendantProbeV2.bossDia, "mm", PROBE_C_BLUE, fo === 0, 1);
+    probeDrawKVTouch(122, 113, 111, 27, "Y size", pendantProbeV2.bossSizeY, "mm", PROBE_C_BLUE, fo === 1, 1);
+    probeDrawKVTouch(122, 142, 111, 27, "Probe depth Z", pendantProbeV2.bossDepth, "mm", PROBE_C_BLUE, fo === 2, 1);
+    probeDrawKVTouch(122, 171, 111, 27, "Clearance", pendantProbeV2.bossClear, "mm", PROBE_C_BLUE, fo === 3, 1);
   } else {
-    probeDrawKVTouch(122, 84, 111, 27, "Nominal dia.", pendantProbeV2.bossDia, "mm", PROBE_C_BLUE, fo === 0, 3);
-    probeDrawKVTouch(122, 113, 111, 27, "Probe depth Z", pendantProbeV2.bossDepth, "mm", PROBE_C_BLUE, fo === 1, 3);
-    probeDrawKVTouch(122, 142, 111, 27, "Clearance", pendantProbeV2.bossClear, "mm", PROBE_C_BLUE, fo === 2, 3);
+    probeDrawKVTouch(122, 84, 111, 27, "Nominal dia.", pendantProbeV2.bossDia, "mm", PROBE_C_BLUE, fo === 0, 1);
+    probeDrawKVTouch(122, 113, 111, 27, "Probe depth Z", pendantProbeV2.bossDepth, "mm", PROBE_C_BLUE, fo === 1, 1);
+    probeDrawKVTouch(122, 142, 111, 27, "Clearance", pendantProbeV2.bossClear, "mm", PROBE_C_BLUE, fo === 2, 1);
   }
 }
 

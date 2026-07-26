@@ -113,7 +113,7 @@ function updateProbeCfg3DScreen() {
 function updateProbeCfg3DFields() {
   if (currentPendantScreen !== PSCREEN_PROBE_CFG_3D) return;
   const fo = pendantProbeV2.focusedField;
-  probeDrawKVTouch(7, 79, 112, 40, "Ball dia.", pendantProbeV2.ballDia, "mm", PROBE_C_BLUE, fo === 0, 3);
+  probeDrawKVTouch(7, 79, 112, 40, "Ball dia.", pendantProbeV2.ballDia, "mm", PROBE_C_BLUE, fo === 0, 1);
   probeDrawKVTouch(122, 79, 111, 40, "Deflection", pendantProbeV2.deflection, "mm", PROBE_C_BLUE, fo === 1, 3);
   probeDrawKVTouch(7, 140, 112, 40, "Gauge width", pendantProbeV2.calGaugeWidth, "mm", PROBE_C_BLUE, fo === 2, 1);
 }
@@ -195,11 +195,11 @@ function updateProbeCfgPlateFields() {
   if (currentPendantScreen !== PSCREEN_PROBE_CFG_PLATE) return;
   const xyz = (pendantProbeV2.probeTypeIdx === PROBE_TYPE_XYZPLATE);
   const fo = pendantProbeV2.focusedField;
-  probeDrawKVTouch(7, 79, 112, 40, "Thickness", pendantProbeV2.plateThick, "mm", PROBE_C_BLUE, fo === 0, 3);
+  probeDrawKVTouch(7, 79, 112, 40, "Thickness", pendantProbeV2.plateThick, "mm", PROBE_C_BLUE, fo === 0, 1);
   if (xyz) {
-    probeDrawKVTouch(122, 79, 111, 40, "Width", pendantProbeV2.plateWidth, "mm", PROBE_C_DIMBLUE, fo === 1, 3);
-    probeDrawKVTouch(7, 122, 112, 40, "XY offset X", pendantProbeV2.plateOffX, "mm", PROBE_C_BLUE, fo === 2, 3);
-    probeDrawKVTouch(122, 122, 111, 40, "XY offset Y", pendantProbeV2.plateOffY, "mm", PROBE_C_BLUE, fo === 3, 3);
+    probeDrawKVTouch(122, 79, 111, 40, "Width", pendantProbeV2.plateWidth, "mm", PROBE_C_DIMBLUE, fo === 1, 1);
+    probeDrawKVTouch(7, 122, 112, 40, "XY offset X", pendantProbeV2.plateOffX, "mm", PROBE_C_BLUE, fo === 2, 1);
+    probeDrawKVTouch(122, 122, 111, 40, "XY offset Y", pendantProbeV2.plateOffY, "mm", PROBE_C_BLUE, fo === 3, 1);
   }
 }
 

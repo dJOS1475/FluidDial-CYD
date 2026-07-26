@@ -15,10 +15,12 @@ function drawFeedsSpeedsScreen() {
     const bg = i === pendantFeeds.selectedFeedOverride ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
     drawButton(5 + i * 78, 95, 72, 37, pcts[i], bg, COLOR_WHITE, 2);
   }
+  // Presets run 50->150 in reading order across both rows; the DIAL box sits at
+  // the end rather than interrupting the sequence (matching Spindle Control).
   drawButton(5, 137, 72, 37, pcts[3], (3 === pendantFeeds.selectedFeedOverride ? COLOR_ORANGE : COLOR_BUTTON_GRAY), COLOR_WHITE, 2);
-  display.fillRoundRect(83, 137, 72, 37, 2, COLOR_BACKGROUND);
+  drawButton(83, 137, 72, 37, pcts[4], (4 === pendantFeeds.selectedFeedOverride ? COLOR_ORANGE : COLOR_BUTTON_GRAY), COLOR_WHITE, 2);
+  display.fillRoundRect(161, 137, 72, 37, 2, COLOR_BACKGROUND);
   updateFeedOverrideDisplay();
-  drawButton(161, 137, 72, 37, pcts[4], (4 === pendantFeeds.selectedFeedOverride ? COLOR_ORANGE : COLOR_BUTTON_GRAY), COLOR_WHITE, 2);
 
   display.setTextColor(COLOR_GRAY_TEXT); display.setTextSize(1);
   display.setCursor(5, 182); display.print("SPINDLE OVERRIDE");
@@ -27,9 +29,9 @@ function drawFeedsSpeedsScreen() {
     drawButton(5 + i * 78, 194, 72, 37, pcts[i], bg, COLOR_WHITE, 2);
   }
   drawButton(5, 236, 72, 37, pcts[3], (3 === pendantFeeds.selectedSpindleOverride ? COLOR_ORANGE : COLOR_BUTTON_GRAY), COLOR_WHITE, 2);
-  display.fillRoundRect(83, 236, 72, 37, 2, COLOR_BACKGROUND);
+  drawButton(83, 236, 72, 37, pcts[4], (4 === pendantFeeds.selectedSpindleOverride ? COLOR_ORANGE : COLOR_BUTTON_GRAY), COLOR_WHITE, 2);
+  display.fillRoundRect(161, 236, 72, 37, 2, COLOR_BACKGROUND);
   updateSpindleOverrideDisplay();
-  drawButton(161, 236, 72, 37, pcts[4], (4 === pendantFeeds.selectedSpindleOverride ? COLOR_ORANGE : COLOR_BUTTON_GRAY), COLOR_WHITE, 2);
 
   drawButton(5, 280, 230, 40, "Main Menu", COLOR_BLUE, COLOR_WHITE, 2);
 }
@@ -77,7 +79,7 @@ function updateFeedOverrideDisplay() {
   if (currentPendantScreen !== PSCREEN_FEEDS_SPEEDS) return;
   const fro = pendantMachine.feedOverride;
   const active = pendantFeeds.dialMode === 1;
-  const P = panel(72, 37, 83, 137);
+  const P = panel(72, 37, 161, 137);
   drawDialField(P.g, P.ox, P.oy, 72, 37, fro, COLOR_ORANGE, active);
 }
 
@@ -85,7 +87,7 @@ function updateSpindleOverrideDisplay() {
   if (currentPendantScreen !== PSCREEN_FEEDS_SPEEDS) return;
   const sro = pendantMachine.spindleOverride;
   const active = pendantFeeds.dialMode === 2;
-  const P = panel(72, 37, 83, 236);
+  const P = panel(72, 37, 161, 236);
   drawDialField(P.g, P.ox, P.oy, 72, 37, sro, COLOR_GREEN, active);
 }
 
@@ -97,7 +99,7 @@ function redrawFeedOverrideButtons() {
     drawButton(5 + i * 78, 95, 72, 37, pcts[i], bg, COLOR_WHITE, 2);
   }
   drawButton(5, 137, 72, 37, pcts[3], (3 === pendantFeeds.selectedFeedOverride ? COLOR_ORANGE : COLOR_BUTTON_GRAY), COLOR_WHITE, 2);
-  drawButton(161, 137, 72, 37, pcts[4], (4 === pendantFeeds.selectedFeedOverride ? COLOR_ORANGE : COLOR_BUTTON_GRAY), COLOR_WHITE, 2);
+  drawButton(83, 137, 72, 37, pcts[4], (4 === pendantFeeds.selectedFeedOverride ? COLOR_ORANGE : COLOR_BUTTON_GRAY), COLOR_WHITE, 2);
   updateFeedOverrideDisplay();
 }
 
@@ -109,7 +111,7 @@ function redrawSpindleOverrideButtons() {
     drawButton(5 + i * 78, 194, 72, 37, pcts[i], bg, COLOR_WHITE, 2);
   }
   drawButton(5, 236, 72, 37, pcts[3], (3 === pendantFeeds.selectedSpindleOverride ? COLOR_ORANGE : COLOR_BUTTON_GRAY), COLOR_WHITE, 2);
-  drawButton(161, 236, 72, 37, pcts[4], (4 === pendantFeeds.selectedSpindleOverride ? COLOR_ORANGE : COLOR_BUTTON_GRAY), COLOR_WHITE, 2);
+  drawButton(83, 236, 72, 37, pcts[4], (4 === pendantFeeds.selectedSpindleOverride ? COLOR_ORANGE : COLOR_BUTTON_GRAY), COLOR_WHITE, 2);
   updateSpindleOverrideDisplay();
 }
 
@@ -178,13 +180,13 @@ function handleFeedsSpeedsTouch(x, y) {
     return;
   }
   if (isTouchInBounds(x, y, 83, 137, 72, 37)) {
-    pendantFeeds.dialMode = pendantFeeds.dialMode === 1 ? 0 : 1;
-    updateFeedOverrideDisplay(); updateSpindleOverrideDisplay();
-    return;
-  }
-  if (isTouchInBounds(x, y, 161, 137, 72, 37)) {
     pendantFeeds.dialMode = 0; pendantFeeds.selectedFeedOverride = 4;
     applyFeedOverride(150); redrawFeedOverrideButtons(); updateSpindleOverrideDisplay();
+    return;
+  }
+  if (isTouchInBounds(x, y, 161, 137, 72, 37)) {   // DIAL box — end of row 2
+    pendantFeeds.dialMode = pendantFeeds.dialMode === 1 ? 0 : 1;
+    updateFeedOverrideDisplay(); updateSpindleOverrideDisplay();
     return;
   }
   for (let i = 0; i < 3; i++) {
@@ -200,13 +202,13 @@ function handleFeedsSpeedsTouch(x, y) {
     return;
   }
   if (isTouchInBounds(x, y, 83, 236, 72, 37)) {
-    pendantFeeds.dialMode = pendantFeeds.dialMode === 2 ? 0 : 2;
-    updateSpindleOverrideDisplay(); updateFeedOverrideDisplay();
-    return;
-  }
-  if (isTouchInBounds(x, y, 161, 236, 72, 37)) {
     pendantFeeds.dialMode = 0; pendantFeeds.selectedSpindleOverride = 4;
     applySpindleOverride(150); redrawSpindleOverrideButtons(); updateFeedOverrideDisplay();
+    return;
+  }
+  if (isTouchInBounds(x, y, 161, 236, 72, 37)) {   // DIAL box — end of row 2
+    pendantFeeds.dialMode = pendantFeeds.dialMode === 2 ? 0 : 2;
+    updateSpindleOverrideDisplay(); updateFeedOverrideDisplay();
     return;
   }
   if (isTouchInBounds(x, y, 5, 280, 230, 40)) currentPendantScreen = PSCREEN_MAIN_MENU;

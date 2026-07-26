@@ -93,6 +93,19 @@ function handleEncoderDelta(delta) {
       updateJogAxisDisplay();
       return;
     }
+    if (pendantJog.incDialMode) {
+      // Coarse dial box — step through 10/50/100 mm (.5/2.0/4.0 in).  Clamped
+      // rather than wrapping, like every other dial-driven field in the UI.
+      const ci = constrain(pendantJog.coarseIdx + (delta > 0 ? 1 : -1), 0, JOG_COARSE_COUNT - 1);
+      if (ci !== pendantJog.coarseIdx) {
+        pendantJog.coarseIdx = ci;
+        jogApplyCoarseIncrement();
+        saveJogPrefs();
+        redrawJogIncrementButtons();
+        updateJogAxisDisplay();
+      }
+      return;
+    }
     if (pendantJog.selectedAxis < 0) return;
 
     // Continuous-jog (MPG) detection + dial-stop watchdog (mirrors CNC_Pendant_UI.cpp):
@@ -180,6 +193,10 @@ function handleEncoderDelta(delta) {
     const fo = pendantProbeV2.focusedField;
     if (fo < 0) return;
     const p = pendantProbeV2;
+    // Dial inert while the confirm overlay is up — the fields-only redraw would
+    // paint over the dialog, and the values being confirmed must not move
+    // underneath the prompt.  Mirrors the calState guard below.
+    if (p.confirmActive) return;
     if (currentPendantScreen === PSCREEN_PROBE) {
       const step = probeDialStep(delta, fo <= 1 ? 10.0 : 0.1);
       if (fo === 0) p.probeRate = constrain(p.probeRate + delta * step, 10, 3000);
@@ -355,7 +372,7 @@ window.addEventListener("DOMContentLoaded", () => {
   loadProbeSettings();
   try {
     const jp = JSON.parse(localStorage.getItem("sim.jog") || "{}");
-    if (jp.fineIncrements !== undefined) pendantJog.fineIncrements = jp.fineIncrements;
+    if (jp.coarseIdx !== undefined) pendantJog.coarseIdx = constrain(jp.coarseIdx, 0, JOG_COARSE_COUNT - 1);
     if (jp.selectedIncrement !== undefined) pendantJog.selectedIncrement = jp.selectedIncrement;
   } catch (e) {}
 

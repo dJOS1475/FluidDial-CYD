@@ -93,11 +93,29 @@ function updateStatusAxisPositions() {
   g.fillRoundRect(ox, oy, 230, 65, 5, COLOR_DARKER_BG);
   g.setTextColor(COLOR_GRAY_TEXT); g.setTextSize(1);
   g.setCursor(ox + 5, oy + 5); g.print("MACHINE POSITION");
+  // Unit hint, dim, top-right — drawn once so it costs no column width.  Without
+  // it the panel gave no clue whether it showed mm or inches (a 25x difference).
+  const inInch = pendantMachine.inInches;
+  g.setCursor(ox + 212, oy + 5); g.print(inInch ? "in" : "mm");
+  // Resolution follows the unit: 1 decimal always meant 0.1" = 2.54 mm in inch
+  // mode.  0.1 mm is the right grain for a monitoring DRO, so inch gets 3dp
+  // (0.025 mm) to land at the same real-world resolution.  Same pairing as
+  // probeDrawPosPanel().  A long coordinate can still outrun a column, so drop
+  // a decimal until it fits rather than running into the neighbouring axis.
+  const colW = 112;              // narrowest of the two columns (118..230)
+  const prefDec = inInch ? 3 : 1;
   const axisNames = ["X", "Y", "Z", "A"];
   g.setTextColor(COLOR_ORANGE); g.setTextSize(2);
   for (let i = 0; i < numAxes; i++) {
-    g.setCursor(ox + (i % 2 ? 125 : 5), oy + 20 + ((i / 2) | 0) * 23);
-    g.print(axisNames[i] + ":" + fmtF(pos[i], 1));
+    let dec = prefDec;
+    let s = axisNames[i] + ":" + fmtF(pos[i], dec);
+    while (dec > 0 && g.textWidth(s) > colW) {
+      dec--;
+      s = axisNames[i] + ":" + fmtF(pos[i], dec);
+    }
+    // Right column at 118 (was 125): "Y:-145.60" is 108 px, the old 105 px clipped.
+    g.setCursor(ox + (i % 2 ? 118 : 5), oy + 20 + ((i / 2) | 0) * 23);
+    g.print(s);
   }
 }
 

@@ -125,7 +125,10 @@ static void drawCalOverlay(const char* l1, const char* l2, uint16_t l2col, int b
 void updateProbeCfg3DFields() {
     if (currentPendantScreen != PSCREEN_PROBE_CFG_3D) return;
     int fo = pendantProbeV2.focusedField;
-    probeDrawKVTouch( 7,  79, 112, 40, "Ball dia.",   pendantProbeV2.ballDia,       "mm", PROBE_C_BLUE, fo==0, 3);
+    // Ball dia. steps in 0.1 mm → 1 decimal.  Deflection keeps 3: its dial step is
+    // 0.001 mm and the calibration routine writes a measured value, so those digits
+    // are real.
+    probeDrawKVTouch( 7,  79, 112, 40, "Ball dia.",   pendantProbeV2.ballDia,       "mm", PROBE_C_BLUE, fo==0, 1);
     probeDrawKVTouch(122,  79, 111, 40, "Deflection",  pendantProbeV2.deflection,    "mm", PROBE_C_BLUE, fo==1, 3);
     probeDrawKVTouch(  7, 140, 112, 40, "Gauge width", pendantProbeV2.calGaugeWidth, "mm", PROBE_C_BLUE, fo==2, 1);
 }
@@ -367,11 +370,12 @@ void updateProbeCfgPlateFields() {
     if (currentPendantScreen != PSCREEN_PROBE_CFG_PLATE) return;
     bool xyz = (pendantProbeV2.probeTypeIdx == PROBE_TYPE_XYZPLATE);
     int fo = pendantProbeV2.focusedField;
-    probeDrawKVTouch(7, 79, 112, 40, "Thickness", pendantProbeV2.plateThick, "mm", PROBE_C_BLUE, fo==0, 3);
+    // 1 decimal — all four step in 0.1 mm.
+    probeDrawKVTouch(7, 79, 112, 40, "Thickness", pendantProbeV2.plateThick, "mm", PROBE_C_BLUE, fo==0, 1);
     if (xyz) {
-        probeDrawKVTouch(122,  79, 111, 40, "Width",       pendantProbeV2.plateWidth, "mm", PROBE_C_DIMBLUE, fo==1, 3);
-        probeDrawKVTouch(  7, 122, 112, 40, "XY offset X", pendantProbeV2.plateOffX,  "mm", PROBE_C_BLUE,    fo==2, 3);
-        probeDrawKVTouch(122, 122, 111, 40, "XY offset Y", pendantProbeV2.plateOffY,  "mm", PROBE_C_BLUE,    fo==3, 3);
+        probeDrawKVTouch(122,  79, 111, 40, "Width",       pendantProbeV2.plateWidth, "mm", PROBE_C_DIMBLUE, fo==1, 1);
+        probeDrawKVTouch(  7, 122, 112, 40, "XY offset X", pendantProbeV2.plateOffX,  "mm", PROBE_C_BLUE,    fo==2, 1);
+        probeDrawKVTouch(122, 122, 111, 40, "XY offset Y", pendantProbeV2.plateOffY,  "mm", PROBE_C_BLUE,    fo==3, 1);
     }
 }
 

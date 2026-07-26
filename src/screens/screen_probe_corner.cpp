@@ -167,9 +167,10 @@ static void drawCornerDiagram() {
 void updateProbeCornerFields() {
     if (currentPendantScreen != PSCREEN_PROBE_CORNER) return;
     int fo = pendantProbeV2.focusedField;
-    probeDrawKVTouch(122, 117, 111, 31, "Probe depth", pendantProbeV2.cornerDepth, "mm", PROBE_C_BLUE, fo==0, 3);
-    probeDrawKVTouch(122, 150, 111, 31, "Overshoot",   pendantProbeV2.cornerOver,  "mm", PROBE_C_BLUE, fo==1, 3);
-    probeDrawKVTouch(122, 183, 111, 31, "XY retract",  pendantProbeV2.cornerRetXY, "mm", PROBE_C_BLUE, fo==2, 3);
+    // 1 decimal — the dial steps these in 0.1 mm (see updateProbeSharedFields).
+    probeDrawKVTouch(122, 117, 111, 31, "Probe depth", pendantProbeV2.cornerDepth, "mm", PROBE_C_BLUE, fo==0, 1);
+    probeDrawKVTouch(122, 150, 111, 31, "Overshoot",   pendantProbeV2.cornerOver,  "mm", PROBE_C_BLUE, fo==1, 1);
+    probeDrawKVTouch(122, 183, 111, 31, "XY retract",  pendantProbeV2.cornerRetXY, "mm", PROBE_C_BLUE, fo==2, 1);
 }
 
 void drawProbeCornerScreen() {

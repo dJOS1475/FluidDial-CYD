@@ -19,7 +19,7 @@
 // step with the top entry in CHANGELOG.md on every release — it is independent
 // of the git-tag-derived `git_info` string (which only changes when a tag is
 // actually cut, and is kept for the full build identifier in the About screen).
-#define FIRMWARE_VERSION "v2.1.9"
+#define FIRMWARE_VERSION "v2.1.10"
 
 // ===== Display Configuration =====
 #define DISPLAY_WIDTH 240
@@ -72,8 +72,9 @@
 #define COLOR_WHITE 0xFFFF           // White
 #define COLOR_BUTTON_GRAY 0x31A6     // Dark button gray
 #define COLOR_BUTTON_ACTIVE 0x5AEB   // Active button gray
-#define COLOR_TEAL 0x032C            // 565 of (0,100,100) — Spindle Dial idle
+#define COLOR_TEAL 0x032C            // 565 of (0,100,100) — Spindle Dial idle; main-menu params group
 #define COLOR_TEAL_BRIGHT 0x05B6     // 565 of (0,180,180) — Spindle Dial active
+#define COLOR_INDIGO 0x52B9          // 565 of (82,85,206) — XYZ Corner routine; main-menu jobs group
 
 // ===== Serial Configuration =====
 #define SERIAL_BAUD 115200

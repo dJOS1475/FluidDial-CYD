@@ -10,14 +10,22 @@ function drawMainMenu() {
   updateMainMenuDisplay();
 
   const btnY = 115, btnH = 47, btnGap = 52;
-  drawButton(5, btnY, 112, btnH, "Jog", COLOR_BLUE, COLOR_WHITE, 2);
-  drawButton(123, btnY, 112, btnH, "Work Area", COLOR_BLUE, COLOR_WHITE, 2);
-  drawMultiLineButton(5, btnY + btnGap, 112, btnH, "Feeds &", "Speeds", COLOR_BLUE, COLOR_WHITE, 2);
-  drawMultiLineButton(123, btnY + btnGap, 112, btnH, "Spindle", "Control", COLOR_BLUE, COLOR_WHITE, 2);
-  drawButton(5, btnY + btnGap * 2, 112, btnH, "Macros", COLOR_BLUE, COLOR_WHITE, 2);
-  drawButton(123, btnY + btnGap * 2, 112, btnH, "SD Card", COLOR_BLUE, COLOR_WHITE, 2);
-  drawButton(5, btnY + btnGap * 3, 112, btnH, "Probe", COLOR_BLUE, COLOR_WHITE, 2);
-  drawButton(123, btnY + btnGap * 3, 112, btnH, "Status", COLOR_BLUE, COLOR_WHITE, 2);
+  // Colour groups the menu by what each destination is for, so you can land on the
+  // right button without reading it.  The existing row pairs are already coherent
+  // categories, so nothing moves — only the tint changes.  All navigation colours:
+  // orange (selected), green (execute), red (alarm), yellow (focus) stay reserved.
+  const MENU_MACHINE = COLOR_BLUE;    // move it, datum it, probe it, watch it
+  const MENU_PARAMS  = COLOR_TEAL;    // cutting parameters
+  const MENU_JOBS    = COLOR_INDIGO;  // jobs & files
+
+  drawButton(5, btnY, 112, btnH, "Jog", MENU_MACHINE, COLOR_WHITE, 2);
+  drawButton(123, btnY, 112, btnH, "Work Area", MENU_MACHINE, COLOR_WHITE, 2);
+  drawMultiLineButton(5, btnY + btnGap, 112, btnH, "Feeds &", "Speeds", MENU_PARAMS, COLOR_WHITE, 2);
+  drawMultiLineButton(123, btnY + btnGap, 112, btnH, "Spindle", "Control", MENU_PARAMS, COLOR_WHITE, 2);
+  drawButton(5, btnY + btnGap * 2, 112, btnH, "Macros", MENU_JOBS, COLOR_WHITE, 2);
+  drawButton(123, btnY + btnGap * 2, 112, btnH, "SD Card", MENU_JOBS, COLOR_WHITE, 2);
+  drawButton(5, btnY + btnGap * 3, 112, btnH, "Probe", MENU_MACHINE, COLOR_WHITE, 2);
+  drawButton(123, btnY + btnGap * 3, 112, btnH, "Status", MENU_MACHINE, COLOR_WHITE, 2);
 }
 
 function updateMainMenuDisplay() {

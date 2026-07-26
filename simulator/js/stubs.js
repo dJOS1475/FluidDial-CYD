@@ -96,7 +96,7 @@ function saveJogPrefs() {
   localStorage.setItem(
     "sim.jog",
     JSON.stringify({
-      fineIncrements: pendantJog.fineIncrements,
+      coarseIdx: pendantJog.coarseIdx,
       selectedIncrement: pendantJog.selectedIncrement,
     })
   );

@@ -18,6 +18,11 @@
 #define PROBE_BTN_BLUE    COLOR_BLUE          // 0x1C9F — Main Menu / nav buttons
 #define PROBE_BTN_NAVY    COLOR_BUTTON_GRAY   // 0x31A6
 #define PROBE_BTN_TEAL    COLOR_TEAL_BRIGHT   // 0x05B6 — Configure button (distinct from blue nav)
+// Routine-button identity colours.  These name a routine, they don't signal state —
+// so they deliberately avoid orange (= selected) and the bright greens (= execute).
+#define PROBE_BTN_INDIGO  COLOR_INDIGO        // 0x52B9 — XYZ Corner routine (was ORANGE,
+                                              //  which was identical to the selected-chip colour)
+#define PROBE_BTN_PURPLE  0x8010              // Boss routine
 #define PROBE_SEL_BG      COLOR_DARKER_BG     // 0x2104 — focused field background
 #define PROBE_WARN_BG     0x2880              // amber warning bg (functional colour — keep)
 #define PROBE_WARN_BDR    0x6800              // amber warning border

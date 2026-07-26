@@ -1,29 +1,59 @@
 /* screen_jog_homing.cpp port */
 
+// Slots 0-2 are fixed fine increments; slot 3 is the dial box, holding whichever
+// coarse value pendantJog.coarseIdx selects.  Imperial mirrors metric one-for-one
+// in real terms (.001"~0.01mm ... 4.0"~100mm) using round inch numbers.
+const JOG_COARSE_COUNT = 3;
+const kCoarseLabelsMm = ["10", "50", "100"];
+const kCoarseValuesMm = [10.0, 50.0, 100.0];
+const kCoarseLabelsIn = [".5", "2.0", "4.0"];
+const kCoarseValuesIn = [0.5, 2.0, 4.0];
+
 function currentIncrements() {
   const s = { labels: [], values: [] };
+  const ci = constrain(pendantJog.coarseIdx, 0, JOG_COARSE_COUNT - 1);
   if (pendantMachine.inInches) {
-    if (pendantJog.fineIncrements) {
-      s.labels = [".0001", ".001", ".010", ".100"];
-      s.values = [0.0001, 0.001, 0.01, 0.1];
-    } else {
-      s.labels = [".05", ".5", "2.0", "4.0"];
-      s.values = [0.05, 0.5, 2.0, 4.0];
-    }
+    s.labels = [".001", ".010", ".100", kCoarseLabelsIn[ci]];
+    s.values = [0.001, 0.010, 0.100, kCoarseValuesIn[ci]];
   } else {
-    if (pendantJog.fineIncrements) {
-      s.labels = ["0.01", "0.1", "1", "10"];
-      s.values = [0.01, 0.1, 1.0, 10.0];
-    } else {
-      s.labels = ["1", "10", "50", "100"];
-      s.values = [1.0, 10.0, 50.0, 100.0];
-    }
+    s.labels = ["0.01", "0.1", "1", kCoarseLabelsMm[ci]];
+    s.values = [0.01, 0.1, 1.0, kCoarseValuesMm[ci]];
   }
   return s;
 }
 
+function jogApplyCoarseIncrement() {
+  if (pendantJog.selectedIncrement !== 3) return;
+  pendantJog.increment = currentIncrements().values[3];
+}
+
 const SPD_X = 80, SPD_W = 80, SPD_Y = 277, SPD_H = 40;
-let _incTapCount = 0, _incTapMs = 0;
+const INC_Y = 231, INC_H = 38;
+function incX(i) { return 5 + i * 56; }
+
+// Slot 3 is the coarse dial box — adjustable-field styling so it reads as
+// something the encoder drives, yellow while incDialMode is live.
+function drawIncDialButton() {
+  const selected = pendantJog.selectedIncrement === 3;
+  const active = pendantJog.incDialMode;
+  const incs = currentIncrements();
+  const bg = active ? PROBE_SEL_BG : (selected ? COLOR_ORANGE : COLOR_BUTTON_GRAY);
+  const bdr = active ? PROBE_C_YELLOW : PROBE_C_TAPBDR;
+  const x = incX(3);
+  display.fillRoundRect(x, INC_Y, 52, INC_H, 5, bg);
+  display.drawRoundRect(x, INC_Y, 52, INC_H, 5, bdr);
+  display.setTextSize(1);
+  display.setTextColor(active ? PROBE_C_YELLOW : COLOR_WHITE);
+  const lw = display.textWidth("DIAL");
+  display.setCursor(x + ((52 - lw) / 2 | 0), INC_Y + 5);
+  display.print("DIAL");
+  const v = incs.labels[3];
+  display.setTextSize(2);
+  display.setTextColor(active ? PROBE_C_YELLOW : COLOR_WHITE);
+  const vw = display.textWidth(v);
+  display.setCursor(x + ((52 - vw) / 2 | 0), INC_Y + 17);
+  display.print(v);
+}
 
 function redrawJogSpeedButton() {
   // Adjustable-field style, matching the tap-to-edit buttons on the Probe
@@ -38,9 +68,9 @@ function redrawJogSpeedButton() {
 function enterJogHoming() {
   releasePanelSprites();
   pendantJog.increment = currentIncrements().values[pendantJog.selectedIncrement];
-  _incTapCount = 0; _incTapMs = 0;
-  if (pendantJog.speedDialMode || pendantJog.selectedAxis < 0) {
+  if (pendantJog.speedDialMode || pendantJog.incDialMode || pendantJog.selectedAxis < 0) {
     pendantJog.speedDialMode = false;
+    pendantJog.incDialMode = false;
     pendantJog.selectedAxis = 0;
   }
   releasePanelSprites();
@@ -59,8 +89,7 @@ function redrawJogIncrementLabel() {
   } else {
     display.setTextColor(COLOR_GRAY_TEXT);
     const unitStr = pendantJog.selectedAxis === 3 ? "deg" : (pendantMachine.inInches ? "in" : "mm");
-    const modeStr = pendantJog.fineIncrements ? " - fine" : " - coarse";
-    display.print("JOG INCREMENT (" + unitStr + ")" + modeStr);
+    display.print("JOG INCREMENT (" + unitStr + ")");
   }
 }
 
@@ -95,10 +124,13 @@ function drawJogHomingScreen() {
 
   redrawJogIncrementLabel();
 
-  const incs = currentIncrements();
-  for (let i = 0; i < 4; i++) {
-    const bg = i === pendantJog.selectedIncrement ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
-    drawButton(5 + i * 56, 231, 52, 38, incs.labels[i], bg, COLOR_WHITE, 2);
+  {
+    const incs = currentIncrements();
+    for (let i = 0; i < 3; i++) {
+      const bg = i === pendantJog.selectedIncrement ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
+      drawButton(incX(i), INC_Y, 52, INC_H, incs.labels[i], bg, COLOR_WHITE, 2);
+    }
+    drawIncDialButton();   // slot 3 — coarse dial box
   }
 
   drawButton(5, SPD_Y, 73, SPD_H, "Main Menu", COLOR_BLUE, COLOR_WHITE, 1);
@@ -127,6 +159,21 @@ function updateJogAxisDisplay() {
     g.setTextColor(COLOR_GRAY_TEXT); g.setTextSize(1);
     let hw = g.textWidth("Select an axis to jog");
     g.setCursor(ox + 115 - (hw / 2 | 0), oy + 42); g.print("Select an axis to jog");
+  } else if (pendantJog.incDialMode) {
+    // Coarse dial mode — mirrors the speed panel so the encoder's job is never
+    // ambiguous: it's stepping the increment, not moving the machine.
+    const incs = currentIncrements();
+    const unit = pendantJog.selectedAxis === 3 ? "deg" : (pendantMachine.inInches ? "in" : "mm");
+    g.setTextColor(PROBE_C_YELLOW); g.setTextSize(1);
+    let lw = g.textWidth("JOG INCREMENT");
+    g.setCursor(ox + 115 - (lw / 2 | 0), oy + 5); g.print("JOG INCREMENT");
+    const incStr = incs.labels[3] + " " + unit;
+    g.setTextSize(2);
+    let sw = g.textWidth(incStr);
+    g.setCursor(ox + 115 - (sw / 2 | 0), oy + 20); g.print(incStr);
+    g.setTextColor(COLOR_GRAY_TEXT); g.setTextSize(1);
+    let hw2 = g.textWidth("Select an axis to jog");
+    g.setCursor(ox + 115 - (hw2 / 2 | 0), oy + 42); g.print("Select an axis to jog");
   } else {
     const axisNames = ["X", "Y", "Z", "A"];
     const inAlarm = pendantMachine.status.startsWith("Alarm");
@@ -175,10 +222,11 @@ function redrawJogAxisButtons() {
 function redrawJogIncrementButtons() {
   if (currentPendantScreen !== PSCREEN_JOG_HOMING) return;
   const incs = currentIncrements();
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 3; i++) {
     const bg = i === pendantJog.selectedIncrement ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
-    drawButton(5 + i * 56, 231, 52, 38, incs.labels[i], bg, COLOR_WHITE, 2);
+    drawButton(incX(i), INC_Y, 52, INC_H, incs.labels[i], bg, COLOR_WHITE, 2);
   }
+  drawIncDialButton();   // slot 3 — coarse dial box
 }
 
 function handleJogHomingTouch(x, y) {
@@ -200,42 +248,47 @@ function handleJogHomingTouch(x, y) {
   }
   for (let i = 0; i < numAx; i++) {
     if (isTouchInBounds(x, y, 5 + i * btnW, 173, btnW - 4, 38)) {
+      const leavingIncDial = pendantJog.incDialMode;
       pendantJog.speedDialMode = false;
+      pendantJog.incDialMode = false;   // picking an axis hands the dial back to jogging
       pendantJog.selectedAxis = i;
       pendantJog.homingAxis = -1;
       redrawJogAxisButtons();
       redrawJogSpeedButton();
+      if (leavingIncDial) redrawJogIncrementButtons();
       redrawJogIncrementLabel();   // A<->X/Y/Z changes the unit (deg vs mm/in)
       return;
     }
   }
+  // Slots 0-2 are plain picks.  Slot 3 is the coarse dial box: selecting it also
+  // hands the encoder over to stepping 10/50/100, so it deselects the axis exactly
+  // as the Speed box does — picking an axis hands the encoder back to jogging.
   for (let i = 0; i < 4; i++) {
-    if (isTouchInBounds(x, y, 5 + i * 56, 231, 52, 38)) {
-      if (i === 3) {
-        const now = millis();
-        if (now - _incTapMs < 600) _incTapCount++; else _incTapCount = 1;
-        _incTapMs = now;
-        if (_incTapCount >= 3) {
-          _incTapCount = 0;
-          pendantJog.fineIncrements = !pendantJog.fineIncrements;
-          pendantJog.increment = currentIncrements().values[pendantJog.selectedIncrement];
-          saveJogPrefs();
-          drawJogHomingScreen();
-          return;
-        }
-      } else _incTapCount = 0;
+    if (isTouchInBounds(x, y, incX(i), INC_Y, 52, INC_H)) {
       pendantJog.selectedIncrement = i;
       pendantJog.increment = currentIncrements().values[i];
       saveJogPrefs();
+      if (i === 3) {
+        pendantJog.incDialMode = true;
+        pendantJog.speedDialMode = false;
+        pendantJog.selectedAxis = -1;
+        redrawJogAxisButtons();
+        redrawJogSpeedButton();
+      } else if (pendantJog.incDialMode) {
+        pendantJog.incDialMode = false;
+      }
       redrawJogIncrementButtons();
       return;
     }
   }
   if (isTouchInBounds(x, y, SPD_X, SPD_Y, SPD_W, SPD_H)) {
+    const leavingIncDial = pendantJog.incDialMode;
     pendantJog.speedDialMode = true;
+    pendantJog.incDialMode = false;   // only one dial mode at a time
     pendantJog.selectedAxis = -1;
     redrawJogAxisButtons();
     redrawJogSpeedButton();
+    if (leavingIncDial) redrawJogIncrementButtons();
     updateJogAxisDisplay();
     return;
   }

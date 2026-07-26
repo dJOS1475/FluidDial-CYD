@@ -567,6 +567,19 @@ static void handleEncoderDelta(int32_t delta) {
             updateJogAxisDisplay();
             return;
         }
+        if (pendantJog.incDialMode) {
+            // Coarse dial box — step through 10/50/100 mm (.5/2.0/4.0 in).  Clamped
+            // rather than wrapping, like every other dial-driven field in the UI.
+            int ci = constrain(pendantJog.coarseIdx + (delta > 0 ? 1 : -1), 0, JOG_COARSE_COUNT - 1);
+            if (ci != pendantJog.coarseIdx) {
+                pendantJog.coarseIdx = ci;
+                jogApplyCoarseIncrement();   // slot 3 is selected, so refresh the live increment
+                saveJogPrefs();
+                redrawJogIncrementButtons();
+                updateJogAxisDisplay();
+            }
+            return;
+        }
         if (pendantJog.selectedAxis < 0) return;  // no axis selected — do nothing
 
         // Continuous-jog cadence — record EVERY detent here, BEFORE the flow-control
@@ -716,6 +729,13 @@ static void handleEncoderDelta(int32_t delta) {
 
         auto& p = pendantProbeV2;
 
+        // Dial inert while the confirm overlay is up.  Two reasons: the fields-only
+        // redraw below would paint over the dialog (it doesn't repaint the overlay
+        // the way a full screen draw did), and — more importantly — the values being
+        // confirmed must not move underneath the prompt, or you'd confirm a probe
+        // against a number you never saw.  Mirrors the calState guard below.
+        if (p.confirmActive) return;
+
         if (currentPendantScreen == PSCREEN_PROBE) {
             // SCR0 shared fields: 0=probeRate 1=seekRate 2=retractDist 3=maxZTravel
             float step = probeDialStep(delta, (fo <= 1) ? 10.0f : 0.1f);
@@ -822,7 +842,7 @@ static void handleEncoderDelta(int32_t delta) {
 
 void saveJogPrefs() {
     preferences.begin("pendant", false);
-    preferences.putBool("jogFineMode", pendantJog.fineIncrements);
+    preferences.putInt("jogCoarseIdx", pendantJog.coarseIdx);
     preferences.putInt("jogSelInc",    pendantJog.selectedIncrement);
     preferences.end();
 }
@@ -1672,13 +1692,14 @@ void setup_pendant() {
     // Load saved display rotation and jog preferences
     preferences.begin("pendant", false);
     int  savedRotation = preferences.getInt("rotation",    2);
-    bool savedFineInc  = preferences.getBool("jogFineMode", true);
+    int  savedCoarse   = preferences.getInt("jogCoarseIdx", 0);
     int  savedSelInc   = preferences.getInt("jogSelInc",    1);
     preferences.end();
 
-    pendantJog.fineIncrements    = savedFineInc;
-    // Clamp saved index to a valid increment slot — guards against a corrupted
-    // NVS entry indexing past the 4-element increment table.
+    // Clamp saved indices to valid slots — guards against a corrupted NVS entry,
+    // and against the pre-v2.1.10 layout where slot 3 was a fixed value and this
+    // key did not exist (getInt then returns the 0 default, i.e. the 10 mm entry).
+    pendantJog.coarseIdx         = constrain(savedCoarse, 0, JOG_COARSE_COUNT - 1);
     pendantJog.selectedIncrement = constrain(savedSelInc, 0, 3);
 
     pendantMachine.rotation        = savedRotation;

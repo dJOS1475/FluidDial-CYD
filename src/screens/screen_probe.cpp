@@ -446,8 +446,10 @@ void updateProbeSharedFields() {
     int fo = pendantProbeV2.focusedField;
     probeDrawKVTouch( 7,  94, 112, 33, "Probe rate", pendantProbeV2.probeRate,   "mm/m", PROBE_C_BLUE, fo==0, 0);
     probeDrawKVTouch(122,  94, 111, 33, "Seek rate", pendantProbeV2.seekRate,    "mm/m", PROBE_C_BLUE, fo==1, 0);
-    probeDrawKVTouch( 7, 130, 112, 33, "Retract",   pendantProbeV2.retractDist, "mm",   PROBE_C_BLUE,  fo==2, 3);
-    probeDrawKVTouch(122, 130, 111, 33, "Max Z trvl",pendantProbeV2.maxZTravel,  "mm",   PROBE_C_BLUE,   fo==3, 3);
+    // 1 decimal: the dial steps these in 0.1 mm, so further digits could only ever
+    // read as trailing zeros — noise on a 111 px field.
+    probeDrawKVTouch( 7, 130, 112, 33, "Retract",   pendantProbeV2.retractDist, "mm",   PROBE_C_BLUE,  fo==2, 1);
+    probeDrawKVTouch(122, 130, 111, 33, "Max Z trvl",pendantProbeV2.maxZTravel,  "mm",   PROBE_C_BLUE,   fo==3, 1);
 }
 
 static void drawSharedKVPanel() {
@@ -476,12 +478,12 @@ static void drawRoutineButtons() {
     } else if (n == 2) {
         // XYZ Plate — two full-width buttons, one per row.
         drawButton(7, 186, 226, 40, "Z Surface",  PROBE_BTN_GREEN,  COLOR_WHITE, 2);
-        drawButton(7, 230, 226, 40, "XYZ Corner", PROBE_BTN_YELLOW, COLOR_WHITE, 2);
+        drawButton(7, 230, 226, 40, "XYZ Corner", PROBE_BTN_INDIGO, COLOR_WHITE, 2);
     } else {  // n == 4 (3D probe) — 2×2 grid
         drawButton(  7, 186, 112, 40, "Z Surf",  PROBE_BTN_GREEN,  COLOR_WHITE, 2);
-        drawButton(121, 186, 112, 40, "XYZ Cnr", PROBE_BTN_YELLOW, COLOR_WHITE, 2);
+        drawButton(121, 186, 112, 40, "XYZ Cnr", PROBE_BTN_INDIGO, COLOR_WHITE, 2);
         drawButton(  7, 230, 112, 40, "Bore", PROBE_BTN_BLUE,   COLOR_WHITE, 2);
-        drawButton(121, 230, 112, 40, "Boss", (uint16_t)0x8010, COLOR_WHITE, 2);
+        drawButton(121, 230, 112, 40, "Boss", PROBE_BTN_PURPLE, COLOR_WHITE, 2);
     }
 }
 

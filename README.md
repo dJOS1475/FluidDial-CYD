@@ -44,9 +44,11 @@ The 3 physical buttons always perform the same function regardless of the active
 **Jog & Homing**
 * Jog dial moves the selected axis by the chosen increment; the DRO shows **machine coordinates** (MPos)
 * **Handwheel stop** — a single deliberate detent completes its full move, but during a **continuous spin** the axis stops the moment you stop turning (the pendant sends a real-time jog-cancel), so it doesn't coast through queued moves — like a full-size MPG
-* Two increment sets — **Fine** (default) and **Coarse** — triple-tap the rightmost increment button to switch between them; the active set and selected increment are saved to flash and restored on reboot
-  * Fine metric: 0.01 / 0.1 / 1 / 10 mm — Fine imperial: .0001 / .001 / .010 / .100 in
-  * Coarse metric: 1 / 10 / 50 / 100 mm — Coarse imperial: .05 / .5 / 2.0 / 4.0 in
+* Four increment slots — the first three are fixed, the fourth is a **DIAL box** holding the coarse values
+  * Metric: 0.01 / 0.1 / 1 mm, then **10 / 50 / 100 mm** in the DIAL box
+  * Imperial: .001 / .010 / .100 in, then **.5 / 2.0 / 4.0 in** in the DIAL box
+  * Tap the DIAL box to select it and hand the encoder over to stepping the coarse value (the box highlights and the DRO reads "JOG INCREMENT"); tap any axis to hand the encoder back to jogging, keeping the coarse value as the active increment
+  * The selected increment and the DIAL box's value are saved to flash and restored on reboot
 * Units detected automatically from the controller (G20/G21) — no manual switching needed
 * The **A axis** (4th axis) is treated as rotary — its DRO shows a **degree symbol (°)** instead of mm/in; X/Y/Z use mm/in as normal
 * Axis selection and increment buttons on screen

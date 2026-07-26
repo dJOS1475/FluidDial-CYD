@@ -59,12 +59,14 @@ void drawFeedsSpeedsScreen() {
         uint16_t bg = (i == pendantFeeds.selectedFeedOverride) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
         drawButton(5 + i * 78, 95, 72, 37, pcts[i], bg, COLOR_WHITE, 2);
     }
+    // Presets run 50→150 in reading order across both rows; the DIAL box sits at
+    // the end rather than interrupting the sequence (matching Spindle Control).
     uint16_t bg3 = (3 == pendantFeeds.selectedFeedOverride) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
     drawButton(5, 137, 72, 37, pcts[3], bg3, COLOR_WHITE, 2);
-    display.fillRoundRect(83, 137, 72, 37, 2, COLOR_BACKGROUND);
-    updateFeedOverrideDisplay();
     uint16_t bg4 = (4 == pendantFeeds.selectedFeedOverride) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
-    drawButton(161, 137, 72, 37, pcts[4], bg4, COLOR_WHITE, 2);
+    drawButton(83, 137, 72, 37, pcts[4], bg4, COLOR_WHITE, 2);
+    display.fillRoundRect(161, 137, 72, 37, 2, COLOR_BACKGROUND);
+    updateFeedOverrideDisplay();
 
     display.setTextColor(COLOR_GRAY_TEXT);
     display.setTextSize(1);
@@ -77,10 +79,10 @@ void drawFeedsSpeedsScreen() {
     }
     uint16_t bg3s = (3 == pendantFeeds.selectedSpindleOverride) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
     drawButton(5, 236, 72, 37, pcts[3], bg3s, COLOR_WHITE, 2);
-    display.fillRoundRect(83, 236, 72, 37, 2, COLOR_BACKGROUND);
-    updateSpindleOverrideDisplay();
     uint16_t bg4s = (4 == pendantFeeds.selectedSpindleOverride) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
-    drawButton(161, 236, 72, 37, pcts[4], bg4s, COLOR_WHITE, 2);
+    drawButton(83, 236, 72, 37, pcts[4], bg4s, COLOR_WHITE, 2);
+    display.fillRoundRect(161, 236, 72, 37, 2, COLOR_BACKGROUND);
+    updateSpindleOverrideDisplay();
 
     drawButton(5, 280, 230, 40, "Main Menu", COLOR_BLUE, COLOR_WHITE, 2);
 }
@@ -133,9 +135,9 @@ void updateFeedOverrideDisplay() {
 
     int ox, oy;
     bool active = (pendantFeeds.dialMode == 1);
-    LovyanGFX* g = beginPanelSprite(72, 37, ox, oy, 83, 137);
+    LovyanGFX* g = beginPanelSprite(72, 37, ox, oy, 161, 137);
     drawDialField(g, ox, oy, 72, 37, fro, COLOR_ORANGE, active);
-    endPanelSprite(72, 37, 83, 137);
+    endPanelSprite(72, 37, 161, 137);
 }
 
 void updateSpindleOverrideDisplay() {
@@ -148,9 +150,9 @@ void updateSpindleOverrideDisplay() {
 
     int ox, oy;
     bool active = (pendantFeeds.dialMode == 2);
-    LovyanGFX* g = beginPanelSprite(72, 37, ox, oy, 83, 236);
+    LovyanGFX* g = beginPanelSprite(72, 37, ox, oy, 161, 236);
     drawDialField(g, ox, oy, 72, 37, sro, COLOR_GREEN, active);
-    endPanelSprite(72, 37, 83, 236);
+    endPanelSprite(72, 37, 161, 236);
 }
 
 void redrawFeedOverrideButtons() {
@@ -163,7 +165,7 @@ void redrawFeedOverrideButtons() {
     uint16_t bg3 = (3 == pendantFeeds.selectedFeedOverride) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
     drawButton(5, 137, 72, 37, pcts[3], bg3, COLOR_WHITE, 2);
     uint16_t bg4 = (4 == pendantFeeds.selectedFeedOverride) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
-    drawButton(161, 137, 72, 37, pcts[4], bg4, COLOR_WHITE, 2);
+    drawButton(83, 137, 72, 37, pcts[4], bg4, COLOR_WHITE, 2);
     updateFeedOverrideDisplay();
 }
 
@@ -177,7 +179,7 @@ void redrawSpindleOverrideButtons() {
     uint16_t bg3s = (3 == pendantFeeds.selectedSpindleOverride) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
     drawButton(5, 236, 72, 37, pcts[3], bg3s, COLOR_WHITE, 2);
     uint16_t bg4s = (4 == pendantFeeds.selectedSpindleOverride) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
-    drawButton(161, 236, 72, 37, pcts[4], bg4s, COLOR_WHITE, 2);
+    drawButton(83, 236, 72, 37, pcts[4], bg4s, COLOR_WHITE, 2);
     updateSpindleOverrideDisplay();
 }
 
@@ -218,19 +220,19 @@ void handleFeedsSpeedsTouch(int x, int y) {
         return;
     }
 
-    // ── Feed override readout button (centre of row 2) ───────────────────
     if (isTouchInBounds(x, y, 83, 137, 72, 37)) {
-        pendantFeeds.dialMode = (pendantFeeds.dialMode == 1) ? 0 : 1;  // toggle; deselects spindle
-        updateFeedOverrideDisplay();
-        updateSpindleOverrideDisplay();
-        return;
-    }
-
-    if (isTouchInBounds(x, y, 161, 137, 72, 37)) {
         pendantFeeds.dialMode             = 0;
         pendantFeeds.selectedFeedOverride = 4;
         applyFeedOverride(150);
         redrawFeedOverrideButtons();
+        updateSpindleOverrideDisplay();
+        return;
+    }
+
+    // ── Feed override readout button (end of row 2) ──────────────────────
+    if (isTouchInBounds(x, y, 161, 137, 72, 37)) {
+        pendantFeeds.dialMode = (pendantFeeds.dialMode == 1) ? 0 : 1;  // toggle; deselects spindle
+        updateFeedOverrideDisplay();
         updateSpindleOverrideDisplay();
         return;
     }
@@ -255,19 +257,19 @@ void handleFeedsSpeedsTouch(int x, int y) {
         return;
     }
 
-    // ── Spindle override readout button (centre of row 2) ────────────────
     if (isTouchInBounds(x, y, 83, 236, 72, 37)) {
-        pendantFeeds.dialMode = (pendantFeeds.dialMode == 2) ? 0 : 2;  // toggle; deselects feed
-        updateSpindleOverrideDisplay();
-        updateFeedOverrideDisplay();
-        return;
-    }
-
-    if (isTouchInBounds(x, y, 161, 236, 72, 37)) {
         pendantFeeds.dialMode                = 0;
         pendantFeeds.selectedSpindleOverride = 4;
         applySpindleOverride(150);
         redrawSpindleOverrideButtons();
+        updateFeedOverrideDisplay();
+        return;
+    }
+
+    // ── Spindle override readout button (end of row 2) ───────────────────
+    if (isTouchInBounds(x, y, 161, 236, 72, 37)) {
+        pendantFeeds.dialMode = (pendantFeeds.dialMode == 2) ? 0 : 2;  // toggle; deselects feed
+        updateSpindleOverrideDisplay();
         updateFeedOverrideDisplay();
         return;
     }
