@@ -6,11 +6,11 @@
     {
       "chipFamily": "ESP32",
       "parts": [
-        { "path": "https://cdn.jsdelivr.net/gh/dJOS1475/FluidDial-CYD@latest/docs/bootloader.bin", "offset": 4096 },
-        { "path": "https://cdn.jsdelivr.net/gh/dJOS1475/FluidDial-CYD@latest/docs/partitions.bin", "offset": 32768 },
-        { "path": "https://cdn.jsdelivr.net/gh/dJOS1475/FluidDial-CYD@latest/docs/boot_app0.bin",  "offset": 57344 },
-        { "path": "https://cdn.jsdelivr.net/gh/dJOS1475/FluidDial-CYD@latest/docs/firmware.bin",   "offset": 65536 },
-        { "path": "https://cdn.jsdelivr.net/gh/dJOS1475/FluidDial-CYD@latest/docs/littlefs.bin",   "offset": 2686976 }
+        { "path": "https://cdn.jsdelivr.net/gh/dJOS1475/FluidDial-CYD@v2.1.10/docs/bootloader.bin", "offset": 4096 },
+        { "path": "https://cdn.jsdelivr.net/gh/dJOS1475/FluidDial-CYD@v2.1.10/docs/partitions.bin", "offset": 32768 },
+        { "path": "https://cdn.jsdelivr.net/gh/dJOS1475/FluidDial-CYD@v2.1.10/docs/boot_app0.bin",  "offset": 57344 },
+        { "path": "https://cdn.jsdelivr.net/gh/dJOS1475/FluidDial-CYD@v2.1.10/docs/firmware.bin",   "offset": 65536 },
+        { "path": "https://cdn.jsdelivr.net/gh/dJOS1475/FluidDial-CYD@v2.1.10/docs/littlefs.bin",   "offset": 2686976 }
       ]
     }
   ]

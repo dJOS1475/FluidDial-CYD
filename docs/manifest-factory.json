@@ -6,7 +6,7 @@
     {
       "chipFamily": "ESP32",
       "parts": [
-        { "path": "https://cdn.jsdelivr.net/gh/dJOS1475/FluidDial-CYD@latest/docs/merged-flash.bin", "offset": 0 }
+        { "path": "https://cdn.jsdelivr.net/gh/dJOS1475/FluidDial-CYD@v2.1.10/docs/merged-flash.bin", "offset": 0 }
       ]
     }
   ]
