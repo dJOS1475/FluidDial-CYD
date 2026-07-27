@@ -50,10 +50,20 @@ static const int SPD_W = 80;
 static const int SPD_Y = 277;
 static const int SPD_H = 40;
 
-// Increment row: 4 slots at x = 5 + i*56, w=52.
+// Button rows use the shared rowBtnX()/rowBtnWAt() grid from pendant_shared.h, so
+// HOME, JOG AXIS and the increment row all span 5..235 and align with each other.
+static const int ROW_H  = 38;
+static const int HOME_Y = 115;
+static const int AXIS_Y = 173;
+
+// Increment row: 4 slots on the shared grid — rowBtnW(4) == 56, pitch 58.
 static const int INC_Y = 231;
-static const int INC_H = 38;
-static inline int incX(int i) { return 5 + i * 56; }
+static const int INC_H = ROW_H;
+static const int INC_W = 56;
+static inline int incX(int i) { return rowBtnX(4, i); }
+
+// Axis to restore when the coarse dial box hands the encoder back to jogging.
+static int incDialPrevAxis = 0;
 
 // Slot 3 is the coarse dial box.  Drawn as an adjustable field rather than a plain
 // button — small "DIAL" cap, value below, tappable border — so it reads as
@@ -67,20 +77,20 @@ static void drawIncDialButton() {
     uint16_t bg  = active ? PROBE_SEL_BG : (selected ? COLOR_ORANGE : COLOR_BUTTON_GRAY);
     uint16_t bdr = active ? PROBE_C_YELLOW : PROBE_C_TAPBDR;
     int x = incX(3);
-    display.fillRoundRect(x, INC_Y, 52, INC_H, 5, bg);
-    display.drawRoundRect(x, INC_Y, 52, INC_H, 5, bdr);
+    display.fillRoundRect(x, INC_Y, INC_W, INC_H, 5, bg);
+    display.drawRoundRect(x, INC_Y, INC_W, INC_H, 5, bdr);
 
     display.setTextSize(1);
     display.setTextColor(active ? PROBE_C_YELLOW : COLOR_WHITE);
     int16_t lw = display.textWidth("DIAL");
-    display.setCursor(x + (52 - lw) / 2, INC_Y + 5);
+    display.setCursor(x + (INC_W - lw) / 2, INC_Y + 5);
     display.print("DIAL");
 
     const char* v = incs.labels[3];
     display.setTextSize(2);
     display.setTextColor(active ? PROBE_C_YELLOW : COLOR_WHITE);
     int16_t vw = display.textWidth(v);
-    display.setCursor(x + (52 - vw) / 2, INC_Y + 17);
+    display.setCursor(x + (INC_W - vw) / 2, INC_Y + 17);
     display.print(v);
 }
 
@@ -157,7 +167,6 @@ void drawJogHomingScreen() {
 
     String axisNames[] = { "X", "Y", "Z", "A" };
     int numAx = pendantMachine.numAxes;
-    int btnW  = 230 / numAx;
 
     display.setTextColor(COLOR_GRAY_TEXT);
     display.setTextSize(1);
@@ -165,12 +174,12 @@ void drawJogHomingScreen() {
     display.print("HOME");
 
     {
-        const int HW = 57;
         String homeNames[4] = { "X", "Y", "Z", numAx < 4 ? "ALL" : "A" };
         int    numHome       = (numAx < 4) ? numAx + 1 : 4;
         for (int i = 0; i < numHome; i++) {
             int sz = (i == numAx && numAx < 4) ? 2 : 3;
-            drawButton(5 + i * HW, 115, HW - 4, 38, homeNames[i], COLOR_DARK_GREEN, COLOR_WHITE, sz);
+            drawButton(rowBtnX(numHome, i), HOME_Y, rowBtnWAt(numHome, i), ROW_H,
+                       homeNames[i], COLOR_DARK_GREEN, COLOR_WHITE, sz);
         }
     }
 
@@ -183,7 +192,8 @@ void drawJogHomingScreen() {
         // Deselect all axis buttons when in speed dial mode
         uint16_t bg = (!pendantJog.speedDialMode && i == pendantJog.selectedAxis)
                       ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
-        drawButton(5 + i * btnW, 173, btnW - 4, 38, axisNames[i], bg, COLOR_WHITE, 3);
+        drawButton(rowBtnX(numAx, i), AXIS_Y, rowBtnWAt(numAx, i), ROW_H,
+                   axisNames[i], bg, COLOR_WHITE, 3);
     }
 
     redrawJogIncrementLabel();
@@ -192,7 +202,7 @@ void drawJogHomingScreen() {
         IncrementSet incs = currentIncrements();
         for (int i = 0; i < 3; i++) {
             uint16_t bg = (i == pendantJog.selectedIncrement) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
-            drawButton(incX(i), INC_Y, 52, INC_H, incs.labels[i], bg, COLOR_WHITE, 2);
+            drawButton(incX(i), INC_Y, INC_W, INC_H, incs.labels[i], bg, COLOR_WHITE, 2);
         }
         drawIncDialButton();   // slot 3 — coarse dial box
     }
@@ -268,11 +278,14 @@ void updateJogAxisDisplay() {
         g->setCursor(ox + 115 - sw / 2, oy + 20);
         g->print(incStr);
 
+        // Name the toggle explicitly — the second tap is the quick way back to
+        // jogging, and nothing else on screen would tell you it exists.
         g->setTextColor(COLOR_GRAY_TEXT);
         g->setTextSize(1);
-        int16_t hw2 = g->textWidth("Select an axis to jog");
+        const char* hint = "Tap DIAL again to jog";
+        int16_t hw2 = g->textWidth(hint);
         g->setCursor(ox + 115 - hw2 / 2, oy + 42);
-        g->print("Select an axis to jog");
+        g->print(hint);
     } else {
         String axisNames[] = { "X", "Y", "Z", "A" };
         float  positions[] = { px, py, pz, pa };
@@ -344,11 +357,11 @@ void redrawJogAxisButtons() {
     if (currentPendantScreen != PSCREEN_JOG_HOMING) return;
     String axisNames[] = { "X", "Y", "Z", "A" };
     int numAx = pendantMachine.numAxes;
-    int btnW  = 230 / numAx;
     for (int i = 0; i < numAx; i++) {
         uint16_t bg = (!pendantJog.speedDialMode && i == pendantJog.selectedAxis)
                       ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
-        drawButton(5 + i * btnW, 173, btnW - 4, 38, axisNames[i], bg, COLOR_WHITE, 3);
+        drawButton(rowBtnX(numAx, i), AXIS_Y, rowBtnWAt(numAx, i), ROW_H,
+                   axisNames[i], bg, COLOR_WHITE, 3);
     }
     updateJogAxisDisplay();
 }
@@ -358,7 +371,7 @@ void redrawJogIncrementButtons() {
     IncrementSet incs = currentIncrements();
     for (int i = 0; i < 3; i++) {
         uint16_t bg = (i == pendantJog.selectedIncrement) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
-        drawButton(incX(i), INC_Y, 52, INC_H, incs.labels[i], bg, COLOR_WHITE, 2);
+        drawButton(incX(i), INC_Y, INC_W, INC_H, incs.labels[i], bg, COLOR_WHITE, 2);
     }
     drawIncDialButton();   // slot 3 — coarse dial box
 }
@@ -367,19 +380,18 @@ void redrawJogIncrementButtons() {
 
 void handleJogHomingTouch(int x, int y) {
     int numAx = pendantMachine.numAxes;
-    int btnW  = 230 / numAx;
 
-    // Home buttons — always 4 at fixed 57px width
+    // Home buttons — laid out on the shared row grid
     {
-        const int HW = 57;
         String homeNames[4] = { "X", "Y", "Z", numAx < 4 ? "ALL" : "A" };
         int    numHome       = (numAx < 4) ? numAx + 1 : 4;
         for (int i = 0; i < numHome; i++) {
-            if (isTouchInBounds(x, y, 5 + i * HW, 115, HW - 4, 38)) {
+            int hx = rowBtnX(numHome, i), hw = rowBtnWAt(numHome, i);
+            if (isTouchInBounds(x, y, hx, HOME_Y, hw, ROW_H)) {
                 int sz = (i == numAx && numAx < 4) ? 2 : 3;
-                drawButton(5 + i * HW, 115, HW - 4, 38, homeNames[i], COLOR_WHITE, COLOR_DARK_GREEN, sz);
+                drawButton(hx, HOME_Y, hw, ROW_H, homeNames[i], COLOR_WHITE, COLOR_DARK_GREEN, sz);
                 delay_ms(150);
-                drawButton(5 + i * HW, 115, HW - 4, 38, homeNames[i], COLOR_DARK_GREEN, COLOR_WHITE, sz);
+                drawButton(hx, HOME_Y, hw, ROW_H, homeNames[i], COLOR_DARK_GREEN, COLOR_WHITE, sz);
                 if (!pendantConnected) return;
                 char cmd[16];
                 if (i == numAx) {
@@ -405,7 +417,7 @@ void handleJogHomingTouch(int x, int y) {
 
     // Axis selection — also exits speed dial mode
     for (int i = 0; i < numAx; i++) {
-        if (isTouchInBounds(x, y, 5 + i * btnW, 173, btnW - 4, 38)) {
+        if (isTouchInBounds(x, y, rowBtnX(numAx, i), AXIS_Y, rowBtnWAt(numAx, i), ROW_H)) {
             bool leavingIncDial = pendantJog.incDialMode;
             pendantJog.speedDialMode = false;
             pendantJog.incDialMode   = false;   // picking an axis hands the dial back to jogging
@@ -420,21 +432,41 @@ void handleJogHomingTouch(int x, int y) {
     }
 
     // Increment selection.  Slots 0-2 are plain picks.  Slot 3 is the coarse dial
-    // box: selecting it also hands the encoder over to stepping 10/50/100, which
-    // means deselecting the axis exactly as the Speed box does — the DRO then
-    // prompts for an axis, and picking one hands the encoder back to jogging.
+    // box, which walks three states so a tap can never surprise you by taking the
+    // encoder away mid-jog:
+    //   tap 1 (not yet selected) — just SELECT the coarse value; you keep jogging
+    //   tap 2 (already selected) — hand the encoder over to stepping 10/50/100
+    //                              (axis deselected, like the Speed box)
+    //   tap 3 (adjusting)        — hand it back to jogging at the value just set,
+    //                              restoring the axis you were on
+    // After the first selection it simply toggles jog <-> adjust.  Tapping an axis
+    // is still the other way out of adjust mode.
     {
         for (int i = 0; i < 4; i++) {
-            if (isTouchInBounds(x, y, incX(i), INC_Y, 52, INC_H)) {
+            if (isTouchInBounds(x, y, incX(i), INC_Y, INC_W, INC_H)) {
+                bool wasSelected = (pendantJog.selectedIncrement == i);
                 pendantJog.selectedIncrement = i;
                 IncrementSet incs = currentIncrements();
                 pendantJog.increment = incs.values[i];
                 saveJogPrefs();
 
                 if (i == 3) {
-                    pendantJog.incDialMode   = true;
-                    pendantJog.speedDialMode = false;
-                    pendantJog.selectedAxis  = -1;
+                    if (!wasSelected) {
+                        // Tap 1 — select only, leave the encoder on jogging.
+                        pendantJog.incDialMode = false;
+                    } else if (pendantJog.incDialMode) {
+                        // Tap 3 — back to jogging with the value just set.
+                        pendantJog.incDialMode  = false;
+                        pendantJog.selectedAxis = constrain(incDialPrevAxis, 0,
+                                                            pendantMachine.numAxes - 1);
+                    } else {
+                        // Tap 2 — the encoder now steps the coarse value.
+                        incDialPrevAxis = (pendantJog.selectedAxis >= 0)
+                                          ? pendantJog.selectedAxis : 0;
+                        pendantJog.incDialMode   = true;
+                        pendantJog.speedDialMode = false;
+                        pendantJog.selectedAxis  = -1;
+                    }
                     redrawJogAxisButtons();      // also refreshes the DRO
                     redrawJogSpeedButton();
                 } else if (pendantJog.incDialMode) {

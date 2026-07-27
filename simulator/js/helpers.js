@@ -1,3 +1,13 @@
+/* Shared button-row layout (mirrors pendant_shared.h) — evenly spans n buttons
+   across the standard 5..235 content width with 2 px gaps, so every button row on
+   every screen ends flush on both sides and the rows line up with each other.  The
+   last slot absorbs any rounding remainder, so odd counts still finish at 235.
+     drawButton(rowBtnX(n, i), y, rowBtnWAt(n, i), h, ...)  */
+const ROW_X0 = 5, ROW_W = 230, ROW_GAP = 2;
+function rowBtnW(n) { return ((ROW_W - (n - 1) * ROW_GAP) / n) | 0; }
+function rowBtnX(n, i) { return ROW_X0 + i * (rowBtnW(n) + ROW_GAP); }
+function rowBtnWAt(n, i) { return i === n - 1 ? ROW_X0 + ROW_W - rowBtnX(n, i) : rowBtnW(n); }
+
 /*
  * helpers.js — shared UI helpers, ported from CNC_Pendant_UI.cpp and
  * screen_probe.cpp.  Names and signatures match the firmware so the screen

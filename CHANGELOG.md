@@ -3,6 +3,14 @@
 **ChangeLog:**
 
 
+**2026-07-27**
+
+v2.1.11
+* Change: **the jog increment DIAL box now takes two taps to reach adjust mode.** Tapping it used to hand the encoder straight over to stepping the coarse value, which took the dial away from jogging the moment you selected it. Now the first tap just **selects** the coarse increment — you keep jogging with it, exactly like the other three slots — and a **second tap** switches the encoder to stepping 10/50/100. A further tap hands the encoder back to jogging and **restores the axis you were on**, so you can change the coarse increment and carry on without reaching for an axis button. Tapping an axis is still the other way out. (Once the slot is selected it simply toggles jog ↔ adjust, so returning to the screen with it already selected means the first tap adjusts.)
+* UI: **button rows now span the full width evenly.** The HOME, JOG AXIS and jog-increment rows, and the coordinate-system row on the Work Area screen, each used their own hardcoded pitch and all ended short — 5 px of margin on the left but 11-15 px on the right. They now share one layout grid (5..235, 2 px gaps) so every row ends flush on both sides and the rows line up with each other. Buttons are a few pixels wider as a result, so the touch targets grew slightly.
+* Fix: **resuming a spin straight after a dial-stop needed an extra detent to re-arm.** The watchdog reset its rapid-tick counter to 0 after cancelling, while a fresh spin starts from 1 — so a resumed spin armed on its 3rd detent instead of its 2nd, and if you stopped again inside that window the axis coasted. Both paths now seed identically. A single deliberate detent (>100 ms gap) is still never cancelled.
+* Improve: **continuous jogging stops sooner when you stop turning the dial.** The dial-stop watchdog used a fixed 150 ms of silence before sending JogCancel. That figure had to be sized for the *slowest* spin — gaps between detents can legitimately reach 100 ms, and firing sooner would cancel a jog you were still commanding — but the margin was then paid on every spin, including fast ones with 20 ms gaps. The timeout now scales with the measured tick rate (2.5x the running average, clamped to 60–150 ms): a slow spin keeps the old protection, a fast spin stops in **60 ms instead of 150 ms**. At 5000 mm/min that cuts the latency component of overshoot from ~12.5 mm to ~5 mm. The remainder is FluidNC's own deceleration ramp (`$120`/`$121`/`$122`), which no pendant-side change can shorten.
+
 **2026-07-26**
 
 v2.1.10

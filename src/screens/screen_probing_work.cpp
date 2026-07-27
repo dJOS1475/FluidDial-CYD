@@ -121,11 +121,16 @@ void updateWorkAreaPos() {
     if (hasSprite) spriteValueDisplay.pushSprite(5, 166);
 }
 
+// Coordinate-system row — on the shared 5..235 grid (was pitch 56 / w 52, which
+// left 5 px on the left but 15 px on the right).
+static const int WCS_Y = 55;
+static const int WCS_H = 38;
+
 void redrawWorkCoordButtons() {
     String coordSystems[] = { "G54", "G55", "G56", "G57" };
     for (int i = 0; i < 4; i++) {
         uint16_t bg = (i == pendantProbing.selectedCoordIndex) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
-        drawButton(5 + i * 56, 55, 52, 38, coordSystems[i], bg, COLOR_WHITE, 2);
+        drawButton(rowBtnX(4, i), WCS_Y, rowBtnWAt(4, i), WCS_H, coordSystems[i], bg, COLOR_WHITE, 2);
     }
 }
 
@@ -133,7 +138,7 @@ void handleProbingWorkTouch(int x, int y) {
     // Coordinate system selection
     String coords[] = { "G54", "G55", "G56", "G57" };
     for (int i = 0; i < 4; i++) {
-        if (isTouchInBounds(x, y, 5 + i * 56, 55, 52, 38)) {
+        if (isTouchInBounds(x, y, rowBtnX(4, i), WCS_Y, rowBtnWAt(4, i), WCS_H)) {
             pendantProbing.selectedCoordIndex  = i;
             pendantProbing.selectedCoordSystem = coords[i];
             redrawWorkCoordButtons();

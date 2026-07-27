@@ -47,7 +47,7 @@ The 3 physical buttons always perform the same function regardless of the active
 * Four increment slots — the first three are fixed, the fourth is a **DIAL box** holding the coarse values
   * Metric: 0.01 / 0.1 / 1 mm, then **10 / 50 / 100 mm** in the DIAL box
   * Imperial: .001 / .010 / .100 in, then **.5 / 2.0 / 4.0 in** in the DIAL box
-  * Tap the DIAL box to select it and hand the encoder over to stepping the coarse value (the box highlights and the DRO reads "JOG INCREMENT"); tap any axis to hand the encoder back to jogging, keeping the coarse value as the active increment
+  * **First tap selects** the coarse increment — you carry on jogging with it, just like the other three slots. A **second tap** hands the encoder over to stepping 10/50/100 (the box highlights yellow and the DRO reads "JOG INCREMENT"). A further tap hands the encoder back to jogging and restores the axis you were on; tapping an axis does the same
   * The selected increment and the DIAL box's value are saved to flash and restored on reboot
 * Units detected automatically from the controller (G20/G21) — no manual switching needed
 * The **A axis** (4th axis) is treated as rotary — its DRO shows a **degree symbol (°)** instead of mm/in; X/Y/Z use mm/in as normal

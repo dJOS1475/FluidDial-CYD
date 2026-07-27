@@ -58,18 +58,22 @@ function updateWorkAreaPos() {
   }
 }
 
+// Coordinate-system row — on the shared 5..235 grid (was pitch 56 / w 52, which
+// left 5 px on the left but 15 px on the right).
+const WCS_Y = 55, WCS_H = 38;
+
 function redrawWorkCoordButtons() {
   const coordSystems = ["G54", "G55", "G56", "G57"];
   for (let i = 0; i < 4; i++) {
     const bg = i === pendantProbing.selectedCoordIndex ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
-    drawButton(5 + i * 56, 55, 52, 38, coordSystems[i], bg, COLOR_WHITE, 2);
+    drawButton(rowBtnX(4, i), WCS_Y, rowBtnWAt(4, i), WCS_H, coordSystems[i], bg, COLOR_WHITE, 2);
   }
 }
 
 function handleProbingWorkTouch(x, y) {
   const coords = ["G54", "G55", "G56", "G57"];
   for (let i = 0; i < 4; i++) {
-    if (isTouchInBounds(x, y, 5 + i * 56, 55, 52, 38)) {
+    if (isTouchInBounds(x, y, rowBtnX(4, i), WCS_Y, rowBtnWAt(4, i), WCS_H)) {
       pendantProbing.selectedCoordIndex = i;
       pendantProbing.selectedCoordSystem = coords[i];
       redrawWorkCoordButtons();

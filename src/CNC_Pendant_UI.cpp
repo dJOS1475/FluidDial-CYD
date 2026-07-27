@@ -82,11 +82,43 @@ static unsigned long syncConnectMs  = 0;      // millis() at the connect edge
 // threshold, so it is never cancelled and completes its full commanded distance.
 // All of these are touched only on Core 1 (pendant_comms_task), so no mutex.
 static const unsigned long JOG_CONTINUOUS_MS = 100;   // ticks closer than this = a spin
-static const unsigned long JOG_STOP_MS       = 150;   // silence after last tick → cancel
+static const unsigned long JOG_STOP_MS       = 150;   // ceiling — slowest spin keeps full margin
+static const unsigned long JOG_STOP_MIN_MS   = 60;    // floor — fastest spin still needs jitter room
 static unsigned long jogLastTickMs  = 0;
+static unsigned long jogTickEmaMs   = 0;      // EMA of the inter-detent gap while spinning
 static bool          jogContinuous  = false;
 static int           jogRapidCount  = 0;
 static bool          jogForceReseed = false;  // set on cancel → soft-limit predMm re-seeds
+
+// How much dial silence means "the wheel stopped".
+//
+// A fixed timeout has to be sized for the SLOWEST spin — gaps can legitimately run
+// up to JOG_CONTINUOUS_MS, so anything under ~150 ms risks firing between two
+// detents the user is still turning (cancelling a jog they're actively commanding,
+// which is worse than coasting).  But that worst-case margin was then paid on every
+// spin: a fast spin with 20 ms gaps waited the full 150 ms to notice it had stopped.
+//
+// Scaling the timeout by the observed tick rate keeps the margin proportional rather
+// than absolute.  A slow spin still gets the old 150 ms; a fast spin stops in 60 ms.
+// Self-tuning, so it also adapts to different encoders and to how hard a given user
+// spins.  Latency is only half the overshoot — the rest is FluidNC's decel ramp
+// ($120/$121/$122), which no pendant-side change can shrink.
+//
+// KNOWN TRADE-OFF: because JOG_STOP_MIN_MS (60) is below JOG_CONTINUOUS_MS (100), a
+// sustained fast spin followed by an ABRUPT pause longer than the window — but still
+// short enough to count as one spin — cancels and then restarts on the next detent.
+// Smooth deceleration does NOT trigger this (the EMA tracks it); it needs a >2.5x
+// step change in one detent.  That behaviour is arguably correct for a handwheel —
+// stop turning, motion stops — but if it feels like a stutter in use, raising
+// JOG_STOP_MIN_MS to 105 (just above JOG_CONTINUOUS_MS) makes false cancels
+// impossible by construction, at the cost of a 105 ms floor instead of 60 ms.
+static inline unsigned long jogStopTimeoutMs() {
+    if (jogTickEmaMs == 0) return JOG_STOP_MS;      // no measurement yet — be conservative
+    unsigned long t = (jogTickEmaMs * 5) / 2;        // 2.5x the average gap
+    if (t < JOG_STOP_MIN_MS) t = JOG_STOP_MIN_MS;
+    if (t > JOG_STOP_MS)     t = JOG_STOP_MS;
+    return t;
+}
 
 // ── Paced feed/spindle override stepper ───────────────────────────────────────
 // FluidNC overrides are relative-only (reset / ±10% coarse / ±1% fine real-time
@@ -592,10 +624,19 @@ static void handleEncoderDelta(int32_t delta) {
         unsigned long interval = now - jogLastTickMs;
         jogLastTickMs = now;
         if (interval < JOG_CONTINUOUS_MS) {
+            // Track the average gap so jogStopTimeoutMs() can scale the dial-stop
+            // window to how fast the wheel is actually turning.  Clamped to >=1 ms
+            // because 0 is the "not measured yet" sentinel.  1/4-weight EMA smooths
+            // detent jitter without lagging a real speed change by more than a few
+            // ticks.
+            if (interval < 1) interval = 1;
+            jogTickEmaMs = (jogTickEmaMs == 0) ? interval
+                                               : (jogTickEmaMs * 3 + interval) / 4;
             if (++jogRapidCount >= 2) jogContinuous = true;
         } else {
             jogRapidCount = 1;
             jogContinuous = false;
+            jogTickEmaMs  = 0;   // next spin re-measures from scratch
         }
 
         // Jog flow control: if FluidNC's motion planner is full (many sends in
@@ -1400,10 +1441,15 @@ void pendant_comms_task(void* /*pvParameters*/) {
         // now been still for JOG_STOP_MS, cancel the jog so motion halts at once
         // (flushes the queued G91 moves) instead of coasting.  Harmless if no jog
         // is active — FluidNC ignores JogCancel when not jogging.
-        if (jogContinuous && pendantConnected && (nowMs - jogLastTickMs > JOG_STOP_MS)) {
+        if (jogContinuous && pendantConnected && (nowMs - jogLastTickMs > jogStopTimeoutMs())) {
             fnc_realtime(JogCancel);
             jogContinuous  = false;
-            jogRapidCount  = 0;
+            // Seed at 1, not 0, so resuming a spin re-arms on the same detent count
+            // as starting one.  The tick handler's "gap too long" branch already
+            // seeds 1, so a fresh spin arms on its 2nd detent; resetting to 0 here
+            // made a resumed spin need 3, and a stop during that window coasted.
+            jogRapidCount  = 1;
+            jogTickEmaMs   = 0;
             jogForceReseed = true;   // predMm holds flushed distance — resync next tick
         }
 

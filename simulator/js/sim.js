@@ -72,8 +72,18 @@ function handlePendantTouch(x, y) {
 const _jogClamp = { predMm: [NaN, NaN, NaN], lastTickMs: 0, lastAxis: -1 };
 
 // Continuous-jog (MPG-style) dial-stop tracking (mirrors CNC_Pendant_UI.cpp).
-const JOG_CONTINUOUS_MS = 100, JOG_STOP_MS = 150;
-const _jogMpg = { lastTickMs: 0, continuous: false, rapidCount: 0, timer: null };
+const JOG_CONTINUOUS_MS = 100, JOG_STOP_MS = 150, JOG_STOP_MIN_MS = 60;
+const _jogMpg = { lastTickMs: 0, tickEmaMs: 0, continuous: false, rapidCount: 0, timer: null };
+
+// How much dial silence means "the wheel stopped".  A fixed timeout has to be sized
+// for the SLOWEST spin (gaps up to JOG_CONTINUOUS_MS), but that worst-case margin was
+// then paid on every spin — a fast spin with 20 ms gaps waited the full 150 ms.
+// Scaling by the observed tick rate keeps the margin proportional: slow spins keep
+// the old 150 ms, fast spins stop in 60 ms.
+function jogStopTimeoutMs() {
+  if (_jogMpg.tickEmaMs === 0) return JOG_STOP_MS;   // no measurement yet
+  return Math.min(JOG_STOP_MS, Math.max(JOG_STOP_MIN_MS, (_jogMpg.tickEmaMs * 5 / 2) | 0));
+}
 
 // ===== Encoder delta (ported handleEncoderDelta) =====
 function handleEncoderDelta(delta) {
@@ -116,18 +126,30 @@ function handleEncoderDelta(delta) {
     // (whose sends are mostly dropped) is still recognised as continuous.
     {
       const now = (typeof millis === "function") ? millis() : Date.now();
-      const gap = now - _jogMpg.lastTickMs; _jogMpg.lastTickMs = now;
-      if (gap < JOG_CONTINUOUS_MS) { if (++_jogMpg.rapidCount >= 2) _jogMpg.continuous = true; }
-      else { _jogMpg.rapidCount = 1; _jogMpg.continuous = false; }
+      let gap = now - _jogMpg.lastTickMs; _jogMpg.lastTickMs = now;
+      if (gap < JOG_CONTINUOUS_MS) {
+        // Track the average gap so jogStopTimeoutMs() can scale the dial-stop window
+        // to how fast the wheel is actually turning.  Clamped to >=1 because 0 is the
+        // "not measured yet" sentinel.  1/4-weight EMA smooths detent jitter.
+        if (gap < 1) gap = 1;
+        _jogMpg.tickEmaMs = (_jogMpg.tickEmaMs === 0) ? gap
+                                                      : ((_jogMpg.tickEmaMs * 3 + gap) / 4) | 0;
+        if (++_jogMpg.rapidCount >= 2) _jogMpg.continuous = true;
+      } else {
+        _jogMpg.rapidCount = 1; _jogMpg.continuous = false;
+        _jogMpg.tickEmaMs = 0;   // next spin re-measures from scratch
+      }
       if (_jogMpg.timer) clearTimeout(_jogMpg.timer);
       _jogMpg.timer = setTimeout(() => {
         _jogMpg.timer = null;
         if (_jogMpg.continuous) {
           fnc_realtime(JogCancel);
-          _jogMpg.continuous = false; _jogMpg.rapidCount = 0;
+          // rapidCount seeds at 1 (not 0) so resuming a spin re-arms on the same
+          // detent count as starting one — the "gap too long" branch also seeds 1.
+          _jogMpg.continuous = false; _jogMpg.rapidCount = 1; _jogMpg.tickEmaMs = 0;
           _jogClamp.predMm = [NaN, NaN, NaN];   // flushed queue → resync prediction
         }
-      }, JOG_STOP_MS);
+      }, jogStopTimeoutMs());
     }
 
     // Flow control: skip SENDING this jog if the planner's backed up (the tick is

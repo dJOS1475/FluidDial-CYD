@@ -400,6 +400,22 @@ extern volatile bool pendantConnected;
 // "Connecting" indicator.  Transport-agnostic (works for WiFi and wired).
 extern volatile bool pendantSynced;
 
+// ===== Shared button-row layout =====
+// Evenly spans n buttons across the standard 5..235 content width with 2 px gaps,
+// so every button row on every screen ends flush on both sides and the rows line up
+// with each other.  Several screens previously hardcoded their own pitch (e.g. 56
+// with 52 px buttons), which left 5 px on the left but 15 px on the right.  The last
+// slot absorbs any rounding remainder, so odd button counts still finish at 235.
+//   drawButton(rowBtnX(n, i), y, rowBtnWAt(n, i), h, ...)
+static const int ROW_X0  = 5;
+static const int ROW_W   = 230;
+static const int ROW_GAP = 2;
+static inline int rowBtnW(int n)        { return (ROW_W - (n - 1) * ROW_GAP) / n; }
+static inline int rowBtnX(int n, int i) { return ROW_X0 + i * (rowBtnW(n) + ROW_GAP); }
+static inline int rowBtnWAt(int n, int i) {
+    return (i == n - 1) ? (ROW_X0 + ROW_W - rowBtnX(n, i)) : rowBtnW(n);
+}
+
 // ===== Helper Functions (defined in CNC_Pendant_UI.cpp) =====
 bool   isTouchInBounds(int tx, int ty, int x, int y, int w, int h);
 void   drawRoundRect(int x, int y, int w, int h, int r, uint16_t color);
