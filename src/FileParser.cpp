@@ -34,11 +34,6 @@ bool parser_needs_reset = true;
 // mid-transfer link drop so the parser can't stick half-fed.
 bool g_json_accumulating = false;
 
-// True while a macros fetch is running over HTTP (raw file, no $File/SendJSON
-// envelope).  In this mode the macro listeners only POPULATE the macros vector;
-// the fetch task decides onFilesList()/onError() and the next file, so the
-// listeners must NOT fire those callbacks or touch the WebSocket-chain state.
-static volatile bool g_http_macros_mode = false;
 
 static bool fileinfoCompare(const fileinfo& f1, const fileinfo& f2) {
     // sort into filename order, with files first and folders second (same as on webUI)
@@ -188,6 +183,13 @@ public:
     }
 } macroLinesListener;
 
+// Which macro file's reply is currently outstanding, or null when none is.
+// The macro fallback chain (preferences.json -> macrocfg.json) is normally
+// advanced from the JSON document's end.  An "error:" reply produces no
+// document at all, so without this the chain simply stopped and the Macros
+// screen sat until its own timeout — indistinguishable from a dead link.
+static JsonListener* macro_request_inflight = nullptr;
+
 // macrocfg.json result is a flat array of macro objects, e.g.:
 //   [{"name":"Home","filename":"/macros/home.nc","target":"SD",...}, ...]
 // Entries with empty name or filename are skipped.
@@ -253,7 +255,7 @@ public:
     }
 
     void endArray() override {
-        if (g_http_macros_mode) return;  // HTTP fetch task handles completion
+        macro_request_inflight = nullptr;
         if (macros.empty()) {
             current_scene->onError("No Macros");
         } else {
@@ -362,8 +364,8 @@ public:
             return;
         }
         if (_level == 0) {
+            macro_request_inflight = nullptr;
             g_json_accumulating = false;
-            if (g_http_macros_mode) return;  // HTTP fetch task handles completion + fallback
             // preferences.json document fully parsed — deliver if we found macros,
             // otherwise fall back to the legacy macrocfg.json file.
             if (!macros.empty()) {
@@ -398,10 +400,24 @@ void request_json_file(const char* name) {
 }
 
 void request_macro_list_wu2() {
+    macro_request_inflight = &preferencesListener;
     request_json_file("preferences.json");   // try current format first
 }
 void request_macro_list_wu3() {
+    macro_request_inflight = &macrocfgListener;
     request_json_file("macrocfg.json");      // fall back to legacy format
+}
+
+// Called from show_error(): FluidNC answered a macro request with "error:N"
+// instead of a document, so advance the fallback chain by hand.  Returns true
+// if a macro request really was outstanding.
+bool macro_request_error() {
+    void try_next_macro_file(JsonListener*);   // defined just below
+    if (!macro_request_inflight) return false;
+    JsonListener* who = macro_request_inflight;
+    macro_request_inflight = nullptr;
+    try_next_macro_file(who);
+    return true;
 }
 
 void try_next_macro_file(JsonListener* listener) {
@@ -428,103 +444,13 @@ void request_macros() {
     try_next_macro_file(nullptr);
 }
 
-#ifdef USE_WIFI
-#include "WiFiConnection.h"   // wifi_http_get()
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
+// v2.2.0: the HTTP macro fetch lived here.  It existed only because FluidNC
+// serves its WebUI and the pendant WebSocket on the same port 80, and the large
+// preferences.json truncated over the WebSocket's $File/SendJSON path — a WiFi
+// problem, not a macro problem.  With the WiFi backend gone both remaining
+// transports (UART, ESP-NOW) are plain byte streams, so request_macros() below
+// is the only path and needs no transport special-casing.
 
-static void clear_macro_list() {
-    macroMenu.removeAllItems();
-    for (auto* m : macros) delete m;
-    macros.clear();
-}
-
-// Fetch macros over HTTP (not the WebSocket) on a short-lived task.  FluidNC's
-// WebUI fetches files this way; it's reliable for the large preferences.json
-// that truncates/disconnects over the WebSocket's $File/SendJSON path.  The
-// HTTP body is the RAW file (no [JSON:]/envelope), so we feed it straight to
-// the macro listeners.  g_http_macros_mode makes the listeners only populate;
-// THIS task decides onFilesList()/onError() and the legacy fallback.
-// Fetch one JSON file over HTTP and parse it with `listener`, retrying the
-// whole GET a few times.  The HTTP connect intermittently fails or stalls when
-// FluidNC is busy servicing the WebSocket on the same port 80 — that race is
-// exactly why macros "sometimes" loaded.  Each attempt is bounded by
-// wifi_http_get's own connect/read timeout, so worst case is a few seconds per
-// try.  Returns true if any macros were parsed.
-// True if any GET in the last fetch returned HTTP 200 (the file was served).
-// Lets onError() tell "served but no macros configured" (→ "No macros found")
-// apart from "couldn't reach the file" (→ "Couldn't load — tap Refresh").
-volatile bool g_macros_http_served = false;
-
-static bool http_fetch_macros(const char* path, JsonListener* listener) {
-    for (int attempt = 0; attempt < 3 && macros.empty(); attempt++) {
-        if (attempt) {
-            clear_macro_list();        // discard any partial parse from the failed try
-            vTaskDelay(pdMS_TO_TICKS(400));   // give FluidNC time to free the socket
-        }
-        JsonStreamingParser p;
-        p.setListener(listener);
-        // 5 s per attempt: enough for the HTTP connect to win the race against
-        // the WebSocket on FluidNC's shared port 80.  3 tries × 2 files stays
-        // under the macros screen's 35 s UI loading deadline.
-        int code = wifi_http_get(path,
-            [&p](const uint8_t* d, size_t n) { for (size_t i = 0; i < n; i++) p.parse((char)d[i]); },
-            5000);
-        if (code == 200) g_macros_http_served = true;
-        if (code == 200 && !macros.empty()) return true;
-    }
-    return !macros.empty();
-}
-
-// Guards against a second fetch task spawning while one is already running
-// (rapid Refresh taps, or leaving and re-entering the Macros screen during the
-// multi-second retry window).  Two tasks would race on the shared `macros`
-// vector (one delete()s a Macro* the other dereferences) and fight over the
-// WS suspend/resume.  Set on the comms/UI thread before xTaskCreate; cleared by
-// the task as it exits.
-static volatile bool g_macros_fetch_active = false;
-
-static void fetch_macros_http_task(void* /*arg*/) {
-    g_http_macros_mode   = true;
-    g_macros_http_served = false;
-    clear_macro_list();
-
-    // Close the WebSocket for the duration of the fetch.  FluidNC serves HTTP
-    // and the WS on the same port 80 and won't reliably accept the GET while the
-    // WS is streaming status — that was the "HTTP 0 / 0 bytes" hang.  With the
-    // socket closed, the GET has the port to itself.  Core 0 reopens it the
-    // instant we resume.
-    wifi_ws_suspend();
-    vTaskDelay(pdMS_TO_TICKS(200));  // let FluidNC fully free the closed channel slot
-
-    // WebUI3 stores macros in preferences.json (settings.macros[]); fall back to
-    // the legacy macrocfg.json (flat array) if preferences.json yields none.
-    if (!http_fetch_macros("/preferences.json", &preferencesListener)) {
-        clear_macro_list();
-        http_fetch_macros("/macrocfg.json", &macrocfgListener);
-    }
-
-    wifi_ws_resume();   // hand the socket back to Core 0
-    g_http_macros_mode = false;
-    // ALWAYS deliver a terminal callback so the macros screen's "Loading…"
-    // clears — onFilesList() on success, onError() otherwise.
-    if (!macros.empty()) current_scene->onFilesList();
-    else                 current_scene->onError("No Macros");
-    g_macros_fetch_active = false;   // allow the next fetch
-    vTaskDelete(nullptr);
-}
-
-void request_macros_http() {
-    // Re-entrancy guard: ignore if a fetch is already running (see flag above).
-    if (g_macros_fetch_active) return;
-    g_macros_fetch_active = true;
-    // Generous stack: WiFiClient + a JsonStreamingParser instance.
-    if (xTaskCreate(fetch_macros_http_task, "macros_http", 16384,
-                    nullptr, 1, nullptr) != pdPASS) {
-        g_macros_fetch_active = false;   // spawn failed — don't latch the guard
-    }
-}
-#endif  // USE_WIFI
 
 void init_macro_parser() {
     macro_parser = new JsonStreamingParser();
@@ -774,6 +700,29 @@ void parser_parse_line(const char* line) {
 // JSON truncates (diagnostic: stuck on x1/a1 mid-result).  The small SD
 // listing has too few chunks to trip it, which is why SD worked and macros
 // didn't.  We target FluidNC v4.0+ only, so the ACK is simply removed.
+
+// Byte-at-a-time entry into the JSON streaming parser, bypassing GrblParser's
+// collect() line buffer entirely.
+//
+// collect() accumulates into a 1024-byte static (_report) and only flushes on a
+// newline — with NO bounds check.  FluidNC's ESPNowChannel flushes its TX buffer
+// either on a newline OR at a 1024-byte threshold, and a raw JSON reply contains
+// no newlines until the document ends, so a ~10 KB macros file arrives as one
+// enormous "line".  Feeding that through collect() overruns _report by kilobytes
+// and corrupts adjacent .bss — which is why Macros/SD failed AND why unrelated
+// state (the sync flag) misbehaved afterwards.
+//
+// A streaming parser needs no line framing, so while a JSON reply is in flight we
+// hand it the bytes directly and collect() never sees them.
+void json_stream_byte(char c) {
+    if (parser_needs_reset) {
+        parser_needs_reset = false;
+        parser.setListener(pInitialListener);
+        parser.reset();
+    }
+    if (c == '\r') return;
+    parser.parse(c);
+}
 
 extern "C" void handle_json(const char* line) {
     if (parser_needs_reset) {

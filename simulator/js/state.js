@@ -21,7 +21,9 @@ const PSCREEN_SPINDLE_CONTROL = "SPINDLE_CONTROL";
 const PSCREEN_MACROS        = "MACROS";
 const PSCREEN_SD_CARD       = "SD_CARD";
 const PSCREEN_FLUIDNC       = "FLUIDNC";
-const PSCREEN_WIFI_SETUP    = "WIFI_SETUP";
+const PSCREEN_CONNECTION       = "CONNECTION";
+const PSCREEN_ESPNOW_PAIR      = "ESPNOW_PAIR";
+const PSCREEN_ESPNOW_MACHINES  = "ESPNOW_MACHINES";
 const PSCREEN_SLEEP         = "SLEEP";   // hidden — display blank after idle; touch-to-wake
 
 // ===== Machine state =====
@@ -41,8 +43,10 @@ const pendantMachine = {
   rotation: 2,
   spindleMaxRPM: 24000,
   spindleMinRPM: 0,
-  fluidDialVersion: "v2.1.11",
-  fluidNCVersion: "v3.7.16",
+  fluidDialVersion: "v2.2.0",
+  // Empty until a [VER:] report arrives — a plausible-looking default rendered
+  // exactly like a real reading.  Screens show "---" while empty, as for IP/SSID.
+  fluidNCVersion: "",
   baudRate: "1000000",
   port: "UART0",
   connectionStatus: "N/C",
@@ -56,8 +60,7 @@ const pendantMachine = {
   batteryPercent: -1,
   batteryMv: 0,
   batteryCharging: false,
-  wifiSignalBars: -1,
-  wifiInApMode: false,
+  linkSignalBars: -1,
 };
 
 const pendantJog = {

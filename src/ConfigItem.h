@@ -32,6 +32,25 @@ public:
         configRequests.push_back(this);
         send_line(_name);
     }
+    // Register for the reply and send the query WITHOUT waiting for an ack.
+    //
+    // init() uses the blocking send_line(), which spins on the previous
+    // command's ack — calling it for a whole settings burst can stall the
+    // caller for seconds (see requestControllerConfig).  This is the same
+    // registration, minus the wait.  Re-requesting an item already outstanding
+    // just re-sends the query; parse_dollar() erases it when the reply lands.
+    void request() {
+        _known = false;
+        for (auto* item : configRequests) {
+            if (item == this) {
+                send_line_nowait(_name);
+                return;
+            }
+        }
+        configRequests.push_back(this);
+        send_line_nowait(_name);
+    }
+
     void got(const char* s) {
         _known = true;
         set(s);

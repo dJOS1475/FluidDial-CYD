@@ -16,9 +16,6 @@ extern fileinfo              fileInfo;
 extern std::vector<fileinfo> fileVector;
 
 extern void request_file_list(const char* dirname);
-#ifdef USE_WIFI
-void request_macros_http();   // fetch macros over HTTP (reliable for large files)
-#endif
 
 struct Macro {
     std::string name;
@@ -30,11 +27,11 @@ extern std::vector<Macro*> macros;
 
 extern void request_macros();
 
-#ifdef USE_WIFI
-// True if the last macros fetch got an HTTP 200 (the file was served).  Lets the
-// UI distinguish "served but empty" from "couldn't reach it".
-extern volatile bool g_macros_http_served;
-#endif
+// Feed one received byte straight into the JSON streaming parser, bypassing
+// GrblParser's fixed 1024-byte line buffer.  Used while g_expecting_json is set
+// on transports that deliver JSON raw (no "[JSON:...]" wrapper and no newlines).
+void json_stream_byte(char c);
+
 
 extern void request_file_preview(const char* name, int firstline, int lastline);
 
@@ -56,6 +53,10 @@ bool json_continuation_line(const char* line);
 // route those raw chunks into the same streaming parser handle_json() drives.
 // Set when a request is issued, cleared when the JSON document completes.
 extern volatile bool g_expecting_json;
+
+// Advance the macro fallback chain after an "error:" reply (no JSON document
+// is produced, so nothing else would).  True if a macro request was pending.
+bool macro_request_error();
 
 // Cleared by set_disconnected_state() on a mid-transfer link drop.
 extern bool g_json_accumulating;

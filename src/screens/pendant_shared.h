@@ -89,7 +89,9 @@ enum PendantScreen {
     PSCREEN_MACROS,
     PSCREEN_SD_CARD,
     PSCREEN_FLUIDNC,
-    PSCREEN_WIFI_SETUP,
+    PSCREEN_CONNECTION,       // transport select + link status (was WiFi Setup)
+    PSCREEN_ESPNOW_PAIR,      // ESP-NOW pairing wizard
+    PSCREEN_ESPNOW_MACHINES,  // paired-controller list (select / forget)
     PSCREEN_SLEEP            // hidden — display-blank after idle; touch-to-wake (not a menu item)
 };
 
@@ -140,7 +142,12 @@ struct MachineState {
     int    spindleMaxRPM   = 24000;
     int    spindleMinRPM   = 0;
     String fluidDialVersion = FIRMWARE_VERSION;
-    String fluidNCVersion   = "v3.7.16";
+    // Empty until a [VER:] report actually arrives from the controller.  This
+    // used to default to a plausible-looking "v3.7.16", which rendered exactly
+    // like a real reading — so a pendant that had never heard from FluidNC
+    // appeared to be reporting the controller's firmware version.  Screens show
+    // "---" while it is empty, matching IP address and SSID.
+    String fluidNCVersion   = "";
     String baudRate         = "1000000";
     String port             = "UART0";
     String connectionStatus = "N/C";
@@ -168,8 +175,9 @@ struct MachineState {
     // cross-core WiFi.h access that was a suspected crash source.  Int / bool
     // fields are 32-bit atomic on Xtensa LX6 so the read on Core 1 cannot be
     // torn.  -1 means "not yet sampled".
-    int    wifiSignalBars   = -1;    // 0..4 bars, or -1 if not sampled / UART mode
-    bool   wifiInApMode     = false; // true while captive portal is active
+    // Wireless link quality for the title-bar icon.  0..4 bars, or -1 when not
+    // sampled (UART mode).  Populated from espnow_signal_bars() on Core 0.
+    int    linkSignalBars   = -1;
 };
 
 struct JogState {
@@ -424,6 +432,9 @@ void   drawMultiLineButton(int x, int y, int w, int h, String line1, String line
 void   drawTitle(String title);
 void   drawInfoBox(int x, int y, int w, int h, String label, String value, uint16_t valueColor = COLOR_ORANGE);
 void   drawCurrentPendantScreen();
+// Reserve the shared panel scratch sprite at boot, before the radio starts —
+// see the note on releasePanelSprites() in CNC_Pendant_UI.cpp.
+void   initPanelScratch();
 void   navigateTo(PendantScreen next);
 
 // ===== Alarm Description Helper =====
@@ -450,3 +461,4 @@ inline String alarmDescription(const String& status) {
 // ===== Screen Lifecycle (declared in each screen header, called by coordinator) =====
 // Each screen exposes: enterXxx(), exitXxx(), drawXxx(), handleXxxTouch(int,int)
 // Plus zero or more updateXxx() sprite-refresh functions called every 100ms.
+

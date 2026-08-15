@@ -23,7 +23,9 @@ const SCREENS = {
   [PSCREEN_MACROS]:        { enter: enterMacros,       exit: exitMacros,       draw: drawMacrosScreen,        handle: handleMacrosTouch,       update: [updateMacrosFileList] },
   [PSCREEN_SD_CARD]:       { enter: enterSDCard,       exit: exitSDCard,       draw: drawSDCardScreen,        handle: handleSDCardTouch,       update: [updateSDCardFileList] },
   [PSCREEN_FLUIDNC]:       { enter: enterFluidNC,      exit: exitFluidNC,      draw: drawFluidNCScreen,       handle: handleFluidNCTouch,      update: [updateFluidNCDisplay] },
-  [PSCREEN_WIFI_SETUP]:    { enter: enterWiFiSetup,    exit: exitWiFiSetup,    draw: drawWiFiSetupScreen,     handle: handleWiFiSetupTouch,    update: [updateWiFiSetupDisplay] },
+  [PSCREEN_CONNECTION]:      { enter: enterConnection,      exit: exitConnection,      draw: drawConnectionScreen,      handle: handleConnectionTouch,      update: [updateConnectionDisplay] },
+  [PSCREEN_ESPNOW_PAIR]:     { enter: enterEspNowPair,      exit: exitEspNowPair,      draw: drawEspNowPairScreen,      handle: handleEspNowPairTouch,      update: [updateEspNowPairDisplay] },
+  [PSCREEN_ESPNOW_MACHINES]: { enter: enterEspNowMachines,  exit: exitEspNowMachines,  draw: drawEspNowMachinesScreen,  handle: handleEspNowMachinesTouch,  update: [updateEspNowMachinesDisplay] },
   [PSCREEN_SLEEP]:         { enter: enterSleep,        exit: exitSleep,        draw: drawSleepScreen,         handle: handleSleepTouch,        update: [] },
 };
 
@@ -33,7 +35,7 @@ const SCREEN_LABELS = {
   [PSCREEN_PROBE_CFG_PLATE]: "Probe Config (Plate)", [PSCREEN_PROBE_Z]: "Probe: Z Surface",
   [PSCREEN_PROBE_CORNER]: "Probe: XYZ Corner", [PSCREEN_PROBE_BORE]: "Probe: Bore", [PSCREEN_PROBE_BOSS]: "Probe: Boss",
   [PSCREEN_FEEDS_SPEEDS]: "Feeds & Speeds", [PSCREEN_SPINDLE_CONTROL]: "Spindle Control",
-  [PSCREEN_MACROS]: "Macros", [PSCREEN_SD_CARD]: "SD Card", [PSCREEN_FLUIDNC]: "FluidNC Info", [PSCREEN_WIFI_SETUP]: "WiFi Setup",
+  [PSCREEN_MACROS]: "Macros", [PSCREEN_SD_CARD]: "SD Card", [PSCREEN_FLUIDNC]: "FluidNC Info", [PSCREEN_CONNECTION]: "Connection", [PSCREEN_ESPNOW_PAIR]: "ESP-NOW Pairing", [PSCREEN_ESPNOW_MACHINES]: "Machines",
 };
 
 let display;
@@ -347,7 +349,7 @@ function handleSleepTouch(/*x, y*/) {                      // any touch wakes; s
 }
 // Demo helper: blank immediately (so you don't wait out the 15-min timer).
 function forceSleepNow() {
-  if (currentPendantScreen === PSCREEN_SLEEP || currentPendantScreen === PSCREEN_WIFI_SETUP) return;
+  if (currentPendantScreen === PSCREEN_SLEEP || currentPendantScreen === PSCREEN_CONNECTION) return;
   sleepReturnScreen = currentPendantScreen;
   navigateTo(PSCREEN_SLEEP);
 }
@@ -360,7 +362,7 @@ function manageScreenSleep() {
   if (!sleepEligible) lastActivityMs = millis();
   if (currentPendantScreen === PSCREEN_SLEEP) {
     if (pendantConnected && !pendantMachine.status.startsWith("Idle")) navigateTo(sleepReturnScreen);
-  } else if (currentPendantScreen !== PSCREEN_WIFI_SETUP
+  } else if (currentPendantScreen !== PSCREEN_CONNECTION
              && sleepEligible
              && millis() - lastActivityMs >= SLEEP_TIMEOUT_MS) {
     sleepReturnScreen = currentPendantScreen;

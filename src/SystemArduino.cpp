@@ -7,7 +7,7 @@
 // All transport-specific code now lives in the Comms layer:
 //   • Comms.h / Comms.cpp        — facade (picks one backend at boot)
 //   • CommsUart.h / CommsUart.cpp — UART backend (ESP-IDF UART driver)
-//   • WiFiConnection.h / .cpp     — WiFi backend (WebSocket to FluidNC)
+//   • PeerLink.h / .cpp           — ESP-NOW backend (peer link to FluidNC)
 //
 // fnc_putchar() and fnc_getchar() are GrblParserC's only byte-level hooks;
 // they now forward into the comms facade.  Nothing in this file knows

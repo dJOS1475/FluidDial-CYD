@@ -41,15 +41,14 @@
 #include "screens/screen_macros.h"
 #include "screens/screen_sd_card.h"
 #include "screens/screen_fluidnc.h"
-#include "screens/screen_wifi_setup.h"
+#include "screens/screen_connection.h"
+#include "screens/screen_espnow.h"
 
 #include "Comms.h"
-#ifdef USE_WIFI
-// Needed for drawWiFiIcon() which renders signal bars / AP indicator into the
-// title bar on every screen.  All actual byte-level I/O still goes through
-// the comms facade (comms_putchar / comms_getchar / comms_poll); WiFiConnection
-// is included here only for display-side status queries.
-#include "WiFiConnection.h"
+#ifdef USE_ESPNOW
+// Display-side status queries only (link state, RSSI) for the title-bar icon.
+// All byte-level I/O goes through the comms facade.
+#include "PeerLink.h"
 #endif
 
 // ===== Hardware pin externs (defined in Hardware2432.cpp) =====
@@ -63,6 +62,8 @@ Preferences preferences;
 // ===== FreeRTOS Sync Objects =====
 SemaphoreHandle_t stateMutex   = nullptr;
 QueueHandle_t     hwEventQueue = nullptr;
+// Lines longer than GrblParser's line buffer, truncated to avoid overrunning it.
+// Non-zero means a reply was too long to parse (see the drain loop).
 
 // ===== Connection State =====
 // Driven exclusively by fnc_is_connected() on Core 0 (backed by update_rx_time() per UART byte).
@@ -203,54 +204,124 @@ bool allocPanelSprite(LGFX_Sprite& s, int w, int h, uint32_t minHeap) {
 static LGFX_Sprite spritePanelScratch(&display);
 static int         scratchW = 0;
 static int         scratchH = 0;
+// Did the CURRENT begin/endPanelSprite pair actually render into the scratch?
+// endPanelSprite() must not push when beginPanelSprite() handed back the display
+// instead: the scratch still holds the LAST panel that used it (typically from a
+// different screen), so pushing it would paint that stale image straight over
+// the panel just drawn — a rapid alternation between two unrelated panels.
+static bool        scratchInUse = false;
+
+// Largest panel ANY screen draws.  This must be the true maximum across every
+// screen, not the common case: the FluidNC panels are 230x70 and the
+// Status/Jog/Menu DRO panels are 230x65.  Sizing this to the common case meant
+// the taller panels grew the scratch at runtime — see beginPanelSprite().
+//
+// The Connection screen's LINK panel is 116 px tall and deliberately does NOT
+// set the size here: at 16 bpp that would be 53 KB of heap the radio needs, and
+// when the allocation lost the panel silently direct-drew and flickered.  It
+// renders as two bands instead.  Raise this only if a panel cannot be banded.
+#define PANEL_SCRATCH_W 230
+#define PANEL_SCRATCH_H 70
 
 void releasePanelSprites() {
     spriteAxisDisplay.deleteSprite();
     spriteValueDisplay.deleteSprite();
     spriteStatusBar.deleteSprite();
     spriteFileDisplay.deleteSprite();
-    spritePanelScratch.deleteSprite();
+    // NOTE: spritePanelScratch is deliberately NOT freed here.  It is a single
+    // ~30 KB contiguous allocation, and screens call this on every enter/exit —
+    // so freeing it meant re-allocating 30 KB after every screen change.  With
+    // the ESP-NOW radio running the heap is smaller and more fragmented than on
+    // UART, that re-allocation intermittently FAILS, and beginPanelSprite()
+    // then silently falls back to drawing straight to the display — which is
+    // exactly the "much more flicker on ESP-NOW than UART" symptom.  Allocated
+    // once by initPanelScratch() at boot and held for the life of the process.
+}
+
+// Allocate the shared panel scratch once, AFTER the radio is up.
+//
+// Ordering matters and it is not the obvious way round.  This used to run
+// BEFORE comms_init() so the buffer got an unfragmented heap — but the scratch
+// is cosmetic and the radio is not.  At 230x116 it wants 53 KB, and taking that
+// first starved esp_now_init() / the WiFi stack: the radio silently failed to
+// come up, so a paired machine never reconnected and pairing never saw a
+// discovery packet.  The radio claims what it needs first; the scratch then
+// takes the largest size still available.
+//
+// The ladder degrades gracefully: the full size fits every panel, 70 covers
+// everything except the Connection LINK panel, 65 covers the DRO panels.  A
+// panel bigger than whatever we got direct-draws (flicker) instead of failing.
+void initPanelScratch() {
+    if (spritePanelScratch.getBuffer()) return;
+
+    static const int kHeights[] = { PANEL_SCRATCH_H, 70, 65 };
+    for (int h : kHeights) {
+        spritePanelScratch.setColorDepth(16);
+        spritePanelScratch.createSprite(PANEL_SCRATCH_W, h);
+        if (spritePanelScratch.getBuffer()) {
+            scratchW = PANEL_SCRATCH_W;
+            scratchH = h;
+            dbg_printf("Panel scratch: %dx%d @16bpp (%d bytes), free heap %u\n",
+                       PANEL_SCRATCH_W, h, PANEL_SCRATCH_W * h * 2,
+                       (unsigned)ESP.getFreeHeap());
+            return;
+        }
+        spritePanelScratch.deleteSprite();   // release any partial state
+    }
     scratchW = scratchH = 0;
+    dbg_printf("Panel scratch: alloc FAILED (free heap %u) — direct-draw, expect flicker\n",
+               (unsigned)ESP.getFreeHeap());
 }
 
 // Shared-scratch panel helpers.  Instead of allocating/freeing a sprite on
 // every panel every frame (heap churn + fragmentation), or holding a separate
 // persistent buffer per panel (too much RAM at 16-bit), these draw every panel
 // into ONE 16-bit scratch sprite and push only the panel's w×h region via a
-// destination clip rect.  The scratch grows monotonically to the screen's
-// largest panel, then stays put — zero churn in steady state.  16-bit keeps the
-// near-neutral COLOR_DARKER_BG panels true gray (8-bit rgb332 crushed them
-// green).  Freed by releasePanelSprites() on screen change.
+// destination clip rect.  It is allocated ONCE at boot at the largest size any
+// panel needs and is never grown, shrunk or freed — zero heap churn, ever.  The
+// old code grew it on demand, which meant deleteSprite() + createSprite() of
+// ~32 KB at runtime; with the ESP-NOW radio up the heap is fragmented enough
+// that this intermittently failed, and because the delete happened FIRST a
+// failure destroyed the working buffer and forced every panel on every screen
+// into the direct-draw path.  That is the "lots of flicker on ESP-NOW"
+// symptom, and it is why it appeared on screens far from the one that grew it.
+// 16-bit keeps the near-neutral COLOR_DARKER_BG panels true gray (8-bit rgb332
+// crushed them green).  Never freed — see releasePanelSprites().
 //
 // beginPanelSprite() returns the graphics target and sets ox/oy to the draw
 // origin: (0,0) into the scratch, or the on-screen panel origin (px,py) when the
 // scratch can't allocate (direct-draw fallback — never blank).  Pair every call
 // with endPanelSprite(), passing the SAME w/h/px/py.
 LovyanGFX* beginPanelSprite(int w, int h, int& ox, int& oy, int px, int py) {
+    // Too big for the scratch, or the boot allocation failed: draw straight to
+    // the display.  Deliberately NO runtime reallocation — a panel that does not
+    // fit is a compile-time mistake (raise PANEL_SCRATCH_H), and retrying a
+    // 32 KB alloc on every frame would thrash the heap for the whole UI.
     if (!spritePanelScratch.getBuffer() || w > scratchW || h > scratchH) {
-        int nw = w > scratchW ? w : scratchW;
-        int nh = h > scratchH ? h : scratchH;
-        spritePanelScratch.deleteSprite();
-        spritePanelScratch.setColorDepth(16);
-        spritePanelScratch.createSprite(nw, nh);
-        if (spritePanelScratch.getBuffer()) { scratchW = nw; scratchH = nh; }
-        else                                { scratchW = scratchH = 0; }
+        static bool warned = false;
+        if (!warned) {
+            warned = true;
+            dbg_printf("Panel %dx%d exceeds scratch %dx%d (free heap %u) — "
+                       "direct-draw fallback, expect flicker\n",
+                       w, h, scratchW, scratchH, (unsigned)ESP.getFreeHeap());
+        }
+        ox = px; oy = py;
+        scratchInUse = false;
+        return (LovyanGFX*)&display;
     }
-    if (spritePanelScratch.getBuffer()) {
-        ox = 0; oy = 0;
-        return (LovyanGFX*)&spritePanelScratch;
-    }
-    ox = px; oy = py;
-    return (LovyanGFX*)&display;
+    ox = 0; oy = 0;
+    scratchInUse = true;
+    return (LovyanGFX*)&spritePanelScratch;
 }
 
 void endPanelSprite(int w, int h, int px, int py) {
-    if (spritePanelScratch.getBuffer()) {
+    if (scratchInUse && spritePanelScratch.getBuffer()) {
         // Clip the destination so a larger scratch writes only the panel region.
         display.setClipRect(px, py, w, h);
         spritePanelScratch.pushSprite(px, py);
         display.clearClipRect();
     }
+    scratchInUse = false;
 }
 
 // ===== Helper Functions =====
@@ -323,11 +394,9 @@ static void drawChargeBolt(LGFX_Sprite& spr, int x, int y) {
 }
 
 static void drawBatteryIcon() {
-#ifdef USE_WIFI
-    if (comms_active_mode() != COMMS_MODE_WIFI) return;  // wired pendant
-#else
-    return;
-#endif
+    // Battery only exists on the wireless (mobile) pendant; a wired unit is
+    // powered from the UART cable and has no cell to report.
+    if (comms_active_mode() == COMMS_MODE_UART) return;
     int  pct      = pendantMachine.batteryPercent;
     bool charging = pendantMachine.batteryCharging;
     if (pct < 0) return;  // ADC not yet sampled or out of valid range — skip
@@ -365,9 +434,9 @@ static void drawBatteryIcon() {
 // 500 ms; Core 1's UI never calls WiFi.RSSI() / wifi_in_ap_mode() directly,
 // avoiding cross-core access to the Arduino WiFi state machine which has
 // been a suspected crash source.
-static void drawWiFiIcon() {
-#ifdef USE_WIFI
-    if (comms_active_mode() != COMMS_MODE_WIFI) return;
+static void drawLinkIcon() {
+    // Wired pendants have no radio — nothing to show.
+    if (comms_active_mode() == COMMS_MODE_UART) return;
 
     static LGFX_Sprite spr(&display);
     if (!spr.getBuffer()) {
@@ -376,31 +445,23 @@ static void drawWiFiIcon() {
     }
     spr.fillSprite(COLOR_DARKER_BG);
 
-    if (pendantMachine.wifiInApMode) {
-        spr.setTextSize(1);
-        spr.setTextColor(COLOR_ORANGE);
-        spr.setCursor(2, 3);
-        spr.print("AP");
-    } else {
-        int bars = pendantMachine.wifiSignalBars;
-        if (bars < 0) bars = 0;
-        uint16_t live = (bars >= 3) ? COLOR_GREEN
-                      : (bars >= 2) ? COLOR_ORANGE
-                      : (bars >= 1) ? COLOR_RED
-                                    : COLOR_GRAY_TEXT;
-        // 4 bars at x = 1, 6, 11, 16  (3 wide, 4 px gap between centres)
-        // Heights ascending; baseline at y = 12 so all bars are bottom-aligned.
-        static const int bar_h[4] = { 3, 6, 9, 12 };
-        for (int i = 0; i < 4; ++i) {
-            int x = 1 + i * 5;
-            int h = bar_h[i];
-            int y = 12 - h;
-            uint16_t col = (i < bars) ? live : COLOR_BUTTON_GRAY;
-            spr.fillRect(x, y, 3, h, col);
-        }
+    int bars = pendantMachine.linkSignalBars;
+    if (bars < 0) bars = 0;
+    uint16_t live = (bars >= 3) ? COLOR_GREEN
+                  : (bars >= 2) ? COLOR_ORANGE
+                  : (bars >= 1) ? COLOR_RED
+                                : COLOR_GRAY_TEXT;
+    // 4 bars at x = 1, 6, 11, 16  (3 wide, 4 px gap between centres)
+    // Heights ascending; baseline at y = 12 so all bars are bottom-aligned.
+    static const int bar_h[4] = { 3, 6, 9, 12 };
+    for (int i = 0; i < 4; ++i) {
+        int x = 1 + i * 5;
+        int h = bar_h[i];
+        int y = 12 - h;
+        uint16_t col = (i < bars) ? live : COLOR_BUTTON_GRAY;
+        spr.fillRect(x, y, 3, h, col);
     }
     spr.pushSprite(5, 11);
-#endif
 }
 
 void drawTitle(String title) {
@@ -410,7 +471,7 @@ void drawTitle(String title) {
     int16_t tw = display.textWidth(title.c_str());
     display.setCursor((240 - tw) / 2, 10);
     display.print(title);
-    drawWiFiIcon();     // overlay icon at top-left;  no-op if not in WiFi mode
+    drawLinkIcon();     // overlay icon at top-left;  no-op on a wired pendant
     drawBatteryIcon();  // overlay icon at top-right; no-op if battery unavailable
 }
 
@@ -477,7 +538,9 @@ static void callScreenExit(PendantScreen s) {
         case PSCREEN_MACROS:           exitMacros();          break;
         case PSCREEN_SD_CARD:          exitSDCard();          break;
         case PSCREEN_FLUIDNC:          exitFluidNC();         break;
-        case PSCREEN_WIFI_SETUP:       exitWiFiSetup();       break;
+        case PSCREEN_CONNECTION:       exitConnection();       break;
+        case PSCREEN_ESPNOW_PAIR:      exitEspNowPair();      break;
+        case PSCREEN_ESPNOW_MACHINES:  exitEspNowMachines();  break;
         case PSCREEN_SLEEP:            exitSleep();           break;
     }
 }
@@ -500,7 +563,9 @@ static void callScreenEnter(PendantScreen s) {
         case PSCREEN_MACROS:           enterMacros();          break;
         case PSCREEN_SD_CARD:          enterSDCard();          break;
         case PSCREEN_FLUIDNC:          enterFluidNC();         break;
-        case PSCREEN_WIFI_SETUP:       enterWiFiSetup();       break;
+        case PSCREEN_CONNECTION:       enterConnection();       break;
+        case PSCREEN_ESPNOW_PAIR:      enterEspNowPair();      break;
+        case PSCREEN_ESPNOW_MACHINES:  enterEspNowMachines();  break;
         case PSCREEN_SLEEP:            enterSleep();           break;
     }
 }
@@ -523,7 +588,9 @@ void drawCurrentPendantScreen() {
         case PSCREEN_MACROS:           drawMacrosScreen();          break;
         case PSCREEN_SD_CARD:          drawSDCardScreen();          break;
         case PSCREEN_FLUIDNC:          drawFluidNCScreen();         break;
-        case PSCREEN_WIFI_SETUP:       drawWiFiSetupScreen();       break;
+        case PSCREEN_CONNECTION:       drawConnectionScreen();       break;
+        case PSCREEN_ESPNOW_PAIR:      drawEspNowPairScreen();      break;
+        case PSCREEN_ESPNOW_MACHINES:  drawEspNowMachinesScreen();  break;
         case PSCREEN_SLEEP:            drawSleepScreen();           break;
     }
 }
@@ -563,7 +630,9 @@ static void handlePendantTouch(int x, int y) {
         case PSCREEN_MACROS:           handleMacrosTouch(x, y);          break;
         case PSCREEN_STATUS:           handleStatusTouch(x, y);          break;
         case PSCREEN_FLUIDNC:          handleFluidNCTouch(x, y);         break;
-        case PSCREEN_WIFI_SETUP:       handleWiFiSetupTouch(x, y);       break;
+        case PSCREEN_CONNECTION:       handleConnectionTouch(x, y);       break;
+        case PSCREEN_ESPNOW_PAIR:      handleEspNowPairTouch(x, y);      break;
+        case PSCREEN_ESPNOW_MACHINES:  handleEspNowMachinesTouch(x, y);  break;
         case PSCREEN_SLEEP:            handleSleepTouch(x, y);           break;
     }
 
@@ -924,8 +993,14 @@ static void updateCurrentScreenSprites() {
         case PSCREEN_FLUIDNC:
             updateFluidNCDisplay();
             break;
-        case PSCREEN_WIFI_SETUP:
-            updateWiFiSetupDisplay();
+        case PSCREEN_ESPNOW_PAIR:
+            updateEspNowPairDisplay();
+            break;
+        case PSCREEN_ESPNOW_MACHINES:
+            updateEspNowMachinesDisplay();
+            break;
+        case PSCREEN_CONNECTION:
+            updateConnectionDisplay();
             break;
         case PSCREEN_SD_CARD:
             updateSDCardFileList();
@@ -938,7 +1013,7 @@ static void updateCurrentScreenSprites() {
     }
     // Refresh title-bar icons on every periodic tick — cheap direct draw.
     // The title bar is never occupied by sprites so these are always safe to call.
-    drawWiFiIcon();
+    drawLinkIcon();
     drawBatteryIcon();
 }
 
@@ -961,41 +1036,36 @@ static IntConfigItem jogHomingDirMask("$23");   // homing direction invert mask 
 // Called from loop_pendant() when HwEvent::CONNECTED arrives.
 // FluidNC version, IP address, WiFi SSID arrive automatically via [VER:] / status
 // callbacks once a connection is established — no explicit query required.
-// Helper: send a settings query without waiting for the "ok" ack.
+// Settings queries are sent with ConfigItem::request(), which registers the item
+// for its reply and uses the NON-BLOCKING send.
 //
 // The library's fnc_send_line() spins on Core 1 waiting for the *previous*
 // command's ack at the START of every call, up to a 2 s timeout per call.
-// Calling it 7 times in a row over WiFi (where TCP latency can briefly stall
-// FluidNC's reply path) can therefore block Core 1 for up to 14 s — well
-// past the 5 s loop-task watchdog.  The captured Core 0 stage being 101
-// (drain) was a red herring; the watchdog was actually firing because the
-// Arduino loop task on Core 1 hadn't returned to the framework in time.
-//
-// The fix: bypass fnc_send_line's ack-wait entirely for these read-only
-// settings queries.  We just put the bytes on the wire and let the existing
-// GrblParser state machine parse the responses asynchronously (it already
-// does — that's how it populates the ConfigItem values).  Nothing else
-// depends on a synchronous ack here.
-static void sendQueryRaw(const char* s) {
-    // Hold the TX-line lock so this multi-byte query can't interleave in the
-    // WiFi TX ring with a line command being pushed from the other core.
-    bool locked = txLineLock();
-    while (*s) fnc_putchar((uint8_t)*s++);
-    fnc_putchar('\n');
-    if (locked) txLineUnlock();
-}
+// Calling it eight times in a row can block Core 1 for far longer than the 5 s
+// loop-task watchdog allows.  These read-only queries need no synchronous ack —
+// GrblParser parses the replies asynchronously and parse_dollar() feeds them
+// back into the ConfigItems.
 
 static void requestControllerConfig() {
     extern uint32_t rtcCore1Stage;   // defined in ardmain.cpp
     rtcCore1Stage = 200;       // requestControllerConfig start
-    sendQueryRaw("$30");       // spindle max RPM
-    sendQueryRaw("$31");       // spindle min RPM
-    sendQueryRaw("$110");      // jog max feed rate
-    sendQueryRaw("$130");      // X travel
-    sendQueryRaw("$131");      // Y travel
-    sendQueryRaw("$132");      // Z travel
-    sendQueryRaw("$133");      // A travel
-    sendQueryRaw("$23");       // homing direction mask (per-axis envelope sign)
+    // These go through ConfigItem::request() rather than sendQueryRaw().
+    //
+    // sendQueryRaw() only put the query on the wire — it never registered the
+    // item in configRequests, and parse_dollar() matches replies ONLY against
+    // that list.  So the burst asked all eight questions and nothing could
+    // consume the answers: $110/$130-$133/$23 were permanently !known(), and
+    // their consumers silently kept the defaults (maxTravel stuck at {0,0,0,0},
+    // maxFeedRate at 10000).  Registering also makes the retry below possible,
+    // since an unanswered query is then simply one still in the list.
+    spindleMaxItem.request();  // spindle max RPM ($30)
+    spindleMinItem.request();  // spindle min RPM ($31)
+    jogMaxRateItem.request();  // jog max feed rate ($110)
+    jogMaxTravelX.request();   // X travel ($130)
+    jogMaxTravelY.request();   // Y travel ($131)
+    jogMaxTravelZ.request();   // Z travel ($132)
+    jogMaxTravelA.request();   // A travel ($133)
+    jogHomingDirMask.request();// homing direction mask ($23)
     rtcCore1Stage = 208;       // requestControllerConfig done
 }
 
@@ -1028,16 +1098,9 @@ void requestMacros() {
     g_json_accumulating = false;
 
 
-#ifdef USE_WIFI
-    if (comms_active_mode() == COMMS_MODE_WIFI) {
-        // Over WiFi, fetch the macros file via HTTP (like FluidNC's WebUI).  The
-        // WebSocket $File/SendJSON path truncates/drops on the large
-        // preferences.json reply; HTTP is reliable.
-        request_macros_http();
-        return;
-    }
-#endif
-    request_macros();  // UART: $File/SendJSON chain (preferences.json → macrocfg.json)
+    // Both transports are byte streams, so there is a single path: the
+    // $File/SendJSON chain (preferences.json → legacy macrocfg.json).
+    request_macros();
 }
 
 // ===== PendantScene: bridges FluidNC callbacks → pendantMachine (Core 0) =====
@@ -1198,20 +1261,13 @@ public:
     }
 
     void onError(const char* /*errstr*/) override {
-        // Macros fetch finished with nothing to show.  Distinguish the two cases
-        // so the message is accurate: if the file WAS served (HTTP 200) it just
-        // has no macros configured → "No macros found"; if no attempt reached it
-        // → a real load failure → "Couldn't load — tap Refresh".  (UART mode
-        // leaves g_macros_http_served false, so it reports a load failure, which
-        // matches its $File chain having produced no usable reply.)
+        // Macros fetch finished with nothing to show.  Both transports use the
+        // $File/SendJSON chain, and a chain that produced no usable reply is a
+        // load failure → "Couldn't load — tap Refresh".
         if (currentPendantScreen == PSCREEN_MACROS) {
             pendantMacros.loading    = false;
             pendantMacros.count      = 0;
-#ifdef USE_WIFI
-            pendantMacros.loadFailed = !g_macros_http_served;
-#else
             pendantMacros.loadFailed = true;
-#endif
             if (hwEventQueue) {
                 HwEvent ev = { HwEvent::STATE_UPDATE, 0 };
                 xQueueSend(hwEventQueue, &ev, 0);
@@ -1322,13 +1378,25 @@ void pendant_comms_task(void* /*pvParameters*/) {
     readDiagCheckpoint();
     unsigned long lastDiagCheckpointMs = millis();
 
-    // Pick comms backend (UART or WiFi) and initialise only that one.
-    // wifi_init() spins up the radio when WiFi is selected; in UART mode
+    // Pick comms backend (UART or ESP-NOW) and initialise only that one.
+    // espnow_init() spins up the radio when ESP-NOW is selected; in UART mode
     // it is never called and the WiFi radio stays cold.  After this call
     // the hot path is a single indirect function call per byte.
     comms_init();
-    dbg_printf("Comms: active transport = %s\n", comms_mode_name());
+    dbg_printf("Comms: active transport = %s (free heap %u)\n",
+               comms_mode_name(), (unsigned)ESP.getFreeHeap());
     rtcLastBootStage = 5;     // stage 5: comms_init done
+
+    // Panel scratch AFTER the radio, so the radio's allocations always win —
+    // see initPanelScratch() for why this ordering is deliberate.
+    initPanelScratch();
+
+    // NOTE: no first-run screen routing here.  An earlier version forced
+    // currentPendantScreen from this task when ESP-NOW had no stored pairing,
+    // but Core 1 had already drawn the main menu — so the screen STATE and the
+    // drawn CONTENT disagreed and the Connection panel painted itself over the
+    // menu buttons.  The main menu's STATUS panel now reports the link state
+    // directly ("Not paired" / "No link"), so there is nothing to route.
 
     // Send first $? immediately — fnc_is_connected() uses a 'starting' flag
     // so the very first call fires the ping right away.
@@ -1413,11 +1481,86 @@ void pendant_comms_task(void* /*pvParameters*/) {
             // reply arrived faster than it drained, the ring overflowed, and
             // the JSON corrupted (macros never loaded; the smaller SD listing
             // squeaked through).
+            // Bound a single line to just under GrblParser's REPORT_BUFFER_LEN
+            // (1024) so collect() can never overrun its static buffer.
+            static const int GRBL_LINE_MAX = 1000;
+            static int       grblLineLen   = 0;
+#ifdef USE_ESPNOW
+            // Per-line routing state for the interleaved-reply demux below.
+            static bool jsonLineStart   = true;
+            static bool jsonLineIsReply = true;
+#endif
             int c;
             int budget = 8192;
             while (budget-- > 0 && (c = fnc_getchar()) >= 0) {
-                collect((uint8_t)c);
-                rxEverSeen = true;  // real controller data observed (UART path)
+#ifdef USE_ESPNOW
+                // ESP-NOW (like the old WebSocket) receives $File/SendJSON and
+                // $Files/ListGCode replies RAW — no "[JSON:...]" wrapper and no
+                // newlines until the document ends.  GrblParser's collect()
+                // buffers a line into a 1024-byte static with no bounds check,
+                // so a ~10 KB reply overruns it by kilobytes and corrupts .bss.
+                // While such a reply is in flight, stream the bytes straight to
+                // the JSON parser, which needs no line framing.
+                //
+                // UART is deliberately untouched: FluidNC's UartChannel wraps
+                // the reply and emits it in short lines, so collect() handles it
+                // correctly and that path keeps working exactly as before.
+                //
+                // ROUTE BY LINE, NOT BLINDLY.  FluidNC sets a 200 ms auto-report
+                // interval on an ESP-NOW channel the moment a peer pairs
+                // (ESPNowChannel::refreshReportInterval ->
+                // DEFAULT_REPORT_INTERVAL_MS = 200), so ~5 status reports a
+                // second are INTERLEAVED into the very same byte stream as the
+                // reply.  Streaming every byte to the JSON parser fed those
+                // "<Idle|MPos:...>" lines into the document — which both killed
+                // the parse ("Couldn't load" every time) and stopped the reports
+                // ever reaching collect(), freezing the DRO and machine state.
+                //
+                // The reply is still newline-framed, so decide per line from its
+                // first byte: '<' is a status report and '[' is a [MSG:...] line,
+                // both of which belong to the normal parser; anything else is
+                // reply payload.  The decision is made on the first character and
+                // each byte is dispatched as it arrives, so nothing is buffered
+                // and the 1024-byte overrun stays fixed.
+                if (g_expecting_json && comms_active_mode() == COMMS_MODE_ESPNOW) {
+                    if (jsonLineStart) {
+                        jsonLineStart   = false;
+                        jsonLineIsReply = (c != '<' && c != '[');
+                    }
+                    if (c == '\n') jsonLineStart = true;
+                    if (jsonLineIsReply) {
+                        json_stream_byte((char)c);
+                        rxEverSeen = true;
+                        continue;
+                    }
+                    // Controller traffic: fall through to the line parser below.
+                } else {
+                    jsonLineStart   = true;
+                    jsonLineIsReply = true;
+                }
+#endif
+                // HARD GUARD on GrblParser's line buffer.
+                //
+                // collect() appends into a REPORT_BUFFER_LEN (1024) static with
+                // NO bounds check and only flushes on '\n'.  Anything that
+                // delivers a longer line — a raw JSON reply over ESP-NOW is ~4-10
+                // KB with no newlines — walks off the end of that buffer and
+                // corrupts adjacent .bss.  Observed effect: status-report parsing
+                // died permanently after the first oversized reply (the report
+                // counter froze at 2), which is what left the pendant on
+                // "Syncing" and the DRO stale.
+                //
+                // Truncating an over-long line loses that reply, but keeps the
+                // parser and everything after it intact.
+                if (c == '\n') {
+                    grblLineLen = 0;
+                    collect((uint8_t)c);
+                } else if (grblLineLen < GRBL_LINE_MAX) {
+                    ++grblLineLen;
+                    collect((uint8_t)c);
+                }
+                // else: drop the remainder of this line — never feed collect()
+                rxEverSeen = true;  // real controller data observed
             }
             poll_extra();
         }
@@ -1487,6 +1630,104 @@ void pendant_comms_task(void* /*pvParameters*/) {
             }
             lastPingMs = nowMs;
         }
+
+#ifdef USE_ESPNOW
+        // ── Startup retry ────────────────────────────────────────────────────
+        // ESP-NOW loses data on the boot burst — RX loss is observed at close
+        // range with full signal, so packets are being dropped after the radio
+        // delivers them (ring/queue overflow), not lost over the air.  The
+        // startup exchange was fire-and-forget: one status poll every 4 s and a
+        // single one-shot config burst, with nothing checking either arrived.
+        // Lose the reply and the pendant waits indefinitely — the "stuck on
+        // Syncing until you home" fault, where homing merely happened to be the
+        // next thing that provoked a reply.
+        //
+        // So verify the answers actually arrived and re-ask if not.  Both checks
+        // stop as soon as their data is in, so steady-state traffic is unchanged.
+        if (comms_active_mode() == COMMS_MODE_ESPNOW && pendantConnected) {
+            // 1. Status: re-poll until a report is parsed (which sets
+            //    pendantSynced).  Far faster than the 4 s ping while unsynced.
+            extern void request_status_report();   // FluidNCModel.cpp
+            static unsigned long lastSyncPollMs = 0;
+            if (!pendantSynced && (nowMs - lastSyncPollMs) >= 500) {
+                lastSyncPollMs = nowMs;
+                request_status_report();
+            }
+
+            // 2. Settings queries: parse_dollar() erases each ConfigItem from
+            //    configRequests the moment its reply lands, so a non-empty list
+            //    IS the set of questions still unanswered — an exact
+            //    completeness check, no per-item bookkeeping.  This covers the
+            //    connect-edge burst ($30/$31/$110/$130-$133/$23) and the homing
+            //    cycle/allow items together.  Re-send only what is outstanding.
+            //
+            //    Safe to iterate: replies are parsed on this same task, and
+            //    send_line_nowait() does not pump the parser, so the vector
+            //    cannot change underneath the loop.
+            static unsigned long lastItemRetryMs = 0;
+            static int           itemRetries     = 0;
+            if (!configRequests.empty()) {
+                if (itemRetries < 4 && (nowMs - lastItemRetryMs) >= 1500) {
+                    lastItemRetryMs = nowMs;
+                    ++itemRetries;
+                    for (auto* item : configRequests) send_line_nowait(item->name());
+                }
+            } else {
+                itemRetries = 0;       // all answered — arm for the next reconnect
+            }
+
+            // 3. $A: the alarm code behind an Alarm state.  awaiting_alarm is
+            //    already the completeness flag — it clears when the reply is
+            //    parsed — so a lost reply just needs the question re-asked.
+            static unsigned long lastAlarmRetryMs = 0;
+            static int           alarmRetries     = 0;
+            if (awaiting_alarm) {
+                if (alarmRetries < 4 && (nowMs - lastAlarmRetryMs) >= 1500) {
+                    lastAlarmRetryMs = nowMs;
+                    ++alarmRetries;
+                    send_line_nowait("$A");
+                }
+            } else {
+                alarmRetries = 0;      // answered (or no alarm) — arm for next time
+            }
+
+            // 4. $I: not a ConfigItem, so it needs its own check.  Its reply
+            //    carries the firmware version AND the Mode/IP/SSID line; getting
+            //    the version without the network line means the reply arrived
+            //    only in part.  Bounded, because a controller genuinely off the
+            //    WLAN reports "No Wifi" and will never fill those fields.
+            static unsigned long lastCfgRetryMs = 0;
+            static int           cfgRetries     = 0;
+            const bool           cfgIncomplete  = wifi_ip.empty() || wifi_ssid.empty();
+            if (cfgIncomplete && cfgRetries < 4 && (nowMs - lastCfgRetryMs) >= 2000) {
+                lastCfgRetryMs = nowMs;
+                ++cfgRetries;
+                send_line_nowait("$I");
+            } else if (!cfgIncomplete) {
+                cfgRetries = 0;        // arm again for the next reconnect
+            }
+        }
+
+        // Re-fetch the controller config when the RADIO link genuinely comes up.
+        //
+        // The connect edge above is driven by GrblParser's receive timing, which
+        // keepalives satisfy while PeerLink is still Synchronizing — but
+        // send_fragments() silently discards everything until the link reaches
+        // Connected.  So the one-shot $G/$I/$A burst could be issued into that
+        // window and vanish entirely: no version, no IP/SSID, no status, and no
+        // retry, until some later command (homing) happened to be sent after the
+        // link was up and everything arrived at once.  It is a race, which is why
+        // the fault came and went.  Re-issuing on the real link-up edge closes it.
+        if (comms_active_mode() == COMMS_MODE_ESPNOW) {
+            static bool prevLinkUp = false;
+            const bool  linkUp     = espnow_is_connected();
+            if (linkUp && !prevLinkUp && hwEventQueue) {
+                HwEvent ev = { HwEvent::CONNECTED, 0 };
+                xQueueSend(hwEventQueue, &ev, 0);
+            }
+            prevLinkUp = linkUp;
+        }
+#endif
         rtcLastBootStage = 103;
 
         // ── Physical buttons (Core 0) ────────────────────────────────────────
@@ -1554,9 +1795,12 @@ void pendant_comms_task(void* /*pvParameters*/) {
                 // channel immediately and latches a flag so wifi_poll() won't
                 // reopen it during the ~2.5 s window before sleep.  Safe to
                 // touch _wsClient: we're on Core 0 and not inside its loop().
-                #ifdef USE_WIFI
-                if (comms_active_mode() == COMMS_MODE_WIFI) {
-                    wifi_graceful_disconnect();
+                #ifdef USE_ESPNOW
+                // Close the radio link cleanly before sleeping so the
+                // controller sees a departure rather than a silent timeout.
+                // Does NOT unpair — the profile stays stored for next boot.
+                if (comms_active_mode() == COMMS_MODE_ESPNOW) {
+                    espnow_graceful_disconnect();
                 }
                 #endif
                 if (hwEventQueue) {
@@ -1590,15 +1834,29 @@ void pendant_comms_task(void* /*pvParameters*/) {
         // FluidNC answers within a round-trip.  This does not touch any FluidNC
         // setting (unlike $Report/Interval), so the user's machine config is
         // left exactly as they have it.
-        #ifdef USE_WIFI
-        if (comms_active_mode() == COMMS_MODE_WIFI && websocket_is_connected()) {
-            static unsigned long lastWsStatusPoll = 0;
-            if (nowMs - lastWsStatusPoll >= 250) {
-                lastWsStatusPoll = nowMs;
-                fnc_realtime(StatusReport);   // '?'
+        // NOTE: v2.1.x polled '?' every 250 ms in WiFi mode because the
+        // WebSocket transport ignored $Report/Interval.  UART and ESP-NOW both
+        // honour it, so the controller pushes status on its own schedule and no
+        // polling is needed — one less thing on the radio.
+
+        // Safety net for a JSON reply that never completes.  g_expecting_json
+        // routes incoming bytes to the JSON parser instead of the line parser,
+        // so if a transfer is abandoned mid-document (controller reset, link
+        // drop) the flag would latch and the pendant would go deaf to status
+        // reports — appearing connected but frozen.  Clear it after a bounded
+        // wait; the requesting screen already reports its own load failure.
+        {
+            static bool          jsonWasExpecting = false;
+            static unsigned long jsonExpectSince  = 0;
+            if (g_expecting_json && !jsonWasExpecting) jsonExpectSince = nowMs;
+            jsonWasExpecting = g_expecting_json;
+            if (g_expecting_json && (nowMs - jsonExpectSince) > 20000UL) {
+                dbg_println("JSON reply never completed — releasing the parser");
+                g_expecting_json    = false;
+                g_json_accumulating = false;
+                jsonWasExpecting    = false;
             }
         }
-        #endif
 
         // Drain the pending-nowait counter if no acks have arrived recently.
         // Self-heals from the rare case where an atomic TCP send fails before
@@ -1606,18 +1864,15 @@ void pendant_comms_task(void* /*pvParameters*/) {
         // and would otherwise leave the jog throttle stuck high.
         nowait_pending_decay();
 
-        // WiFi state cache — sample on Core 0 (the task that owns the WiFi
-        // state machine) and publish to pendantMachine so Core 1's UI can
-        // read without touching the WiFi.h API across cores.
-        #ifdef USE_WIFI
-        static unsigned long lastWifiSampleMs = 0;
-        if (comms_active_mode() == COMMS_MODE_WIFI &&
-            (millis() - lastWifiSampleMs) >= 500) {
-            int  bars = wifi_signal_bars();   // reads WiFi.RSSI() — safe on Core 0
-            bool ap   = wifi_in_ap_mode();
-            pendantMachine.wifiSignalBars = bars;
-            pendantMachine.wifiInApMode   = ap;
-            lastWifiSampleMs = millis();
+        // Wireless link-quality cache — sampled on Core 0 (the task that owns
+        // the radio) and published to pendantMachine so Core 1's UI reads a
+        // plain int instead of touching the radio API across cores.
+        #ifdef USE_ESPNOW
+        static unsigned long lastLinkSampleMs = 0;
+        if (comms_active_mode() == COMMS_MODE_ESPNOW &&
+            (millis() - lastLinkSampleMs) >= 500) {
+            pendantMachine.linkSignalBars = espnow_signal_bars();
+            lastLinkSampleMs = millis();
         }
         #endif
         rtcLastBootStage = 107;
@@ -1871,14 +2126,14 @@ void loop_pendant() {
     }
     rtcCore1Stage = 8;     // queue dispatch done
 
-    // ── Screen sleep management (WiFi pendants only) ──────────────────────────
-    // Only WiFi (battery) pendants sleep — wired pendants are powered from the
-    // controller and have no battery, so they power down with it and there's
-    // nothing to blank.  Eligible to blank when the CNC is Idle OR while the
-    // pendant is still "Connecting" (not connected) — both are no-activity
-    // states.  Any connected-but-busy state (Run/Jog/Hold/Home/Alarm/…) keeps
-    // it awake and resets the idle clock, so it never blanks mid-job.
-    if (comms_active_mode() == COMMS_MODE_WIFI) {
+    // ── Screen sleep management (wireless pendants only) ──────────────────────
+    // Only battery pendants sleep — a wired unit is powered from the controller
+    // and has no cell to conserve, so it powers down with it and there's nothing
+    // to blank.  Eligible to blank when the CNC is Idle OR while the pendant is
+    // still "Connecting" (not connected) — both are no-activity states.  Any
+    // connected-but-busy state (Run/Jog/Hold/Home/Alarm/…) keeps it awake and
+    // resets the idle clock, so it never blanks mid-job.
+    if (comms_active_mode() != COMMS_MODE_UART) {
         bool sleepEligible = !pendantConnected || pendantMachine.status.startsWith("Idle");
         if (!sleepEligible) {
             lastActivityMs = millis();
@@ -1889,7 +2144,7 @@ void loop_pendant() {
             if (pendantConnected && !pendantMachine.status.startsWith("Idle")) {
                 navigateTo(sleepReturnScreen);
             }
-        } else if (currentPendantScreen != PSCREEN_WIFI_SETUP
+        } else if (currentPendantScreen != PSCREEN_CONNECTION
                    && sleepEligible
                    && (millis() - lastActivityMs >= SLEEP_TIMEOUT_MS)) {
             sleepReturnScreen = currentPendantScreen;

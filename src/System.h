@@ -77,6 +77,9 @@ void battery_init();
 int  battery_millivolts();        // smoothed battery voltage in mV; 0 if unavailable
 int  battery_level();             // 0–100 %; -1 if hardware not present / not ready
 bool battery_charging();          // true if charge pin indicates charging
+// Raw IP5306 status: (READ0<<8)|READ1, or 0xFFFF if unavailable.  Diagnostic —
+// see the note on battery_charging() in Hardware2432.cpp.
+uint16_t ip5306_status_bytes();
 bool battery_hardware_present();  // true iff IP5306 PMIC was detected at boot
                                   // (used by the Comms layer to auto-select WiFi
                                   // transport on battery-equipped pendants — wired

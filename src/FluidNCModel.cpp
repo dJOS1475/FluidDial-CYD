@@ -423,6 +423,12 @@ extern "C" void show_error(int error) {
     // (cascading SD/macros failures).  Clear it here.
     g_expecting_json = false;
 
+    // ...and if it was a MACRO request that errored, advance the fallback chain
+    // here too.  It is normally driven from the end of the JSON document, which
+    // an "error:" reply never produces, so preferences.json failing used to end
+    // the whole sequence silently instead of trying macrocfg.json.
+    macro_request_error();
+
     // A jog/line command sent via send_line_nowait() consumes exactly one
     // FluidNC response — which is normally "ok" (handled in show_ok) but can
     // be "error:" instead (eg. error:15 "Travel exceeded" when a flood of
@@ -472,6 +478,11 @@ void nowait_pending_decay() {
         _last_nowait_activity = milliseconds();
     }
 }
+
+// Diagnostic counter: how many status reports have actually been PARSED.  If
+// this is not climbing while the link shows connected, the bytes are arriving
+// but never being recognised as reports — which is a framing/routing problem,
+// not a delivery one.
 
 extern "C" void end_status_report() {
     current_scene->onDROChange();

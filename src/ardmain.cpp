@@ -44,8 +44,8 @@ esp_reset_reason_t lastResetReason = ESP_RST_UNKNOWN;
 //   3   setup_pendant done
 //   4   pendant_hw_task started
 //   5   comms_init done
-//   6   WiFi.begin done (wifi_init returned)
-//   7   WL_CONNECTED detected by wifi_poll
+//   6   radio started (espnow_init returned)
+//   7   ESP-NOW link established
 //   8   tcp_begin called
 //   9   tcp_open returned (success or fail)
 //   10  first status report sent over TCP

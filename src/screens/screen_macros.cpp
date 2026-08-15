@@ -171,6 +171,7 @@ void updateMacrosFileList() {
     }
 
     if (hasSprite) spriteFileDisplay.pushSprite(5, 40);
+    // Receive-path counters, drawn last so they sit on top of the panel.
 }
 
 void drawMacrosScreen() {

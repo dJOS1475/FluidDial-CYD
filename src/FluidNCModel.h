@@ -41,6 +41,10 @@ extern uint32_t           myFeed;
 extern uint32_t           mySpeed;
 extern int                lastAlarm;
 extern int                lastError;
+// True between sending "$A" and its reply arriving.  Exposed so the startup
+// retry can re-ask if the reply is lost — the alarm CODE (and so its
+// description) would otherwise stay unknown for the whole alarm.
+extern bool               awaiting_alarm;
 extern uint32_t           errorExpire;
 extern bool               inInches;
 extern uint32_t           mySelectedTool;
@@ -95,6 +99,8 @@ void send_line_nowait(const char* s);
 //     if (pending_nowait_sends >= 6) return;  // skip this jog event
 // 6 is a reasonable threshold matching FluidNC's default planner depth.
 extern volatile int pending_nowait_sends;
+
+// Number of status reports successfully parsed since boot (diagnostic).
 
 // Self-healing decay — call periodically (eg. from the comms task loop).
 // If no acks or new sends in 1+ seconds, decrements the counter by 1.

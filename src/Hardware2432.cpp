@@ -716,84 +716,109 @@ int battery_level() {
 // UART and never start WiFi.
 bool battery_hardware_present() { return ip5306_present; }
 
-// Charging detection by battery-VOLTAGE TREND (Li-Ion cells only).
+// Raw IP5306 status bytes, packed as (READ0 << 8) | READ1, or 0xFFFF if the
+// PMIC can't be read.  Surfaced on the FluidNC info screen so the "are these
+// bits usable?" question can be settled with real data instead of a comment.
 //
-// The IP5306's I2C charge-status bits (0x70/0x71 bit 3) proved unreliable on
-// these CYD boards — the chip ACKs on the bus (which is why transport autodetect
-// works) but those bits don't track the real charge state.  So instead of asking
-// the PMIC, we watch the cell voltage and infer direction.
+// On paper READ0 (0x70) bit 3 = charging and READ1 (0x71) bit 3 = charge-full,
+// which would replace the voltage-trend heuristic entirely with a direct read.
+// A previous attempt concluded they don't track reality on these boards; if the
+// values shown on screen DO move with the charger, that conclusion was wrong
+// and battery_charging() should just return the bit.
+uint16_t ip5306_status_bytes() {
+    if (!ip5306_present) return 0xFFFF;
+    uint8_t r0 = 0, r1 = 0;
+    if (i2c_read_reg(0x75, 0x70, &r0) != ESP_OK) return 0xFFFF;
+    if (i2c_read_reg(0x75, 0x71, &r1) != ESP_OK) return 0xFFFF;
+    return (uint16_t)((r0 << 8) | r1);
+}
+
+// Charging detection from the battery voltage (Li-Ion cells only).
 //
-// The pendant runs under a constant WiFi load, so on battery the cell sags and
-// its voltage trends DOWN; only an external charger can hold the voltage HIGH or
-// push it UP.  We detect that with a fast/slow EMA crossover, evaluated on every
-// call (~3 s) so the indicator reacts within ~15-30 s rather than minutes:
+// The IP5306's I2C charge-status bits (0x70/0x71 bit 3) were reported unreliable
+// on these CYD boards — the chip ACKs on the bus (which is why transport
+// autodetect works) but those bits reportedly don't track the real charge state.
+// The raw bytes are surfaced on the FluidNC info screen (ip5306_status_bytes());
+// if they DO move with the charger on your hardware, this whole heuristic can be
+// deleted in favour of reading the bit.
 //
-//   • fast EMA leads the slow EMA while voltage is rising ⇒ charging,
-//     trails it while falling ⇒ on battery (a few mV of separation is enough on
-//     a Li-Ion cell — no need to wait out a long window).
-//   • "pinned near full" (≥ ~4.15 V under load) ⇒ on charger, caught instantly.
-//   • Hysteresis: a flat reading holds the previous state, so the icon doesn't
-//     flicker as charge current tapers near full.
-//   • Post-boot settling window: the trend is NOT evaluated until the cell stops
-//     climbing after boot (see below) — otherwise the normal boot-load voltage
-//     recovery reads as "charging" for minutes on a battery-only pendant.
+// Until then we infer direction from the voltage, using a DEADBAND rather than a
+// trend: measured on hardware the cell hops +/-10-20 mV sample to sample, which
+// swamps any rate-of-change test (a real charge moves only ~0.2 mV per sample).
+// Noise is bounded; travel is not — so we decide on total movement away from a
+// reference point.  See the comment at the deadband itself for the numbers.
 //
 // Caveat: a battery that is *already full* when you plug in (flat ~4.2 V, no
-// rise) is only caught by the "pinned near full" rule, not the trend.
+// movement) is NOT detected — by voltage alone it is identical to a full battery
+// resting on the bench.  Missing the bolt there is the benign error; claiming to
+// charge while running the battery down is not.
 bool battery_charging() {
     if (display_num == 1) return false;   // resistive — no battery hardware
     if (!bat_ready)        return false;
 
     int mv = battery_millivolts();        // EMA-smoothed cell voltage
-    static float    fast_mv   = 0.0f;     // fast EMA (~15 s at 3 s cadence)
-    static float    slow_mv   = 0.0f;     // slow EMA (~60 s)
+    static int      ref_mv    = 0;        // last voltage we made a decision at
     static bool     state     = false;
     static bool     settled   = false;    // false until the post-boot ramp ends
-    static uint32_t settleMs  = 0;        // millis() of the first valid sample
-    static int      prev_mv   = 0;        // previous sample, for the stability test
-    static int      stableCnt = 0;        // consecutive near-flat samples
+    static uint32_t settleMs  = 0;
+    static int      prev_mv   = 0;
+    static int      stableCnt = 0;
+    static int      up_cnt = 0, dn_cnt = 0;
 
     if (mv <= 0) return state;            // bad reading — hold last decision
 
     // ── Post-boot settling window ─────────────────────────────────────────────
-    // The boot load spike (WiFi + display init) sags the cell; as that load eases
-    // the cell RECOVERS upward over the next ~minute.  Seeding the trend detector
-    // mid-spike and then watching that recovery makes a battery-only pendant read
-    // as "charging" for several minutes after boot.  So until the voltage stops
-    // climbing — stable for a few samples past a 45 s floor, or a 180 s hard cap —
-    // we hold the EMAs at the live reading and report not-charging.  Trend
-    // evaluation then starts from a settled baseline (and a pendant booted ON the
-    // charger, whose voltage keeps rising, is still caught after the cap).
+    // The boot load spike (radio + display init) sags the cell; as that load
+    // eases the cell RECOVERS upward over the next ~minute, and that recovery is
+    // easily larger than MOVE_MV.  Hold off until the voltage stops climbing —
+    // stable for a few samples past a 45 s floor, or a 180 s hard cap — so the
+    // deadband starts from a settled baseline.  A pendant booted ON the charger,
+    // whose voltage keeps rising, is still caught after the cap.
     if (!settled) {
         if (settleMs == 0) { settleMs = millis(); prev_mv = mv; }
-        fast_mv = slow_mv = (float)mv;                 // hold EMAs at live voltage
         if (abs(mv - prev_mv) <= 2) stableCnt++; else stableCnt = 0;
         prev_mv = mv;
         uint32_t elapsed = millis() - settleMs;
         if ((elapsed >= 45000UL && stableCnt >= 3) || elapsed >= 180000UL) {
             settled = true;
+            ref_mv  = mv;                 // baseline the deadband here
         } else {
             return false;
         }
     }
 
-    fast_mv = fast_mv * 0.80f + (float)mv * 0.20f;
-    slow_mv = slow_mv * 0.95f + (float)mv * 0.05f;
-    float diff = fast_mv - slow_mv;       // + rising (charging), - falling (on battery)
+    // ── Direction by DEADBAND on the raw voltage ──────────────────────────────
+    // Previously this compared a fast and a slow EMA and tripped on 3 mV of
+    // divergence.  Measured on hardware the cell hops +/-10-20 mV sample to
+    // sample, and a 20 mV hop produces almost exactly 3 mV of EMA divergence —
+    // i.e. the threshold sat right on the noise floor.  Raising the EMA
+    // threshold is not the answer either: a real Li-Ion charge moves ~0.2 mV per
+    // sample, which is far below the noise, so no divergence threshold can
+    // separate them.
+    //
+    // What DOES separate them is total travel.  Noise is bounded (+/-20 mV) but
+    // charging and discharging move hundreds of mV.  So hold a reference point
+    // and only decide when the voltage has moved MOVE_MV away from it, then
+    // re-baseline.  Noise can never accumulate past the band; a real charge
+    // crosses it every ~50 mV and keeps re-confirming.
+    const int MOVE_MV = 50;   // must exceed the observed +/-20 mV sample noise
+    const int CONFIRM = 2;    // two in a row — rejects a single bad ADC read
 
-    const float DRIFT_MV = 3.0f;          // Li-Ion: a few mV of rise is a clear signal
-    const int   FULL_MV  = 4150;          // held this high under load ⇒ on charger
-
-    if      (mv >= FULL_MV)     state = true;    // pinned near full ⇒ external power
-    else if (diff >=  DRIFT_MV) state = true;    // rising ⇒ charging
-    else if (diff <= -DRIFT_MV) state = false;   // falling ⇒ on battery
-    // else flat ⇒ hold previous state (hysteresis)
+    if (mv >= ref_mv + MOVE_MV) {
+        dn_cnt = 0;
+        if (++up_cnt >= CONFIRM) { state = true;  ref_mv = mv; up_cnt = 0; }
+    } else if (mv <= ref_mv - MOVE_MV) {
+        up_cnt = 0;
+        if (++dn_cnt >= CONFIRM) { state = false; ref_mv = mv; dn_cnt = 0; }
+    } else {
+        up_cnt = dn_cnt = 0;  // inside the band — hold the previous decision
+    }
 
     static uint32_t last_log = 0;
     if (millis() - last_log > 5000) {
         last_log = millis();
-        dbg_printf("Batt charge-trend: mv=%d fast=%.0f slow=%.0f diff=%+.1f → charging=%d\n",
-                   mv, fast_mv, slow_mv, diff, state);
+        dbg_printf("Batt: mv=%d ref=%d delta=%+d (band %d) up=%d dn=%d -> charging=%d\n",
+                   mv, ref_mv, mv - ref_mv, MOVE_MV, up_cnt, dn_cnt, state);
     }
     return state;
 }
@@ -805,5 +830,6 @@ int  battery_millivolts()        { return 0; }
 int  battery_level()             { return -1; }
 bool battery_charging()          { return false; }
 bool battery_hardware_present()  { return false; }   // no PMIC → wired pendant
+uint16_t ip5306_status_bytes()   { return 0xFFFF; }
 
 #endif  // CYD_BATTERY_ADC

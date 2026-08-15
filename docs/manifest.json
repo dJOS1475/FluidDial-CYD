@@ -1,16 +1,16 @@
 {
-  "name": "FluidDial-CYD (Update — preserves WiFi)",
-  "version": "2.1.11",
+  "name": "FluidDial-CYD (Update — preserves settings)",
+  "version": "2.2.0",
   "new_install_prompt_erase": true,
   "builds": [
     {
       "chipFamily": "ESP32",
       "parts": [
-        { "path": "https://cdn.jsdelivr.net/gh/dJOS1475/FluidDial-CYD@v2.1.11/docs/bootloader.bin", "offset": 4096 },
-        { "path": "https://cdn.jsdelivr.net/gh/dJOS1475/FluidDial-CYD@v2.1.11/docs/partitions.bin", "offset": 32768 },
-        { "path": "https://cdn.jsdelivr.net/gh/dJOS1475/FluidDial-CYD@v2.1.11/docs/boot_app0.bin",  "offset": 57344 },
-        { "path": "https://cdn.jsdelivr.net/gh/dJOS1475/FluidDial-CYD@v2.1.11/docs/firmware.bin",   "offset": 65536 },
-        { "path": "https://cdn.jsdelivr.net/gh/dJOS1475/FluidDial-CYD@v2.1.11/docs/littlefs.bin",   "offset": 2686976 }
+        { "path": "https://cdn.jsdelivr.net/gh/dJOS1475/FluidDial-CYD@v2.2.0/docs/bootloader.bin", "offset": 4096 },
+        { "path": "https://cdn.jsdelivr.net/gh/dJOS1475/FluidDial-CYD@v2.2.0/docs/partitions.bin", "offset": 32768 },
+        { "path": "https://cdn.jsdelivr.net/gh/dJOS1475/FluidDial-CYD@v2.2.0/docs/boot_app0.bin",  "offset": 57344 },
+        { "path": "https://cdn.jsdelivr.net/gh/dJOS1475/FluidDial-CYD@v2.2.0/docs/firmware.bin",   "offset": 65536 },
+        { "path": "https://cdn.jsdelivr.net/gh/dJOS1475/FluidDial-CYD@v2.2.0/docs/littlefs.bin",   "offset": 2686976 }
       ]
     }
   ]

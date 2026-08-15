@@ -57,19 +57,21 @@ void updateFluidNCDisplay() {
         g->setTextColor(COLOR_GREEN);
         g->setCursor(ox + 5, oy + 17); g->print(fluidDialVer);
 
+        // "---" until the controller has actually reported its version, so an
+        // unread field can never be mistaken for a real one.
         g->setTextColor(COLOR_GRAY_TEXT);
         g->setCursor(ox + 5, oy + 35);  g->print("FluidNC");
-        g->setTextColor(COLOR_GREEN);
-        g->setCursor(ox + 5, oy + 47); g->print(fluidNCVer);
+        g->setTextColor(fluidNCVer.length() ? COLOR_GREEN : COLOR_GRAY_TEXT);
+        g->setCursor(ox + 5, oy + 47); g->print(fluidNCVer.length() ? fluidNCVer : "---");
 
         g->setTextColor(COLOR_GRAY_TEXT);
         g->setCursor(ox + 115, oy + 5);  g->print("IP ADDRESS");
-        g->setTextColor(COLOR_CYAN);
+        g->setTextColor(ip.length() ? COLOR_CYAN : COLOR_GRAY_TEXT);
         g->setCursor(ox + 115, oy + 17); g->print(ip.length() ? ip : "---");
 
         g->setTextColor(COLOR_GRAY_TEXT);
         g->setCursor(ox + 115, oy + 35);  g->print("WIFI SSID");
-        g->setTextColor(COLOR_CYAN);
+        g->setTextColor(ssid.length() ? COLOR_CYAN : COLOR_GRAY_TEXT);
         g->setCursor(ox + 115, oy + 47); g->print(ssid.length() ? ssid : "---");
 
         endPanelSprite(230, 60, 5, 40);
@@ -113,22 +115,17 @@ void drawFluidNCScreen() {
     drawTitle("FLUIDNC");
 
     // Connection panel — static content, drawn once directly.
-    // The entire panel is a touch target → PSCREEN_WIFI_SETUP, which is the
-    // transport-config / WiFi-status screen.  Tappable on both UART and WiFi
-    // pendants because the setup screen is also where the transport override
-    // lives (in case autodetect picked the wrong mode for the hardware).
+    // The entire panel is a touch target → PSCREEN_CONNECTION, where the
+    // transport is chosen and (on ESP-NOW) machines are paired and selected.
     display.fillRoundRect(5, 108, 230, 70, 5, COLOR_DARKER_BG);
     display.drawRoundRect(5, 108, 230, 70, 5, COLOR_CYAN);  // tappable hint
 
-#ifdef USE_WIFI
-    // Affordance text in the top-right reflects what the user gets on tap:
-    // "WiFi >" when WiFi is live, "Setup >" when UART is live.
-    bool wifiMode = (comms_active_mode() == COMMS_MODE_WIFI);
-    const char* hint = wifiMode ? "WiFi >" : "Setup >";
+    // Affordance text in the top-right names the live transport, so the tap
+    // target reads as "go to the thing that is currently connecting me".
+    const char* hint = (comms_active_mode() == COMMS_MODE_UART) ? "UART >" : "ESP-NOW >";
     display.setTextColor(COLOR_CYAN); display.setTextSize(1);
     display.setCursor(240 - 5 - display.textWidth(hint), 113);
     display.print(hint);
-#endif
 
     display.setTextColor(COLOR_GRAY_TEXT); display.setTextSize(1);
     display.setCursor(10, 113); display.print("CONNECTION");
@@ -158,6 +155,6 @@ void handleFluidNCTouch(int x, int y) {
         currentPendantScreen = PSCREEN_STATUS;
     } else if (isTouchInBounds(x, y, 5, 108, 230, 70)) {
         // Entire CONNECTION panel → WiFi Setup
-        currentPendantScreen = PSCREEN_WIFI_SETUP;
+        currentPendantScreen = PSCREEN_CONNECTION;
     }
 }

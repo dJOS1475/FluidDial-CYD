@@ -9,32 +9,41 @@
 // Single entry point for all FluidNC byte-level I/O.  The application calls
 // fnc_putchar() / fnc_getchar() (from SystemArduino.cpp) which forward into
 // the four functions declared here.  The facade picks exactly ONE backend at
-// boot — either UART (CommsUart) or WiFi/WebSocket (WiFiConnection) — and
-// dispatches every byte through a fixed function pointer.  No mode check, no
-// NVS lookup, and no cross-backend code runs in the hot path.
+// boot — UART (CommsUart) or ESP-NOW (PeerLink) — and dispatches every byte
+// through a fixed function pointer.  No mode check, no NVS lookup, and no
+// cross-backend code runs in the hot path.
 //
 // Backends never see each other:
 //   • CommsUart only knows about the ESP-IDF UART driver.
-//   • WiFiConnection only knows about WiFi.h / TCP.
+//   • PeerLink only knows about esp_now / esp_wifi.
 //   • Comms.cpp is the only file that knows both exist.
 //
-// In UART mode wifi_init() is never called — the WiFi radio and TCP stack
-// stay cold.  In WiFi mode the UART driver is still installed by the
-// hardware init (idempotent, ~4 KB RX buffer) but no bytes are routed
-// through it.
+// Both transports are byte streams, so everything above this layer — probing,
+// jogging, SD streaming, the $File/SendJSON macro chain — is transport-agnostic
+// and behaves identically either way.
+//
+// In UART mode espnow_init() is never called and the radio stays cold.  In
+// ESP-NOW mode the UART driver is still installed by the hardware init
+// (idempotent, ~4 KB RX buffer) but no bytes are routed through it.
+//
+// The WiFi/WebSocket backend was removed in v2.2.0 — see ESPNOW_SPEC.md.
 
 enum CommsMode {
-    COMMS_MODE_UART = 0,
-    COMMS_MODE_WIFI = 1,
+    COMMS_MODE_UART   = 0,
+    COMMS_MODE_ESPNOW = 2,   // 1 was COMMS_MODE_WIFI (removed in v2.2.0)
 };
 
 // Transport selection stored in NVS (namespace "fluidwifi", key "tport_force").
-// User chooses UART or WiFi manually via the WiFi Setup screen — there is no
-// hardware autodetect.  UART is the default so a freshly-flashed pendant
-// always boots into the safe mode and won't try to start WiFi unprompted.
+// The user chooses on the Connection screen; there is no hardware autodetect.
+// UART is the default so a freshly-flashed pendant always boots into the safe
+// wired mode and never starts a radio unprompted.
+//
+// Value 1 was TFORCE_WIFI and is now retired.  comms_init() treats any value it
+// does not recognise as UART, so a pendant upgrading from v2.1.x with WiFi
+// stored comes up wired rather than on a dead transport it cannot escape.
 enum TransportForce {
-    TFORCE_UART = 0,   // default — UART transport
-    TFORCE_WIFI = 1,   // WiFi transport
+    TFORCE_UART   = 0,   // default — UART transport
+    TFORCE_ESPNOW = 2,   // ESP-NOW transport (1 = removed WiFi backend)
 };
 
 // Read / write the selection.  set_transport_force() does NOT restart — the
@@ -44,10 +53,8 @@ TransportForce get_transport_force();
 void           set_transport_force(TransportForce f);
 const char*    transport_force_label();   // "UART" or "WiFi"
 
-// Pick the active backend based on the detected hardware:
-//   • battery_hardware_present() == true  → WiFi backend (mobile pendant)
-//   • battery_hardware_present() == false → UART backend (wired pendant)
-// Calls the backend's own init() and wires up the dispatchers.  Must be
+// Pick the active backend from the stored NVS selection (defaulting to UART),
+// call that backend's own init() and wire up the dispatchers.  Must be
 // called from the SAME task (Core 0 pendant_hw_task) that will later
 // service comms_poll() / comms_getchar(), so the backend's ring buffers
 // are only ever touched by one core.
@@ -59,12 +66,12 @@ void comms_init();
 void comms_putchar(uint8_t c);
 int  comms_getchar();      // returns -1 if no byte is available
 
-// Periodic service hook.  No-op when the active backend is UART; in WiFi
-// mode this drains the TCP socket into the RX ring buffer, runs the AP
-// captive portal, and handles reconnects.
+// Periodic service hook.  No-op when the active backend is UART; in ESP-NOW
+// mode this drains received packets into the RX ring buffer and handles
+// keepalive / reconnect.
 void comms_poll();
 
-// Diagnostics / UI — used by the WiFi setup screen and the FluidNC info
+// Diagnostics / UI — used by the Connection screen and the FluidNC info
 // screen to show which transport is live.
 CommsMode   comms_active_mode();
-const char* comms_mode_name();   // "UART" or "WiFi"
+const char* comms_mode_name();   // "UART" or "ESP-NOW"

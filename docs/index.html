@@ -170,7 +170,7 @@
   <div class="card">
     <h2>Install Firmware</h2>
     <div class="install-section">
-      <div class="version-badge">v2.1.11 — Latest Release</div>
+      <div class="version-badge">v2.2.0 — Latest Release</div>
       <div id="install-count" class="install-count" style="display:none;"></div>
       <p style="text-align:center;">
         Connect your CYD to USB, then click one of the buttons below.<br />
@@ -198,8 +198,8 @@
       </div>
 
       <div class="note">
-        <strong>Update</strong> — installs the latest firmware while preserving saved settings (WiFi credentials, screen-type detection, transport override, jog preferences, rotation). Use this for upgrading from a previous FluidDial-CYD install. <em>When the installer asks, leave the "Erase device" box <strong>unchecked</strong> — ticking it wipes saved WiFi credentials.</em><br /><br />
-        <strong>Factory Reset</strong> — wipes the entire device including all saved settings, then installs the firmware fresh. Use this for first-time installs, or to recover from a stuck WiFi configuration. After reset you'll re-run the touch-screen detection and re-enter WiFi credentials via the captive portal.
+        <strong>Update</strong> — installs the latest firmware while preserving saved settings (screen-type detection, transport choice, ESP-NOW machine pairings, jog preferences, rotation). Use this for upgrading from a previous FluidDial-CYD install. <em>When the installer asks, leave the "Erase device" box <strong>unchecked</strong> — ticking it wipes your saved ESP-NOW pairings and you will have to pair again.</em><br /><br />
+        <strong>Factory Reset</strong> — wipes the entire device including all saved settings, then installs the firmware fresh. Use this for first-time installs, or to recover a pendant that will not boot cleanly. After reset you'll re-run the touch-screen detection, and on ESP-NOW you'll need to pair with your controller again.
       </div>
     </div>
   </div>
@@ -207,7 +207,9 @@
   <div class="card">
     <h2>After Installing</h2>
     <p><strong>First boot — screen detection:</strong> the pendant will display "Capacitive — Tap the Screen" then "Resistive — Tap the Screen". Tap when your screen type is shown. The result is saved and the pendant reboots automatically — this only happens once.</p>
-    <p>Connect your CYD pendant to your FluidNC controller via UART (TX/RX). The pendant will automatically detect the controller and display axis positions, machine state, and allow jogging, homing, probing, and spindle control.</p>
+    <p><strong>Wired (UART):</strong> connect your CYD pendant to your FluidNC controller via UART (TX/RX). The pendant detects the controller automatically and displays axis positions and machine state, and allows jogging, homing, probing and spindle control.</p>
+    <p><strong>Wireless (ESP-NOW):</strong> new in v2.2.0 — a direct encrypted radio link with no WiFi network, access point or router involved. It needs <strong>FluidNC v4.0.4 or newer</strong> on the controller. Go to <em>FluidNC &gt; Connection</em>, choose <strong>ESP-NOW</strong> (the pendant reboots to apply), then tap <strong>Pair New</strong> and run <code>$espnow/pair</code> on the controller. Every feature works exactly as it does over UART.</p>
+    <p><em>The WiFi transport was removed in v2.2.0.</em> If you rely on it, stay on <a href="https://github.com/dJOS1475/FluidDial-CYD/releases/tag/v2.1.11" style="color:#58a6ff;">v2.1.11</a>.</p>
     <p>See the <a href="https://github.com/dJOS1475/FluidDial-CYD" style="color:#58a6ff;">GitHub repository</a> for full documentation and wiring instructions.</p>
   </div>
 

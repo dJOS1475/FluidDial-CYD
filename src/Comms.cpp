@@ -7,8 +7,8 @@
 
 #include <Preferences.h>
 
-#ifdef USE_WIFI
-#include "WiFiConnection.h"
+#ifdef USE_ESPNOW
+#include "PeerLink.h"
 #endif
 
 #define COMMS_PREF_NAMESPACE  "fluidwifi"
@@ -17,8 +17,7 @@
 // ── Active backend state ─────────────────────────────────────────────────────
 // Function pointers default to the UART backend so any byte sent before
 // comms_init() has finished (e.g. fnc_realtime(StatusReport) from setup())
-// goes safely through UART.  comms_init() flips them to WiFi only when the
-// hardware is a battery-equipped (mobile / wireless) pendant.
+// goes safely through UART.  comms_init() only moves them once it has chosen.
 
 static CommsMode _mode = COMMS_MODE_UART;
 
@@ -30,84 +29,64 @@ static void (*_poll_fn)() = _noop_poll;
 
 // ── Public API ───────────────────────────────────────────────────────────────
 //
-// Transport selection is HARDWARE-DRIVEN, not user-configurable:
-//
-//   • Battery-equipped pendant (IP5306 PMIC detected on I2C)
-//       → mobile / wireless variant → WiFi backend
-//   • No battery hardware
-//       → wired pendant → UART backend
-//
-// Rationale: the only pendants that physically need WiFi are battery-powered
-// (i.e. not tethered to FluidNC by a UART cable).  Tying the choice to a
-// hardware capability that the firmware can detect at boot eliminates the
-// "stuck in the wrong mode" failure class entirely — there is no NVS key
-// to get out of sync with reality, and no toggle for a user to flip into
-// a non-functional state.
+// Transport is a stored user choice (NVS "tport_force"), defaulting to UART.
+// UART is the default deliberately: a freshly-flashed pendant never starts a
+// radio unprompted, and a pendant with no ESP-NOW pairing can never boot into a
+// state with no working link and no UI to fix it.
 
 void comms_init() {
-#ifdef USE_WIFI
-    // Transport selection:
-    //   • An explicit NVS override (set once via the WiFi Setup screen) always
-    //     wins and sticks across reboots / firmware updates.
-    //   • With NO override stored yet (fresh flash / factory reset → empty NVS)
-    //     we fall back to a HARDWARE autodetect: a battery pendant (IP5306 PMIC
-    //     present) wants WiFi — and on first boot with no saved credentials
-    //     wifi_init() raises the captive-portal AP so it can be configured — while
-    //     a wired pendant stays on UART.
-    //
-    // This is why a clean build still brings up the captive portal: without the
-    // autodetect default, an empty-NVS pendant would silently pick UART and never
-    // start the portal.  battery_hardware_present() is reliable here because
-    // init_hardware()/battery_init() (with its IP5306 retry probe) runs inside
-    // init_system(), before setup_pendant() calls comms_init().
     Preferences prefs;
-    prefs.begin(COMMS_PREF_NAMESPACE, true);          // read-only
-    int forced = prefs.getInt(COMMS_PREF_FORCE_KEY, -1);  // -1 = no explicit choice
+    prefs.begin(COMMS_PREF_NAMESPACE, true);              // read-only
+    int forced = prefs.getInt(COMMS_PREF_FORCE_KEY, TFORCE_UART);
     prefs.end();
 
-    bool want_wifi;
-    if (forced == TFORCE_WIFI) {
-        want_wifi = true;
-        dbg_println("Comms: transport = WiFi (NVS override)");
-    } else if (forced == TFORCE_UART) {
-        want_wifi = false;
-        dbg_println("Comms: transport = UART (NVS override)");
-    } else {
-        want_wifi = battery_hardware_present();
-        dbg_printf("Comms: transport = %s (autodetect — no override stored)\n",
-                   want_wifi ? "WiFi" : "UART");
+    // Any value we don't recognise falls back to UART.  This matters on upgrade
+    // from v2.1.x, where a WiFi pendant has TFORCE_WIFI(1) stored and the WiFi
+    // backend no longer exists: without this guard the pendant would boot to a
+    // dead transport with no UI left to change it, and would need a reflash to
+    // recover.  Treat "unknown" as "use the safe wired path", always.
+    if (forced != TFORCE_UART
+#ifdef USE_ESPNOW
+        && forced != TFORCE_ESPNOW
+#endif
+    ) {
+        dbg_printf("Comms: stored transport %d not available in this build — using UART\n",
+                   forced);
+        forced = TFORCE_UART;
     }
 
-    if (want_wifi) {
-        _mode       = COMMS_MODE_WIFI;
-        _putchar_fn = ws_putchar;
-        _getchar_fn = ws_getchar;
-        _poll_fn    = wifi_poll;
-        wifi_init();              // start STA / AP captive portal
+#ifdef USE_ESPNOW
+    if (forced == TFORCE_ESPNOW) {
+        _mode       = COMMS_MODE_ESPNOW;
+        _putchar_fn = espnow_putchar;
+        _getchar_fn = espnow_getchar;
+        _poll_fn    = espnow_poll;
+        dbg_println("Comms: transport = ESP-NOW");
+        espnow_init();
         return;
     }
 #endif
 
     // UART path: the driver was already installed by the hardware init pass.
     // No further action required; function pointers already point at UART.
+    dbg_println("Comms: transport = UART");
     _mode = COMMS_MODE_UART;
 }
 
 // ── Transport selection (NVS-backed) ─────────────────────────────────────────
 // NVS key "tport_force" holds the integer value from the TransportForce enum.
-// When the key is ABSENT (fresh flash), comms_init() autodetects from hardware
-// (battery pendant → WiFi, wired → UART); this read-only getter still reports
-// UART as its nominal default for callers that just want the stored override.
-// Once the user toggles transport on the WiFi Setup screen the explicit value
-// is written here and sticks across reboots and firmware updates (NVS is
-// preserved by the Update path of the web installer).
+// The value is written by the Connection screen and sticks across reboots and
+// firmware updates (NVS is preserved by the web installer's Update path).
 
 TransportForce get_transport_force() {
     Preferences prefs;
     prefs.begin(COMMS_PREF_NAMESPACE, true);   // read-only
     int v = prefs.getInt(COMMS_PREF_FORCE_KEY, TFORCE_UART);
     prefs.end();
-    return (v == TFORCE_WIFI) ? TFORCE_WIFI : TFORCE_UART;
+#ifdef USE_ESPNOW
+    if (v == TFORCE_ESPNOW) return TFORCE_ESPNOW;
+#endif
+    return TFORCE_UART;   // unknown / removed transports read back as UART
 }
 
 void set_transport_force(TransportForce f) {
@@ -116,11 +95,14 @@ void set_transport_force(TransportForce f) {
     prefs.putInt(COMMS_PREF_FORCE_KEY, (int)f);
     prefs.end();
     dbg_printf("Comms: transport set to %s (restart required)\n",
-               (f == TFORCE_WIFI) ? "WiFi" : "UART");
+               transport_force_label());
 }
 
 const char* transport_force_label() {
-    return (get_transport_force() == TFORCE_WIFI) ? "WiFi" : "UART";
+#ifdef USE_ESPNOW
+    if (get_transport_force() == TFORCE_ESPNOW) return "ESP-NOW";
+#endif
+    return "UART";
 }
 
 void comms_putchar(uint8_t c) {
@@ -140,5 +122,8 @@ CommsMode comms_active_mode() {
 }
 
 const char* comms_mode_name() {
-    return (_mode == COMMS_MODE_WIFI) ? "WiFi" : "UART";
+#ifdef USE_ESPNOW
+    if (_mode == COMMS_MODE_ESPNOW) return "ESP-NOW";
+#endif
+    return "UART";
 }
