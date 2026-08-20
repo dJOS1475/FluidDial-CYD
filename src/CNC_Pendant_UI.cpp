@@ -261,9 +261,10 @@ void initPanelScratch() {
         if (spritePanelScratch.getBuffer()) {
             scratchW = PANEL_SCRATCH_W;
             scratchH = h;
-            dbg_printf("Panel scratch: %dx%d @16bpp (%d bytes), free heap %u\n",
+            dbg_printf("Panel scratch: %dx%d @16bpp (%d bytes), free heap %u, largest block %u\n",
                        PANEL_SCRATCH_W, h, PANEL_SCRATCH_W * h * 2,
-                       (unsigned)ESP.getFreeHeap());
+                       (unsigned)ESP.getFreeHeap(),
+                       (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
             return;
         }
         spritePanelScratch.deleteSprite();   // release any partial state
@@ -1383,8 +1384,9 @@ void pendant_comms_task(void* /*pvParameters*/) {
     // it is never called and the WiFi radio stays cold.  After this call
     // the hot path is a single indirect function call per byte.
     comms_init();
-    dbg_printf("Comms: active transport = %s (free heap %u)\n",
-               comms_mode_name(), (unsigned)ESP.getFreeHeap());
+    dbg_printf("Comms: active transport = %s (free heap %u, largest block %u)\n",
+               comms_mode_name(), (unsigned)ESP.getFreeHeap(),
+               (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
     rtcLastBootStage = 5;     // stage 5: comms_init done
 
     // Panel scratch AFTER the radio, so the radio's allocations always win —
@@ -1623,7 +1625,15 @@ void pendant_comms_task(void* /*pvParameters*/) {
                 }
                 // On connect edge, ask Core 1 to fetch all static controller config.
                 // Reconnects auto-refresh because the edge fires again on each transition.
-                if (connected && hwEventQueue) {
+                //
+                // UART ONLY.  On ESP-NOW this edge is driven by GrblParser's
+                // receive timing, which the controller's keepalives satisfy while
+                // the radio link is still synchronising — and send_fragments()
+                // discards everything until it reaches Connected, so the burst
+                // was both unreliable AND duplicated by the radio link-up edge
+                // below.  The observed effect was the whole config set going out
+                // three times back-to-back the instant a pairing completed.
+                if (connected && hwEventQueue && comms_active_mode() != COMMS_MODE_ESPNOW) {
                     HwEvent ev = { HwEvent::CONNECTED, 0 };
                     xQueueSend(hwEventQueue, &ev, 0);
                 }
@@ -1721,6 +1731,7 @@ void pendant_comms_task(void* /*pvParameters*/) {
         if (comms_active_mode() == COMMS_MODE_ESPNOW) {
             static bool prevLinkUp = false;
             const bool  linkUp     = espnow_is_connected();
+            // The ONLY config-fetch trigger on this transport (see above).
             if (linkUp && !prevLinkUp && hwEventQueue) {
                 HwEvent ev = { HwEvent::CONNECTED, 0 };
                 xQueueSend(hwEventQueue, &ev, 0);
@@ -2055,6 +2066,10 @@ void loop_pendant() {
     // coalesces the periodic 100 ms tick with the event-driven update so we
     // don't redraw twice in quick succession when DRO updates arrive.
     static unsigned long lastSpriteUpdate = 0;
+    // Floor between event-driven sprite refreshes.  Just under the 100 ms
+    // periodic tick, so a burst of events cannot outpace the display but a
+    // single change still repaints promptly rather than waiting for the tick.
+    static const unsigned long SPRITE_MIN_INTERVAL_MS = 80;
 
     rtcCore1Stage = 3;     // about to process queue
 
@@ -2091,8 +2106,21 @@ void loop_pendant() {
                 rtcCore1Stage = 5;     // inside STATE_UPDATE handler
                 // Use the sprite-only update path to avoid fillScreen flicker.
                 // Full drawXxxScreen() is only called on initial entry or user touch.
-                updateCurrentScreenSprites();
-                lastSpriteUpdate = millis();   // suppress duplicate periodic tick
+                //
+                // RATE-LIMITED.  Six different places post STATE_UPDATE — every
+                // status report, state change, several parser callbacks and the
+                // ESP-NOW link tick — and they arrive in bursts, most obviously
+                // in the seconds after a pairing completes when the config replies
+                // land alongside 5 status reports a second.  Repainting on each
+                // one drove the panel redraw far past the display's useful rate
+                // and showed as heavy flicker.  Coalesce instead: drop the event
+                // if a refresh happened within the last frame, and let the 100 ms
+                // periodic tick below render the latest state.  Nothing is lost —
+                // these events carry no data, they only say "something changed".
+                if (millis() - lastSpriteUpdate >= SPRITE_MIN_INTERVAL_MS) {
+                    updateCurrentScreenSprites();
+                    lastSpriteUpdate = millis();   // suppress duplicate periodic tick
+                }
                 break;
             case HwEvent::CONNECTED:
                 rtcCore1Stage = 4;     // inside CONNECTED handler

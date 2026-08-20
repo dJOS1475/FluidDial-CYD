@@ -99,9 +99,24 @@ void init_system() {
         return;
     }
 
-    // Make an offscreen canvas that can be copied to the screen all at once
+    // Make an offscreen canvas that can be copied to the screen all at once.
+    //
+    // OLD UI ONLY.  This is 240x240 at 8bpp = 57,600 bytes of heap, and the only
+    // thing that ever puts it on screen is refreshDisplay(), which is called
+    // exclusively from the old Scene classes (Status/Help/Menu/Confirm/File*).
+    // The new UI's active scene is PendantScene, which draws to the display
+    // directly and through the shared panel sprites, so under USE_NEW_UI this
+    // buffer was allocated at boot, never drawn, and never freed.
+    //
+    // It mattered: with it plus the 32 KB panel scratch held for the life of the
+    // process, the heap was left small and badly fragmented — measured at 45 KB
+    // free with a LARGEST FREE BLOCK OF 564 BYTES on a resistive pendant, at
+    // which point esp_now_add_peer() cannot allocate and ESP-NOW pairing fails
+    // with no discovery packet ever being sent.
+#ifndef USE_NEW_UI
     canvas.setColorDepth(8);
-    canvas.createSprite(240, 240);  // display.width(), display.height());
+    canvas.createSprite(240, 240);
+#endif  // display.width(), display.height());
 }
 
 // ── Flow-control reset ──────────────────────────────────────────────────────

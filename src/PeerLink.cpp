@@ -251,6 +251,10 @@ static uint32_t         _pairing_last_completion_ms = 0;
 static uint32_t         _pairing_last_confirm_ms = 0;
 static uint32_t         _pairing_await_result_ms = 0;
 static uint32_t         _beacon_last_ms   = 0;
+// Consecutive discovery beacons the radio refused — see the beacon block in
+// espnow_poll().  Kept (not a temporary diagnostic): this failure is otherwise
+// completely silent and presents only as pairing that never starts.
+static uint32_t         _beacon_blocked   = 0;
 static uint8_t          _probe_idx        = 0;
 
 static uint8_t  _reconnect_probe_idx = 0;
@@ -1658,8 +1662,8 @@ void espnow_poll() {
 
         _probe_idx  = (_probe_idx + 1) % 13;
         _op_channel = PROBE_ORDER[_probe_idx];
-        broadcast_ready =
-            esp_wifi_set_channel(_op_channel, WIFI_SECOND_CHAN_NONE) == ESP_OK;
+        const esp_err_t ch_err = esp_wifi_set_channel(_op_channel, WIFI_SECOND_CHAN_NONE);
+        broadcast_ready = (ch_err == ESP_OK);
 
         remove_broadcast_peer();
         esp_now_peer_info_t bp = {};
@@ -1667,7 +1671,8 @@ void espnow_poll() {
         bp.channel = _op_channel;
         bp.encrypt = false;
         bp.ifidx   = WIFI_IF_STA;
-        broadcast_ready = broadcast_ready && esp_now_add_peer(&bp) == ESP_OK;
+        const esp_err_t add_err = esp_now_add_peer(&bp);
+        broadcast_ready = broadcast_ready && (add_err == ESP_OK);
 
         uint8_t my_mac[6];
         esp_wifi_get_mac(WIFI_IF_STA, my_mac);
@@ -1676,12 +1681,35 @@ void espnow_poll() {
             _pairing_keypair_valid =
                 ESPNowCrypto::generateEcdhKeypair(_pairing_private_key, _pairing_public_key);
         }
-        if (_pairing_keypair_valid && broadcast_ready) {
-            DiscoveryV4Pkt pkt;
-            build_discovery_v4(pkt, my_mac, _op_channel);
-            esp_now_send(BROADCAST_MAC, (const uint8_t*)&pkt, sizeof(pkt));
-            ESPNowCrypto::secureZero(&pkt, sizeof(pkt));
+
+        // Either failure above sends NO discovery packet at all, and until now it
+        // did so SILENTLY — the pairing screen simply sat on "Waiting..." with
+        // nothing to say why.  esp_now_add_peer() allocates, so the usual cause
+        // is heap exhaustion; the error name separates that (NO_MEM) from a peer
+        // table problem (FULL / EXIST), and the free-heap figure confirms it.
+        if (!broadcast_ready || !_pairing_keypair_valid) {
+            if (_beacon_blocked == 0) {
+                dbg_printf("ESP-NOW: discovery BLOCKED on ch%u — set_channel=%s "
+                           "add_peer=%s keypair=%d, free heap %u (largest block %u)\n",
+                           (unsigned)_op_channel, esp_err_to_name(ch_err),
+                           esp_err_to_name(add_err), _pairing_keypair_valid ? 1 : 0,
+                           (unsigned)ESP.getFreeHeap(),
+                           (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+            }
+            ++_beacon_blocked;
+            return;
         }
+
+        if (_beacon_blocked) {
+            dbg_printf("ESP-NOW: discovery recovered after %lu blocked beacons\n",
+                       (unsigned long)_beacon_blocked);
+            _beacon_blocked = 0;
+        }
+
+        DiscoveryV4Pkt pkt;
+        build_discovery_v4(pkt, my_mac, _op_channel);
+        esp_now_send(BROADCAST_MAC, (const uint8_t*)&pkt, sizeof(pkt));
+        ESPNowCrypto::secureZero(&pkt, sizeof(pkt));
     }
 }
 
@@ -1799,8 +1827,11 @@ void espnow_start_pairing() {
     set_link_state(LinkState::Discovering);
     _pairing_complete = false;
     _beacon_last_ms   = 0;
+    _beacon_blocked   = 0;
 
-    dbg_println("ESP-NOW: pairing window started");
+    dbg_printf("ESP-NOW: pairing window started — free heap %u (largest block %u)\n",
+               (unsigned)ESP.getFreeHeap(),
+               (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 }
 
 // FluidDial-CYD addition: close the link cleanly before deep sleep so the

@@ -231,6 +231,26 @@ void init_resistive_cyd() {
     red_button_pin   = GPIO_NUM_4;   // RGB LED Red
     dial_button_pin  = GPIO_NUM_17;  // RGB LED Blue
     green_button_pin = GPIO_NUM_16;  // RGB LED Green
+
+    // GPIO4 is the ext0 deep-sleep wake source, so deep_sleep() hands the pad to
+    // the RTC controller (rtc_gpio_init + pullup) and nothing ever hands it back.
+    // Release it before configuring, so the digital pinMode below actually takes
+    // effect on a wake-from-sleep boot and not just a cold one.
+    rtc_gpio_deinit(GPIO_NUM_4);
+
+    // These pins MUST be pulled up.  The capacitive board's init does this; the
+    // resistive one did not, which is the whole bug: the resistive CYD has no
+    // connector for these pins, so the RGB LED stays in circuit and users solder
+    // buttons directly to its legs.  Left as a bare input, GPIO4 sits at roughly
+    // Vcc minus the red LED's forward drop (~1.3 V) — inside the ESP32's
+    // indeterminate band — and reads LOW more often than not.  The button
+    // handler treats LOW as "red pressed", which fires a soft reset ($X) at the
+    // controller on every boot and, 5 s later, the red long-press power-off.
+    // The pullup swamps the LED path, so an unwired pin reads HIGH and is inert.
+    // This also covers partly-wired boards, where only some buttons are fitted.
+    pinMode(red_button_pin, INPUT_PULLUP);
+    pinMode(dial_button_pin, INPUT_PULLUP);
+    pinMode(green_button_pin, INPUT_PULLUP);
 #    else
     red_button_pin = dial_button_pin = green_button_pin = -1;
 #    endif
