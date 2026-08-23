@@ -46,12 +46,11 @@ void drawProbingWorkScreen() {
     display.print("SET WORK ZERO");
 
     {
-        const char* axisLabels[] = { "X", "Y", "Z", "A" };
         int numAx     = pendantMachine.numAxes;
         int totalBtns = numAx + 1;
         int btnW      = 230 / totalBtns;
         for (int i = 0; i < numAx; i++)
-            drawButton(5 + i * btnW, 230, btnW - 2, 38, axisLabels[i], COLOR_DARK_GREEN, COLOR_WHITE, 3);
+            drawButton(5 + i * btnW, 230, btnW - 2, 38, AXIS_NAMES[i], COLOR_DARK_GREEN, COLOR_WHITE, 3);
         drawButton(5 + numAx * btnW, 230, btnW - 2, 38, "ALL", COLOR_DARK_GREEN, COLOR_WHITE, 2);
     }
 
@@ -77,15 +76,18 @@ void updateWorkMachinePos() {
         pz = pendantMachine.workZ; pa = pendantMachine.workA;
     }
 
-    const char* axisNames[] = { "X", "Y", "Z", "A" };
-    float       positions[] = { px, py, pz, pa };
+    // Sized PENDANT_MAX_AXES; numAxes is clamped to that in onDROChange.
+    float positions[PENDANT_MAX_AXES];
+    for (int i = 0; i < PENDANT_MAX_AXES; i++) positions[i] = pendantMachine.pos[i];
+    // Three columns once there are more than 4 axes — see screen_status.
+    const int nCols = (pendantMachine.numAxes > 4) ? 3 : 2;
     if (hasSprite) spriteAxisDisplay.fillSprite(COLOR_BACKGROUND);
     else           display.fillRect(5, 108, 230, 45, COLOR_BACKGROUND);
     g->setTextColor(COLOR_ORANGE);
     g->setTextSize(2);
     for (int i = 0; i < pendantMachine.numAxes; i++) {
-        g->setCursor(ox + ((i % 2) ? 120 : 0), oy + 5 + (i / 2) * 20);
-        g->print(axisNames[i]); g->print(":"); g->print(positions[i], 1);
+        g->setCursor(ox + (i % nCols) * (230 / nCols), oy + 5 + (i / nCols) * 20);
+        g->print(AXIS_NAMES[i]); g->print(":"); g->print(positions[i], 1);
     }
     if (hasSprite) spriteAxisDisplay.pushSprite(5, 108);
 }
@@ -108,15 +110,17 @@ void updateWorkAreaPos() {
         wz = pendantMachine.posZ; wa = pendantMachine.posA;
     }
 
-    const char* wAxisNames[] = { "X", "Y", "Z", "A" };
-    float       workPos[]    = { wx, wy, wz, wa };
+
+    float workPos[PENDANT_MAX_AXES];
+    for (int i = 0; i < PENDANT_MAX_AXES; i++) workPos[i] = pendantMachine.work[i];
+    const int nCols = (pendantMachine.numAxes > 4) ? 3 : 2;
     if (hasSprite) spriteValueDisplay.fillSprite(COLOR_BACKGROUND);
     else           display.fillRect(5, 166, 230, 45, COLOR_BACKGROUND);
     g->setTextColor(COLOR_CYAN);
     g->setTextSize(2);
     for (int i = 0; i < pendantMachine.numAxes; i++) {
-        g->setCursor(ox + ((i % 2) ? 120 : 0), oy + 5 + (i / 2) * 20);
-        g->print(wAxisNames[i]); g->print(":"); g->print(workPos[i], 1);
+        g->setCursor(ox + (i % nCols) * (230 / nCols), oy + 5 + (i / nCols) * 20);
+        g->print(AXIS_NAMES[i]); g->print(":"); g->print(workPos[i], 1);
     }
     if (hasSprite) spriteValueDisplay.pushSprite(5, 166);
 }
@@ -149,20 +153,18 @@ void handleProbingWorkTouch(int x, int y) {
 
     // Set Work Zero buttons — P number matches selected coord system (G54=P1 … G57=P4)
     {
-        const char* axisLabels[] = { "X", "Y", "Z", "A" };
-        const char* axisLetters[] = { "X", "Y", "Z", "A" };
         int pNum      = pendantProbing.selectedCoordIndex + 1;  // G54→1, G55→2, G56→3, G57→4
         int numAx     = pendantMachine.numAxes;
         int totalBtns = numAx + 1;
         int btnW      = 230 / totalBtns;
         for (int i = 0; i < numAx; i++) {
             if (isTouchInBounds(x, y, 5 + i * btnW, 230, btnW - 2, 38)) {
-                drawButton(5 + i * btnW, 230, btnW - 2, 38, axisLabels[i], COLOR_WHITE, COLOR_DARK_GREEN, 3);
+                drawButton(5 + i * btnW, 230, btnW - 2, 38, AXIS_NAMES[i], COLOR_WHITE, COLOR_DARK_GREEN, 3);
                 delay_ms(150);
-                drawButton(5 + i * btnW, 230, btnW - 2, 38, axisLabels[i], COLOR_DARK_GREEN, COLOR_WHITE, 3);
+                drawButton(5 + i * btnW, 230, btnW - 2, 38, AXIS_NAMES[i], COLOR_DARK_GREEN, COLOR_WHITE, 3);
                 if (pendantConnected) {
                     char cmd[32];
-                    snprintf(cmd, sizeof(cmd), "G10 L20 P%d %s0", pNum, axisLetters[i]);
+                    snprintf(cmd, sizeof(cmd), "G10 L20 P%d %s0", pNum, AXIS_NAMES[i]);
                     send_line(cmd);
                 }
                 return;

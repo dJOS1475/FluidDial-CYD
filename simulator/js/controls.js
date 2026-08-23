@@ -97,7 +97,8 @@ function buildControls() {
 
   // -- Machine --
   root.appendChild(_el("h3", {}, "Machine"));
-  root.appendChild(_row("Axes", _select("axes", [{ v: "3", t: "3 (XYZ)" }, { v: "4", t: "4 (XYZA)" }],
+  root.appendChild(_row("Axes", _select("axes", [{ v: "3", t: "3 (XYZ)" }, { v: "4", t: "4 (XYZA)" },
+                     { v: "5", t: "5 (+B)" }, { v: "6", t: "6 (+C)" }],
     (e) => { pendantMachine.numAxes = +e.target.value; repaint(); })));
   root.appendChild(_row("Units", _select("units", [{ v: "mm", t: "mm (G21)" }, { v: "in", t: "inch (G20)" }],
     (e) => { pendantMachine.inInches = e.target.value === "in"; repaint(); })));
@@ -105,14 +106,38 @@ function buildControls() {
     (e) => { pendantProbing.selectedCoordIndex = +e.target.value; pendantProbing.selectedCoordSystem = ["G54", "G55", "G56", "G57"][+e.target.value]; repaint(); })));
 
   // -- Positions (machine / work) --
+  // One field per axis up to PENDANT_MAX_AXES.  Writes the canonical pos/work
+  // arrays and mirrors the first four into posX..posA, exactly as onDROChange
+  // does in the firmware, so the two can never disagree.
   root.appendChild(_el("h3", {}, "Position (work)"));
-  for (const ax of ["X", "Y", "Z", "A"]) {
-    root.appendChild(_row(ax, _num("pos" + ax, 0.1, (e) => { pendantMachine["pos" + ax] = +e.target.value || 0; repaint(); })));
-  }
+  AXIS_NAMES.forEach((ax, i) => {
+    root.appendChild(_row(ax, _num("pos" + ax, 0.1, (e) => {
+      pendantMachine.pos[i] = +e.target.value || 0;
+      if (i < 4) pendantMachine["pos" + ax] = pendantMachine.pos[i];
+      repaint();
+    })));
+  });
   root.appendChild(_el("h3", {}, "Position (machine)"));
-  for (const ax of ["X", "Y", "Z", "A"]) {
-    root.appendChild(_row(ax, _num("work" + ax, 0.1, (e) => { pendantMachine["work" + ax] = +e.target.value || 0; repaint(); })));
-  }
+  AXIS_NAMES.forEach((ax, i) => {
+    root.appendChild(_row(ax, _num("work" + ax, 0.1, (e) => {
+      pendantMachine.work[i] = +e.target.value || 0;
+      if (i < 4) pendantMachine["work" + ax] = pendantMachine.work[i];
+      repaint();
+    })));
+  });
+
+  // -- Boot diagnostics (drives the FluidNC screen's LAST RESET field) --
+  root.appendChild(_el("h3", {}, "Last reset"));
+  root.appendChild(_row("Reason", _select("resetReason",
+    ["POWER_ON", "PANIC", "TASK_WDT", "INT_WDT", "BROWNOUT", "SW_RESET", "DEEPSLEEP"]
+      .map((r) => ({ v: r, t: r })),
+    (e) => { simDiag.resetReason = e.target.value; repaint(); })));
+  root.appendChild(_row("Core 0 stage", _num("bootStage", 1,
+    (e) => { simDiag.bootStage = +e.target.value || 0; repaint(); })));
+  root.appendChild(_row("Core 1 stage", _num("core1Stage", 1,
+    (e) => { simDiag.core1Stage = +e.target.value || 0; repaint(); })));
+  root.appendChild(_row("Heap min KB", _num("minHeapKB", 1,
+    (e) => { simDiag.minHeapKB = +e.target.value || 0; repaint(); })));
 
   // -- Feeds / spindle --
   root.appendChild(_el("h3", {}, "Feeds / Spindle"));
@@ -167,10 +192,14 @@ function syncControlsFromState() {
   set("axes", String(pendantMachine.numAxes));
   set("units", pendantMachine.inInches ? "in" : "mm");
   set("wcs", String(pendantProbing.selectedCoordIndex));
-  for (const ax of ["X", "Y", "Z", "A"]) {
-    set("pos" + ax, pendantMachine["pos" + ax]);
-    set("work" + ax, pendantMachine["work" + ax]);
-  }
+  AXIS_NAMES.forEach((ax, i) => {
+    set("pos" + ax, pendantMachine.pos[i]);
+    set("work" + ax, pendantMachine.work[i]);
+  });
+  set("resetReason", simDiag.resetReason);
+  set("bootStage", simDiag.bootStage);
+  set("core1Stage", simDiag.core1Stage);
+  set("minHeapKB", simDiag.minHeapKB);
   set("feedRate", pendantMachine.feedRate);
   set("spindleRPM", pendantMachine.spindleRPM);
   set("spindleMaxRPM", pendantMachine.spindleMaxRPM);

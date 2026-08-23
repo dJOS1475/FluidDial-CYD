@@ -634,6 +634,19 @@ static bool register_peer(const uint8_t mac[6], uint8_t channel, bool encrypt, c
     } else {
         result = esp_now_add_peer(&p);
     }
+
+    // Say so when the radio refuses.  Four of the ten call sites discard this
+    // return, and a peer that never registers means a link that silently never
+    // works — the same invisible-failure class that hid the pairing bug for a
+    // release.  esp_now_add_peer() allocates, so NO_MEM here means fragmentation,
+    // not a logic error; the heap figures make that distinguishable.
+    if (result != ESP_OK) {
+        dbg_printf("ESP-NOW: register_peer(ch%u,%s) FAILED: %s — free heap %u "
+                   "(largest block %u)\n",
+                   (unsigned)channel, encrypt ? "enc" : "plain",
+                   esp_err_to_name(result), (unsigned)ESP.getFreeHeap(),
+                   (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+    }
     return result == ESP_OK;
 }
 

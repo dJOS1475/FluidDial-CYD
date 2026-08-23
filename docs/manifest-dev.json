@@ -1,0 +1,17 @@
+{
+  "name": "FluidDial-CYD v2.2.2 DEV (Update — preserves settings)",
+  "version": "2.2.2-dev",
+  "new_install_prompt_erase": true,
+  "builds": [
+    {
+      "chipFamily": "ESP32",
+      "parts": [
+        { "path": "https://cdn.jsdelivr.net/gh/dJOS1475/FluidDial-CYD@v2.2.2-dev/docs/dev/bootloader.bin", "offset": 4096 },
+        { "path": "https://cdn.jsdelivr.net/gh/dJOS1475/FluidDial-CYD@v2.2.2-dev/docs/dev/partitions.bin", "offset": 32768 },
+        { "path": "https://cdn.jsdelivr.net/gh/dJOS1475/FluidDial-CYD@v2.2.2-dev/docs/dev/boot_app0.bin",  "offset": 57344 },
+        { "path": "https://cdn.jsdelivr.net/gh/dJOS1475/FluidDial-CYD@v2.2.2-dev/docs/dev/firmware.bin",   "offset": 65536 },
+        { "path": "https://cdn.jsdelivr.net/gh/dJOS1475/FluidDial-CYD@v2.2.2-dev/docs/dev/littlefs.bin",   "offset": 2686976 }
+      ]
+    }
+  ]
+}

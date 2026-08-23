@@ -165,7 +165,6 @@ void drawJogHomingScreen() {
     display.fillRoundRect(5, 40, 230, 55, 5, COLOR_DARKER_BG);
     updateJogAxisDisplay();
 
-    String axisNames[] = { "X", "Y", "Z", "A" };
     int numAx = pendantMachine.numAxes;
 
     display.setTextColor(COLOR_GRAY_TEXT);
@@ -174,12 +173,15 @@ void drawJogHomingScreen() {
     display.print("HOME");
 
     {
-        String homeNames[4] = { "X", "Y", "Z", numAx < 4 ? "ALL" : "A" };
-        int    numHome       = (numAx < 4) ? numAx + 1 : 4;
+        // One button per reported axis, plus "ALL" when there is room for it.
+        // Sized from numAx (already clamped) rather than a fixed 4-entry table.
+        const int numHome = (numAx < 4) ? numAx + 1 : numAx;
         for (int i = 0; i < numHome; i++) {
-            int sz = (i == numAx && numAx < 4) ? 2 : 3;
+            const bool  isAll = (numAx < 4) && (i == numAx);
+            const char* label = isAll ? "ALL" : AXIS_NAMES[i];
+            const int   sz    = isAll ? 2 : 3;
             drawButton(rowBtnX(numHome, i), HOME_Y, rowBtnWAt(numHome, i), ROW_H,
-                       homeNames[i], COLOR_DARK_GREEN, COLOR_WHITE, sz);
+                       label, COLOR_DARK_GREEN, COLOR_WHITE, sz);
         }
     }
 
@@ -193,7 +195,7 @@ void drawJogHomingScreen() {
         uint16_t bg = (!pendantJog.speedDialMode && i == pendantJog.selectedAxis)
                       ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
         drawButton(rowBtnX(numAx, i), AXIS_Y, rowBtnWAt(numAx, i), ROW_H,
-                   axisNames[i], bg, COLOR_WHITE, 3);
+                   AXIS_NAMES[i], bg, COLOR_WHITE, 3);
     }
 
     redrawJogIncrementLabel();
@@ -229,10 +231,9 @@ void updateJogAxisDisplay() {
     // 230 x 55, pushed at (5, 40); shared 16-bit scratch, direct-draw fallback.
     // Jog & Homing shows MACHINE coordinates (workX/Y/Z/A = MPos) — homing and
     // travel-limit reasoning are all in machine space.  (posX/Y/Z are work coords.)
-    float px, py, pz, pa;
+    float positions[PENDANT_MAX_AXES];
     if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) != pdTRUE) return;
-    px = pendantMachine.workX; py = pendantMachine.workY;
-    pz = pendantMachine.workZ; pa = pendantMachine.workA;
+    for (int i = 0; i < PENDANT_MAX_AXES; i++) positions[i] = pendantMachine.work[i];
     xSemaphoreGive(stateMutex);
 
     int ox, oy;
@@ -287,15 +288,18 @@ void updateJogAxisDisplay() {
         g->setCursor(ox + 115 - hw2 / 2, oy + 42);
         g->print(hint);
     } else {
-        String axisNames[] = { "X", "Y", "Z", "A" };
-        float  positions[] = { px, py, pz, pa };
-        bool   inAlarm     = pendantMachine.status.startsWith("Alarm");
+        bool inAlarm = pendantMachine.status.startsWith("Alarm");
 
         // While homing, the big DRO shows the axis being homed (pendantJog.homingAxis);
         // otherwise it shows the user's jog-button selection (selectedAxis).  When
         // homing ends, homingAxis goes back to -1 and the DRO returns to selectedAxis.
         int dispAxis = (pendantJog.homingAxis >= 0) ? pendantJog.homingAxis
                                                      : pendantJog.selectedAxis;
+        // Both are set from user input / homing state, so they can outlive a
+        // change in axis count.  Clamp before indexing — this is the one place
+        // an axis index is not derived from a bounded loop.
+        if (dispAxis < 0)                  dispAxis = 0;
+        if (dispAxis >= PENDANT_MAX_AXES)  dispAxis = PENDANT_MAX_AXES - 1;
 
         // Large display: axis + position on one line.  Unit handling:
         //   • in alarm        → unit slot shows the alarm state (red)
@@ -309,14 +313,14 @@ void updateJogAxisDisplay() {
         char mainLine[32];
         if (inAlarm) {
             snprintf(mainLine, sizeof(mainLine), "%s %s %s",
-                     axisNames[dispAxis].c_str(), posBuf, pendantMachine.status.c_str());
+                     AXIS_NAMES[dispAxis], posBuf, pendantMachine.status.c_str());
         } else if (isAAxis) {
             // No text unit — a degree icon is overlaid after the value below.
             snprintf(mainLine, sizeof(mainLine), "%s %s",
-                     axisNames[dispAxis].c_str(), posBuf);
+                     AXIS_NAMES[dispAxis], posBuf);
         } else {
             snprintf(mainLine, sizeof(mainLine), "%s %s %s",
-                     axisNames[dispAxis].c_str(), posBuf,
+                     AXIS_NAMES[dispAxis], posBuf,
                      pendantMachine.inInches ? "in" : "mm");
         }
         g->setTextColor(inAlarm ? TFT_RED : COLOR_GREEN);
@@ -341,7 +345,7 @@ void updateJogAxisDisplay() {
             char valBuf[10];
             dtostrf(positions[i], 1, 2, valBuf);
             char buf[16];
-            snprintf(buf, sizeof(buf), "%s:%s", axisNames[i].c_str(), valBuf);
+            snprintf(buf, sizeof(buf), "%s:%s", AXIS_NAMES[i], valBuf);
             g->setCursor(ox + col, oy + 38);
             g->print(buf);
             col += colSpacing;
@@ -355,13 +359,12 @@ void updateJogAxisDisplay() {
 
 void redrawJogAxisButtons() {
     if (currentPendantScreen != PSCREEN_JOG_HOMING) return;
-    String axisNames[] = { "X", "Y", "Z", "A" };
     int numAx = pendantMachine.numAxes;
     for (int i = 0; i < numAx; i++) {
         uint16_t bg = (!pendantJog.speedDialMode && i == pendantJog.selectedAxis)
                       ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
         drawButton(rowBtnX(numAx, i), AXIS_Y, rowBtnWAt(numAx, i), ROW_H,
-                   axisNames[i], bg, COLOR_WHITE, 3);
+                   AXIS_NAMES[i], bg, COLOR_WHITE, 3);
     }
     updateJogAxisDisplay();
 }
@@ -383,15 +386,15 @@ void handleJogHomingTouch(int x, int y) {
 
     // Home buttons — laid out on the shared row grid
     {
-        String homeNames[4] = { "X", "Y", "Z", numAx < 4 ? "ALL" : "A" };
-        int    numHome       = (numAx < 4) ? numAx + 1 : 4;
+        const int numHome = (numAx < 4) ? numAx + 1 : numAx;
         for (int i = 0; i < numHome; i++) {
             int hx = rowBtnX(numHome, i), hw = rowBtnWAt(numHome, i);
             if (isTouchInBounds(x, y, hx, HOME_Y, hw, ROW_H)) {
                 int sz = (i == numAx && numAx < 4) ? 2 : 3;
-                drawButton(hx, HOME_Y, hw, ROW_H, homeNames[i], COLOR_WHITE, COLOR_DARK_GREEN, sz);
+                const char* label = ((numAx < 4) && (i == numAx)) ? "ALL" : AXIS_NAMES[i];
+                drawButton(hx, HOME_Y, hw, ROW_H, label, COLOR_WHITE, COLOR_DARK_GREEN, sz);
                 delay_ms(150);
-                drawButton(hx, HOME_Y, hw, ROW_H, homeNames[i], COLOR_DARK_GREEN, COLOR_WHITE, sz);
+                drawButton(hx, HOME_Y, hw, ROW_H, label, COLOR_DARK_GREEN, COLOR_WHITE, sz);
                 if (!pendantConnected) return;
                 char cmd[16];
                 if (i == numAx) {
@@ -400,8 +403,7 @@ void handleJogHomingTouch(int x, int y) {
                     // it through whichever axis is actively homing.
                     pendantJog.homingAxis = 0;
                 } else {
-                    String axisNames[] = { "X", "Y", "Z", "A" };
-                    snprintf(cmd, sizeof(cmd), "$H%s", axisNames[i].c_str());
+                    snprintf(cmd, sizeof(cmd), "$H%s", AXIS_NAMES[i]);
                     send_line(cmd);
                     // Show the axis being homed in the big DRO.  This uses the
                     // transient homingAxis, NOT selectedAxis — so once homing

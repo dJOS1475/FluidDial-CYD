@@ -175,7 +175,7 @@ function handleEncoderDelta(delta) {
         const loMm = homesNeg ? 0 : -travelMm;
         const hiMm = homesNeg ? travelMm : 0;
         const MARGIN_MM = 0.5;
-        const mposDisp = [pendantMachine.workX, pendantMachine.workY, pendantMachine.workZ][axis];
+        const mposDisp = pendantMachine.work[axis];
         const mposMm = pendantMachine.inInches ? mposDisp * 25.4 : mposDisp;
         let distMm = pendantMachine.inInches ? distance * 25.4 : distance;
 
@@ -196,15 +196,19 @@ function handleEncoderDelta(delta) {
       }
     }
 
-    const an = ["X", "Y", "Z", "A"];
     const g21 = pendantMachine.inInches ? "G20" : "G21";
-    send_line_nowait(`$J=G91 ${g21} ${an[pendantJog.selectedAxis]}${fmtF(distance, 3)} F${pendantJog.jogSpeedMm}`);
+    send_line_nowait(`$J=G91 ${g21} ${AXIS_NAMES[pendantJog.selectedAxis]}${fmtF(distance, 3)} F${pendantJog.jogSpeedMm}`);
     // sim convenience: reflect the jog in both the DRO (work) and the machine
     // position so the Work Area screen and the soft-limit clamp stay consistent.
-    const axisKey = ["posX", "posY", "posZ", "posA"][pendantJog.selectedAxis];
-    const machKey = ["workX", "workY", "workZ", "workA"][pendantJog.selectedAxis];
-    pendantMachine[axisKey] += distance;
-    pendantMachine[machKey] += distance;
+    // Canonical arrays are the source of truth; the named members mirror the
+    // first four, exactly as onDROChange does in the firmware.
+    const ax      = pendantJog.selectedAxis;
+    const axisKey = ax < 4 ? ["posX", "posY", "posZ", "posA"][ax]  : null;
+    const machKey = ax < 4 ? ["workX", "workY", "workZ", "workA"][ax] : null;
+    pendantMachine.pos [ax] += distance;
+    pendantMachine.work[ax] += distance;
+    if (axisKey) pendantMachine[axisKey] = pendantMachine.pos [ax];
+    if (machKey) pendantMachine[machKey] = pendantMachine.work[ax];
     syncControlsFromState();
     updateJogAxisDisplay();
     return;

@@ -195,11 +195,18 @@
             <strong>Factory Reset</strong>
           </button>
         </esp-web-install-button>
+
+        <esp-web-install-button manifest="manifest-dev.json">
+          <button slot="activate" style="background:#6f42c1;">
+            <strong>Dev Build</strong>
+          </button>
+        </esp-web-install-button>
       </div>
 
       <div class="note">
         <strong>Update</strong> — installs the latest firmware while preserving saved settings (screen-type detection, transport choice, ESP-NOW machine pairings, jog preferences, rotation). Use this for upgrading from a previous FluidDial-CYD install. <em>When the installer asks, leave the "Erase device" box <strong>unchecked</strong> — ticking it wipes your saved ESP-NOW pairings and you will have to pair again.</em><br /><br />
-        <strong>Factory Reset</strong> — wipes the entire device including all saved settings, then installs the firmware fresh. Use this for first-time installs, or to recover a pendant that will not boot cleanly. After reset you'll re-run the touch-screen detection, and on ESP-NOW you'll need to pair with your controller again.
+        <strong>Factory Reset</strong> — wipes the entire device including all saved settings, then installs the firmware fresh. Use this for first-time installs, or to recover a pendant that will not boot cleanly. After reset you'll re-run the touch-screen detection, and on ESP-NOW you'll need to pair with your controller again.<br /><br />
+        <strong style="color:#a97bff;">Dev Build (v2.2.2)</strong> — a pre-release build for testing and fault-finding, <em>not</em> the supported release. It preserves your settings exactly like Update. Use it only if you are chasing a specific problem or have been asked to try it; otherwise stick to Update above. It adds a <strong>LAST RESET</strong> readout on the FluidNC screen showing why the pendant last restarted (crash, watchdog, brownout or normal power-on), which is what makes an intermittent restart diagnosable. To go back, just run Update.
       </div>
     </div>
   </div>

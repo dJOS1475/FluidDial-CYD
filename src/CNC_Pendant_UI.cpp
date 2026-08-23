@@ -325,6 +325,11 @@ void endPanelSprite(int w, int h, int px, int py) {
     scratchInUse = false;
 }
 
+// Axis labels — the single source of truth (declared in pendant_shared.h).
+// Matches the old UI's "XYZABC", which is why that build never had the
+// out-of-bounds crash the new UI's per-screen { "X","Y","Z","A" } arrays did.
+const char* const AXIS_NAMES[PENDANT_MAX_AXES] = { "X", "Y", "Z", "A", "B", "C" };
+
 // ===== Helper Functions =====
 bool isTouchInBounds(int tx, int ty, int x, int y, int w, int h) {
     return tx >= x && tx <= x + w && ty >= y && ty <= y + h;
@@ -1111,17 +1116,31 @@ public:
 
     void onDROChange() override {
         if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-            pendantMachine.numAxes       = n_axes;
-            // posX/Y/Z/A = work pos (DRO values, used by all position displays)
-            pendantMachine.posX          = myAxes[0] / 10000.0f;
-            pendantMachine.posY          = (n_axes > 1) ? myAxes[1] / 10000.0f : 0.0f;
-            pendantMachine.posZ          = (n_axes > 2) ? myAxes[2] / 10000.0f : 0.0f;
-            pendantMachine.posA          = (n_axes > 3) ? myAxes[3] / 10000.0f : 0.0f;
-            // workX/Y/Z/A = machine pos (absolute, used by Work Area screen)
-            pendantMachine.workX         = myMachineAxes[0] / 10000.0f;
-            pendantMachine.workY         = (n_axes > 1) ? myMachineAxes[1] / 10000.0f : 0.0f;
-            pendantMachine.workZ         = (n_axes > 2) ? myMachineAxes[2] / 10000.0f : 0.0f;
-            pendantMachine.workA         = (n_axes > 3) ? myMachineAxes[3] / 10000.0f : 0.0f;
+            // CLAMP before anything indexes on it.  n_axes comes straight from the
+            // parser and can be up to MAX_N_AXIS; a raw value here is what let a
+            // 5- or 6-axis controller walk off the end of the screens' arrays.
+            const int nAx = (n_axes < 0) ? 0
+                          : (n_axes > PENDANT_MAX_AXES) ? PENDANT_MAX_AXES
+                                                        : n_axes;
+            pendantMachine.numAxes       = nAx;
+
+            // Canonical per-axis positions — the only thing axis LOOPS may read.
+            for (int i = 0; i < PENDANT_MAX_AXES; i++) {
+                pendantMachine.pos [i] = (i < nAx) ? myAxes[i]        / 10000.0f : 0.0f;
+                pendantMachine.work[i] = (i < nAx) ? myMachineAxes[i] / 10000.0f : 0.0f;
+            }
+
+            // Named aliases for the many call sites that mean one specific axis
+            // (probing, work-zero, jog envelope).  Written here, from the same
+            // source as the array above, so the two cannot drift apart.
+            pendantMachine.posX          = pendantMachine.pos[0];
+            pendantMachine.posY          = pendantMachine.pos[1];
+            pendantMachine.posZ          = pendantMachine.pos[2];
+            pendantMachine.posA          = pendantMachine.pos[3];
+            pendantMachine.workX         = pendantMachine.work[0];
+            pendantMachine.workY         = pendantMachine.work[1];
+            pendantMachine.workZ         = pendantMachine.work[2];
+            pendantMachine.workA         = pendantMachine.work[3];
             pendantMachine.feedRate      = (int)myFeed;
             pendantMachine.spindleRPM    = (int)mySpeed;
             pendantMachine.feedOverride  = (int)myFro;

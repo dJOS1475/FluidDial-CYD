@@ -4,6 +4,28 @@
  * extern objects) so every screen port and the control panel share them.
  */
 
+// ===== Axis count — the single source of truth (firmware: pendant_shared.h) =====
+// GrblParser reports up to 6 axes.  Every axis-indexed array is sized from this
+// and every axis loop bounded by it; per-screen { "X","Y","Z","A" } tables are
+// exactly what let a 5/6-axis controller run off the end and panic the firmware.
+const PENDANT_MAX_AXES = 6;
+const AXIS_NAMES = ["X", "Y", "Z", "A", "B", "C"];
+
+// Boot diagnostics — mirrors what the firmware captures in setup():
+// esp_reset_reason() plus the last stage each core reached, preserved across
+// the reset in RTC_NOINIT memory.  Shown on the FluidNC screen so "it restarts"
+// becomes a specific cause instead of a mystery.
+const simDiag = {
+  resetReason: "POWER_ON",   // POWER_ON | PANIC | TASK_WDT | BROWNOUT | SW_RESET | ...
+  bootStage:   100,          // Core 0 stage (see ardmain.cpp stage map)
+  core1Stage:  10,           // Core 1 stage
+  minHeapKB:   41,           // esp_get_minimum_free_heap_size()
+};
+function resetIsAbnormal(r) {
+  return r === "PANIC" || r === "INT_WDT" || r === "TASK_WDT" ||
+         r === "OTHER_WDT" || r === "BROWNOUT";
+}
+
 // ===== Screen enum (order matches PendantScreen in pendant_shared.h) =====
 const PSCREEN_MAIN_MENU     = "MAIN_MENU";
 const PSCREEN_STATUS        = "STATUS";
@@ -31,6 +53,11 @@ const pendantMachine = {
   status: "N/C",
   currentFile: "",
   jobPercent: 0,
+  // Canonical per-axis positions — anything that ITERATES axes uses these.
+  // posX..posA below are kept only for call sites naming a specific axis; both
+  // are written from the same place so they cannot drift.
+  pos:  [0, 0, 0, 0, 0, 0],
+  work: [0, 0, 0, 0, 0, 0],
   posX: 0, posY: 0, posZ: 0, posA: 0,
   workX: 0, workY: 0, workZ: 0, workA: 0,
   feedRate: 0,
@@ -43,7 +70,7 @@ const pendantMachine = {
   rotation: 2,
   spindleMaxRPM: 24000,
   spindleMinRPM: 0,
-  fluidDialVersion: "v2.2.1",
+  fluidDialVersion: "v2.2.2",
   // Empty until a [VER:] report arrives — a plausible-looking default rendered
   // exactly like a real reading.  Screens show "---" while empty, as for IP/SSID.
   fluidNCVersion: "",
@@ -51,6 +78,7 @@ const pendantMachine = {
   port: "UART0",
   connectionStatus: "N/C",
   freeHeap: 148000,
+  // Clamped to PENDANT_MAX_AXES — never index an array with a raw value.
   numAxes: 3,
   inInches: false,
   workCoordSystem: "G54",

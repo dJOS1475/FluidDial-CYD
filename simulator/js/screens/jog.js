@@ -1,5 +1,9 @@
 /* screen_jog_homing.cpp port */
 
+// HOME row label for slot i: one per reported axis, plus "ALL" when there is
+// room for it.  Mirrors the firmware — sized from numAx, never a fixed table.
+function homeLabel(numAx, i) { return (numAx < 4 && i === numAx) ? "ALL" : AXIS_NAMES[i]; }
+
 // Slots 0-2 are fixed fine increments; slot 3 is the dial box, holding whichever
 // coarse value pendantJog.coarseIdx selects.  Imperial mirrors metric one-for-one
 // in real terms (.001"~0.01mm ... 4.0"~100mm) using round inch numbers.
@@ -110,17 +114,15 @@ function drawJogHomingScreen() {
   display.fillRoundRect(5, 40, 230, 55, 5, COLOR_DARKER_BG);
   updateJogAxisDisplay();
 
-  const axisNames = ["X", "Y", "Z", "A"];
   const numAx = pendantMachine.numAxes;
   display.setTextColor(COLOR_GRAY_TEXT); display.setTextSize(1);
   display.setCursor(5, 103); display.print("HOME");
   {
-    const homeNames = ["X", "Y", "Z", numAx < 4 ? "ALL" : "A"];
-    const numHome = numAx < 4 ? numAx + 1 : 4;
+    const numHome = numAx < 4 ? numAx + 1 : numAx;
     for (let i = 0; i < numHome; i++) {
       const sz = (i === numAx && numAx < 4) ? 2 : 3;
       drawButton(rowBtnX(numHome, i), HOME_Y, rowBtnWAt(numHome, i), ROW_H,
-                 homeNames[i], COLOR_DARK_GREEN, COLOR_WHITE, sz);
+                 homeLabel(numAx, i), COLOR_DARK_GREEN, COLOR_WHITE, sz);
     }
   }
 
@@ -128,7 +130,7 @@ function drawJogHomingScreen() {
   display.setCursor(5, 161); display.print("JOG AXIS");
   for (let i = 0; i < numAx; i++) {
     const bg = (!pendantJog.speedDialMode && i === pendantJog.selectedAxis) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
-    drawButton(rowBtnX(numAx, i), AXIS_Y, rowBtnWAt(numAx, i), ROW_H, axisNames[i], bg, COLOR_WHITE, 3);
+    drawButton(rowBtnX(numAx, i), AXIS_Y, rowBtnWAt(numAx, i), ROW_H, AXIS_NAMES[i], bg, COLOR_WHITE, 3);
   }
 
   redrawJogIncrementLabel();
@@ -150,7 +152,7 @@ function drawJogHomingScreen() {
 function updateJogAxisDisplay() {
   if (currentPendantScreen !== PSCREEN_JOG_HOMING) return;
   // MACHINE coordinates (workX/Y/Z/A = MPos); posX/Y/Z are work coords.
-  const pos = [pendantMachine.workX, pendantMachine.workY, pendantMachine.workZ, pendantMachine.workA];
+  const pos = pendantMachine.work;
   const P = panel(230, 55, 5, 40);
   const g = P.g, ox = P.ox, oy = P.oy;
   g.fillRect(ox, oy, 230, 55, COLOR_DARKER_BG);
@@ -186,7 +188,6 @@ function updateJogAxisDisplay() {
     let hw2 = g.textWidth(hint);
     g.setCursor(ox + 115 - (hw2 / 2 | 0), oy + 42); g.print(hint);
   } else {
-    const axisNames = ["X", "Y", "Z", "A"];
     const inAlarm = pendantMachine.status.startsWith("Alarm");
     const dispAxis = pendantJog.homingAxis >= 0 ? pendantJog.homingAxis : pendantJog.selectedAxis;
     const decPlaces = pendantMachine.inInches ? 4 : 2;
@@ -194,9 +195,9 @@ function updateJogAxisDisplay() {
     const isAAxis = dispAxis === 3;
     const val = fmtF(pos[dispAxis], decPlaces);
     let mainLine;
-    if (inAlarm) mainLine = `${axisNames[dispAxis]} ${val} ${pendantMachine.status}`;
-    else if (isAAxis) mainLine = `${axisNames[dispAxis]} ${val}`;
-    else mainLine = `${axisNames[dispAxis]} ${val} ${pendantMachine.inInches ? "in" : "mm"}`;
+    if (inAlarm) mainLine = `${AXIS_NAMES[dispAxis]} ${val} ${pendantMachine.status}`;
+    else if (isAAxis) mainLine = `${AXIS_NAMES[dispAxis]} ${val}`;
+    else mainLine = `${AXIS_NAMES[dispAxis]} ${val} ${pendantMachine.inInches ? "in" : "mm"}`;
     g.setTextColor(inAlarm ? TFT_RED : COLOR_GREEN); g.setTextSize(3);
     g.setCursor(ox + 5, oy + 5); g.print(mainLine);
     if (isAAxis && !inAlarm) {
@@ -212,7 +213,7 @@ function updateJogAxisDisplay() {
     for (let i = 0; i < numAx; i++) {
       if (i === dispAxis) continue;
       g.setCursor(ox + col, oy + 38);
-      g.print(`${axisNames[i]}:${fmtF(pos[i], 2)}`);
+      g.print(`${AXIS_NAMES[i]}:${fmtF(pos[i], 2)}`);
       col += colSpacing;
     }
   }
@@ -220,11 +221,10 @@ function updateJogAxisDisplay() {
 
 function redrawJogAxisButtons() {
   if (currentPendantScreen !== PSCREEN_JOG_HOMING) return;
-  const axisNames = ["X", "Y", "Z", "A"];
   const numAx = pendantMachine.numAxes;
   for (let i = 0; i < numAx; i++) {
     const bg = (!pendantJog.speedDialMode && i === pendantJog.selectedAxis) ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
-    drawButton(rowBtnX(numAx, i), AXIS_Y, rowBtnWAt(numAx, i), ROW_H, axisNames[i], bg, COLOR_WHITE, 3);
+    drawButton(rowBtnX(numAx, i), AXIS_Y, rowBtnWAt(numAx, i), ROW_H, AXIS_NAMES[i], bg, COLOR_WHITE, 3);
   }
   updateJogAxisDisplay();
 }
@@ -242,8 +242,7 @@ function redrawJogIncrementButtons() {
 function handleJogHomingTouch(x, y) {
   const numAx = pendantMachine.numAxes;
   {
-    const homeNames = ["X", "Y", "Z", numAx < 4 ? "ALL" : "A"];
-    const numHome = numAx < 4 ? numAx + 1 : 4;
+    const numHome = numAx < 4 ? numAx + 1 : numAx;
     for (let i = 0; i < numHome; i++) {
       if (isTouchInBounds(x, y, rowBtnX(numHome, i), HOME_Y, rowBtnWAt(numHome, i), ROW_H)) {
         if (!pendantConnected) return;

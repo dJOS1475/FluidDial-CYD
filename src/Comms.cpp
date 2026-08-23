@@ -68,9 +68,12 @@ void comms_init() {
 #endif
 
     // UART path: the driver was already installed by the hardware init pass.
-    // No further action required; function pointers already point at UART.
+    // Point the poll hook at the UART backend so its event queue is drained and
+    // RX overflows are counted — with no poll they go unnoticed, which is how
+    // dropped bytes stayed invisible.
     dbg_println("Comms: transport = UART");
-    _mode = COMMS_MODE_UART;
+    _mode    = COMMS_MODE_UART;
+    _poll_fn = uart_backend_poll;
 }
 
 // ── Transport selection (NVS-backed) ─────────────────────────────────────────

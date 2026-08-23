@@ -86,7 +86,7 @@ function updateStatusCurrentFile() {
 function updateStatusAxisPositions() {
   if (currentPendantScreen !== PSCREEN_STATUS) return;
   // MACHINE coordinates (workX/Y/Z/A = MPos); posX/Y/Z are work coords.
-  const pos = [pendantMachine.workX, pendantMachine.workY, pendantMachine.workZ, pendantMachine.workA];
+  const pos = pendantMachine.work;   // sized PENDANT_MAX_AXES; numAxes is clamped
   const numAxes = pendantMachine.numAxes;
   const P = panel(230, 65, 5, 140);
   const g = P.g, ox = P.ox, oy = P.oy;
@@ -102,19 +102,22 @@ function updateStatusAxisPositions() {
   // (0.025 mm) to land at the same real-world resolution.  Same pairing as
   // probeDrawPosPanel().  A long coordinate can still outrun a column, so drop
   // a decimal until it fits rather than running into the neighbouring axis.
-  const colW = 112;              // narrowest of the two columns (118..230)
+  // Two columns up to 4 axes; three once there are 5 or 6, so they still fit the
+  // panel's two rows instead of spilling past its bottom edge.
+  const nCols = numAxes > 4 ? 3 : 2;
+  const colW  = nCols === 3 ? 74 : 112;
   const prefDec = inInch ? 3 : 1;
-  const axisNames = ["X", "Y", "Z", "A"];
   g.setTextColor(COLOR_ORANGE); g.setTextSize(2);
   for (let i = 0; i < numAxes; i++) {
     let dec = prefDec;
-    let s = axisNames[i] + ":" + fmtF(pos[i], dec);
+    let s = AXIS_NAMES[i] + ":" + fmtF(pos[i], dec);
     while (dec > 0 && g.textWidth(s) > colW) {
       dec--;
-      s = axisNames[i] + ":" + fmtF(pos[i], dec);
+      s = AXIS_NAMES[i] + ":" + fmtF(pos[i], dec);
     }
     // Right column at 118 (was 125): "Y:-145.60" is 108 px, the old 105 px clipped.
-    g.setCursor(ox + (i % 2 ? 118 : 5), oy + 20 + ((i / 2) | 0) * 23);
+    g.setCursor(ox + 5 + (i % nCols) * (((230 - 5) / nCols) | 0),
+                oy + 20 + ((i / nCols) | 0) * 23);
     g.print(s);
   }
 }

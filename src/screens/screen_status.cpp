@@ -156,12 +156,11 @@ void updateStatusAxisPositions() {
     if (currentPendantScreen != PSCREEN_STATUS) return;
 
     // Status shows MACHINE coordinates (workX/Y/Z/A = MPos).  (posX/Y/Z are work.)
-    float px, py, pz, pa;
+    float positions[PENDANT_MAX_AXES];
     int   numAxes;
     bool  inInch;
     if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) != pdTRUE) return;
-    px = pendantMachine.workX;  py = pendantMachine.workY;
-    pz = pendantMachine.workZ;  pa = pendantMachine.workA;
+    for (int i = 0; i < PENDANT_MAX_AXES; i++) positions[i] = pendantMachine.work[i];
     numAxes = pendantMachine.numAxes;
     inInch  = pendantMachine.inInches;
     xSemaphoreGive(stateMutex);
@@ -191,24 +190,28 @@ void updateStatusAxisPositions() {
     // A long coordinate can still outrun a column (a >1 m machine homed to max,
     // e.g. "X:-1234.56", or inch on the same machine), so drop a decimal until it
     // fits rather than letting it run into the neighbouring axis.
-    const int   colW    = 112;   // narrowest of the two columns (118..230)
+    // Two columns up to 4 axes; three once there are 5 or 6, so they still fit
+    // the panel's two rows instead of spilling past its bottom edge.
+    const int   nCols   = (numAxes > 4) ? 3 : 2;
+    const int   colW    = (nCols == 3) ? 74 : 112;
     const int   prefDec = inInch ? 3 : 1;
     char        posBuf[20];
 
-    const char* axisNames[] = { "X", "Y", "Z", "A" };
-    float       positions[] = { px, py, pz, pa };
+    // AXIS_NAMES / pendantMachine.work are sized PENDANT_MAX_AXES; numAxes is
+    // already clamped to that in onDROChange, so this loop cannot run off the end.
     g->setTextColor(COLOR_ORANGE);
     g->setTextSize(2);
     for (int i = 0; i < numAxes; i++) {
         int dec = prefDec;
-        snprintf(posBuf, sizeof(posBuf), "%s:%.*f", axisNames[i], dec, positions[i]);
+        snprintf(posBuf, sizeof(posBuf), "%s:%.*f", AXIS_NAMES[i], dec, positions[i]);
         while (dec > 0 && g->textWidth(posBuf) > colW) {
             --dec;
-            snprintf(posBuf, sizeof(posBuf), "%s:%.*f", axisNames[i], dec, positions[i]);
+            snprintf(posBuf, sizeof(posBuf), "%s:%.*f", AXIS_NAMES[i], dec, positions[i]);
         }
         // Right column starts at 118 (was 125): the extra decimal needs the width,
         // e.g. "Y:-145.60" is 108 px and the old 105 px column would have clipped it.
-        g->setCursor(ox + ((i % 2) ? 118 : 5), oy + 20 + (i / 2) * 23);
+        g->setCursor(ox + 5 + (i % nCols) * ((230 - 5) / nCols),
+                     oy + 20 + (i / nCols) * 23);
         g->print(posBuf);
     }
 

@@ -22,12 +22,11 @@ function drawProbingWorkScreen() {
   display.setTextColor(COLOR_GRAY_TEXT); display.setTextSize(1);
   display.setCursor(5, 218); display.print("SET WORK ZERO");
   {
-    const axisLabels = ["X", "Y", "Z", "A"];
     const numAx = pendantMachine.numAxes;
     const totalBtns = numAx + 1;
     const btnW = (230 / totalBtns) | 0;
     for (let i = 0; i < numAx; i++)
-      drawButton(5 + i * btnW, 230, btnW - 2, 38, axisLabels[i], COLOR_DARK_GREEN, COLOR_WHITE, 3);
+      drawButton(5 + i * btnW, 230, btnW - 2, 38, AXIS_NAMES[i], COLOR_DARK_GREEN, COLOR_WHITE, 3);
     drawButton(5 + numAx * btnW, 230, btnW - 2, 38, "ALL", COLOR_DARK_GREEN, COLOR_WHITE, 2);
   }
   drawButton(5, 277, 112, 40, "Main Menu", COLOR_BLUE, COLOR_WHITE, 2);
@@ -36,25 +35,26 @@ function drawProbingWorkScreen() {
 
 function updateWorkMachinePos() {
   if (currentPendantScreen !== PSCREEN_PROBING_WORK) return;
-  const pos = [pendantMachine.workX, pendantMachine.workY, pendantMachine.workZ, pendantMachine.workA];
-  const axisNames = ["X", "Y", "Z", "A"];
+  const pos = pendantMachine.work;
+  // Three columns once there are more than 4 axes — see status.js.
+  const nCols = pendantMachine.numAxes > 4 ? 3 : 2;
   display.fillRect(5, 108, 230, 45, COLOR_BACKGROUND);
   display.setTextColor(COLOR_ORANGE); display.setTextSize(2);
   for (let i = 0; i < pendantMachine.numAxes; i++) {
-    display.setCursor(5 + (i % 2 ? 120 : 0), 108 + 5 + ((i / 2) | 0) * 20);
-    display.print(axisNames[i] + ":" + fmtF(pos[i], 1));
+    display.setCursor(5 + (i % nCols) * ((230 / nCols) | 0), 108 + 5 + ((i / nCols) | 0) * 20);
+    display.print(AXIS_NAMES[i] + ":" + fmtF(pos[i], 1));
   }
 }
 
 function updateWorkAreaPos() {
   if (currentPendantScreen !== PSCREEN_PROBING_WORK) return;
-  const pos = [pendantMachine.posX, pendantMachine.posY, pendantMachine.posZ, pendantMachine.posA];
-  const axisNames = ["X", "Y", "Z", "A"];
+  const pos = pendantMachine.pos;
+  const nCols = pendantMachine.numAxes > 4 ? 3 : 2;
   display.fillRect(5, 166, 230, 45, COLOR_BACKGROUND);
   display.setTextColor(COLOR_CYAN); display.setTextSize(2);
   for (let i = 0; i < pendantMachine.numAxes; i++) {
-    display.setCursor(5 + (i % 2 ? 120 : 0), 166 + 5 + ((i / 2) | 0) * 20);
-    display.print(axisNames[i] + ":" + fmtF(pos[i], 1));
+    display.setCursor(5 + (i % nCols) * ((230 / nCols) | 0), 166 + 5 + ((i / nCols) | 0) * 20);
+    display.print(AXIS_NAMES[i] + ":" + fmtF(pos[i], 1));
   }
 }
 

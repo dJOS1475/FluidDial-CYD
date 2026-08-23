@@ -19,3 +19,8 @@ void init_fnc_uart(int uart_num, int tx_pin, int rx_pin);
 void uart_backend_putchar(uint8_t c);
 int  uart_backend_getchar();                 // returns -1 if no byte available
 void uart_backend_reset_flow_control();      // force HW XON (recovers from XOFF)
+
+// Drains the UART driver's event queue and counts RX overflows.  Must be called
+// periodically (wired to the comms poll hook) or overflow goes unnoticed again.
+void     uart_backend_poll();
+uint32_t uart_backend_rx_lost();             // RX overflow events since boot

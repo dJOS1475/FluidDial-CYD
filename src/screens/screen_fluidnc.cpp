@@ -91,6 +91,13 @@ void updateFluidNCDisplay() {
         g->print(ESP.getFreeHeap() / 1024);
         g->print(" KB");
 
+        // Low-water mark since boot.  The instantaneous figure is nearly useless
+        // for diagnosing an allocation failure — the heap can be healthy when you
+        // look and have been squeezed minutes earlier.  "min" catches the dip.
+        g->setTextSize(1); g->setTextColor(COLOR_GRAY_TEXT);
+        g->setCursor(ox + 5, oy + 37);
+        g->printf("min %u KB", (unsigned)(esp_get_minimum_free_heap_size() / 1024));
+
         g->setTextColor(COLOR_GRAY_TEXT); g->setTextSize(1);
         g->setCursor(ox + 115, oy + 5); g->print("STATUS");
         g->setTextColor(connected ? COLOR_GREEN : COLOR_RED);
@@ -101,10 +108,37 @@ void updateFluidNCDisplay() {
         g->setTextColor(COLOR_CYAN);
         g->setCursor(ox + 5, oy + 58); g->print(dispRotation);
 
-        g->setTextColor(COLOR_GRAY_TEXT);
-        g->setCursor(ox + 115, oy + 48); g->print("Jog Dial");
-        g->setTextColor(COLOR_CYAN);
-        g->setCursor(ox + 115, oy + 58); g->print("Rotate");
+        // ── Why the pendant last restarted ───────────────────────────────
+        //
+        // esp_reset_reason() is captured in setup() before anything else runs,
+        // and the last stage each core reached is preserved across the reset in
+        // RTC_NOINIT memory (guarded by a magic number, so a wiped RTC reads 0).
+        // All of that was already being collected and displayed NOWHERE, which
+        // meant a user reporting "it restarts" gave us nothing to work with —
+        // a crash, a hang, and a power dip are three completely different
+        // problems and were indistinguishable in the field.
+        //
+        // Replaces a static "Jog Dial / Rotate" label that only restated what
+        // the dial obviously does.
+        {
+            const bool abnormal = (lastResetReason == ESP_RST_PANIC   ||
+                                   lastResetReason == ESP_RST_INT_WDT ||
+                                   lastResetReason == ESP_RST_TASK_WDT||
+                                   lastResetReason == ESP_RST_WDT     ||
+                                   lastResetReason == ESP_RST_BROWNOUT);
+            g->setTextColor(COLOR_GRAY_TEXT);
+            g->setCursor(ox + 115, oy + 48); g->print("LAST RESET");
+
+            // Stage pair localises WHERE it died: Core 0 / Core 1 (see the stage
+            // map in ardmain.cpp).  100 = "main loop was iterating normally".
+            char rb[28];
+            snprintf(rb, sizeof(rb), "%s %lu/%lu",
+                     resetReasonName(lastResetReason),
+                     (unsigned long)capturedBootStage,
+                     (unsigned long)capturedCore1Stage);
+            g->setTextColor(abnormal ? COLOR_RED : COLOR_CYAN);
+            g->setCursor(ox + 115, oy + 58); g->print(rb);
+        }
 
         endPanelSprite(230, 70, 5, 186);
     }

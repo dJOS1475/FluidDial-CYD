@@ -109,11 +109,31 @@ struct HwEvent {
     int32_t value;
 };
 
+// ===== Axis count — the single source of truth =====
+//
+// GrblParser reports up to MAX_N_AXIS (6) axes, and a machine configured with
+// more than four WILL report them.  Every axis-indexed array must be sized from
+// this constant and every axis loop bounded by it.
+//
+// This existed as a bug for five releases: each screen declared its own inline
+// { "X", "Y", "Z", "A" } and looped to numAxes, so a 5- or 6-axis controller
+// walked off the end of a 4-element array of `const char*` and the first
+// dereference panicked the ESP32 — an instant reboot the moment the first
+// status report was parsed.  The old UI never had this: it used "XYZABC"[axis].
+#define PENDANT_MAX_AXES MAX_N_AXIS
+extern const char* const AXIS_NAMES[PENDANT_MAX_AXES];
+
 // ===== Machine State =====
 struct MachineState {
     String status        = "N/C";
     String currentFile   = "";
     int    jobPercent    = 0;     // 0-100, valid only while currentFile is non-empty
+    // Canonical positions, one slot per axis the controller reports.  Anything
+    // that ITERATES axes must use these; posX..posA below are kept only for the
+    // many call sites that name a specific axis (probing, work-zero, etc.).
+    // Both are written from the same place (onDROChange) so they cannot diverge.
+    float  pos [PENDANT_MAX_AXES] = { 0.0f };   // work coordinates (DRO)
+    float  work[PENDANT_MAX_AXES] = { 0.0f };   // machine coordinates (MPos)
     float  posX          = 0.0f;
     float  posY          = 0.0f;
     float  posZ          = 0.0f;
@@ -152,6 +172,8 @@ struct MachineState {
     String port             = "UART0";
     String connectionStatus = "N/C";
     int    freeHeap         = 0;
+    // Clamped to PENDANT_MAX_AXES by onDROChange — never index an array with a
+    // raw parser value.
     int    numAxes          = 3;
     bool   inInches         = false;
     String workCoordSystem  = "G54";
@@ -204,7 +226,7 @@ struct JogState {
     // 0 = unknown (not yet reported by controller) → fall back to hard-coded jog cap.
     // Used to clamp per-tick jog distance so a fast wheel turn at a coarse increment
     // can't request a move larger than half the axis travel range.
-    int          maxTravel[4]      = { 0, 0, 0, 0 };
+    int          maxTravel[PENDANT_MAX_AXES] = { 0 };
     // Homing direction invert mask from $23 (grbl/FluidNC).  Bit per axis:
     // clear = axis homes toward + (switch at the max end, MPos 0 there, travel
     // runs negative → envelope [-maxTravel, 0]); set = homes toward − (switch at

@@ -46,6 +46,10 @@ function updateFluidNCDisplay() {
     g.setCursor(ox + 5, oy + 5); g.print("FREE HEAP");
     g.setTextColor(COLOR_ORANGE); g.setTextSize(2);
     g.setCursor(ox + 5, oy + 20); g.print(((ESP.getFreeHeap() / 1024) | 0) + " KB");
+    // Low-water mark since boot — the instantaneous figure is nearly useless for
+    // diagnosing an allocation failure; "min" catches a dip that has recovered.
+    g.setTextSize(1); g.setTextColor(COLOR_GRAY_TEXT);
+    g.setCursor(ox + 5, oy + 37); g.print("min " + simDiag.minHeapKB + " KB");
     g.setTextColor(COLOR_GRAY_TEXT); g.setTextSize(1);
     g.setCursor(ox + 115, oy + 5); g.print("STATUS");
     g.setTextColor(connected ? COLOR_GREEN : COLOR_RED);
@@ -54,18 +58,15 @@ function updateFluidNCDisplay() {
     g.setCursor(ox + 5, oy + 48); g.print("ROTATION");
     g.setTextColor(COLOR_CYAN);
     g.setCursor(ox + 5, oy + 58); g.print(pendantMachine.displayRotation);
+    // Why the pendant last restarted.  A crash, a hang and a power dip are three
+    // different problems and were indistinguishable in the field before this.
+    // The stage pair localises WHERE it died (see the stage map in ardmain.cpp);
+    // 100 = "main loop was iterating normally".
     g.setTextColor(COLOR_GRAY_TEXT);
-    // Battery voltage + inferred charge state — charging is INFERRED from the
-    // voltage trend, so the raw mV is shown to make a wrong icon diagnosable.
-    g.setCursor(ox + 115, oy + 48); g.print("BATTERY");
-    if (pendantMachine.batteryPercent < 0) {
-      g.setTextColor(COLOR_GRAY_TEXT);
-      g.setCursor(ox + 115, oy + 58); g.print("n/a");
-    } else {
-      g.setTextColor(pendantMachine.batteryCharging ? COLOR_YELLOW : COLOR_CYAN);
-      g.setCursor(ox + 115, oy + 58);
-      g.print(pendantMachine.batteryMv + "mV " + (pendantMachine.batteryCharging ? "CHG" : "bat"));
-    }
+    g.setCursor(ox + 115, oy + 48); g.print("LAST RESET");
+    g.setTextColor(resetIsAbnormal(simDiag.resetReason) ? PROBE_C_RED : COLOR_CYAN);
+    g.setCursor(ox + 115, oy + 58);
+    g.print(simDiag.resetReason + " " + simDiag.bootStage + "/" + simDiag.core1Stage);
   }
 }
 
