@@ -7,7 +7,7 @@
   "screens/screen_spindle_control.cpp": "b778ed5396566df7358a9948d10b973097d32e05",
   "screens/screen_sd_card.cpp": "267f817c79a90d3d8badd081242e9ed2efc1820f",
   "screens/screen_macros.cpp": "c537edb1a1f4772a62b29a73d2c8950ed0eecd1f",
-  "screens/screen_fluidnc.cpp": "d9a69a1cadab50bbc0c3dc4e5357362f8794bf24",
+  "screens/screen_fluidnc.cpp": "d39b9fba744f81db43fc8d0af2139d80e4b71fd8",
   "screens/screen_connection.cpp": "ead4045f519302a1a47e4ef5cc18ee270b4f2655",
   "screens/screen_espnow.cpp": "20dc49f8a400a8e4e52b23619a82f471518a37fb",
   "screens/screen_probe.cpp": "300d4161bf419ec0b7421c0719df8046ba9d7148",

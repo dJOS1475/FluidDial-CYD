@@ -11,21 +11,6 @@
 const PENDANT_MAX_AXES = 6;
 const AXIS_NAMES = ["X", "Y", "Z", "A", "B", "C"];
 
-// Boot diagnostics — mirrors what the firmware captures in setup():
-// esp_reset_reason() plus the last stage each core reached, preserved across
-// the reset in RTC_NOINIT memory.  Shown on the FluidNC screen so "it restarts"
-// becomes a specific cause instead of a mystery.
-const simDiag = {
-  resetReason: "POWER_ON",   // POWER_ON | PANIC | TASK_WDT | BROWNOUT | SW_RESET | ...
-  bootStage:   100,          // Core 0 stage (see ardmain.cpp stage map)
-  core1Stage:  10,           // Core 1 stage
-  minHeapKB:   41,           // esp_get_minimum_free_heap_size()
-};
-function resetIsAbnormal(r) {
-  return r === "PANIC" || r === "INT_WDT" || r === "TASK_WDT" ||
-         r === "OTHER_WDT" || r === "BROWNOUT";
-}
-
 // ===== Screen enum (order matches PendantScreen in pendant_shared.h) =====
 const PSCREEN_MAIN_MENU     = "MAIN_MENU";
 const PSCREEN_STATUS        = "STATUS";

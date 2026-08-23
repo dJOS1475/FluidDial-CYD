@@ -126,19 +126,6 @@ function buildControls() {
     })));
   });
 
-  // -- Boot diagnostics (drives the FluidNC screen's LAST RESET field) --
-  root.appendChild(_el("h3", {}, "Last reset"));
-  root.appendChild(_row("Reason", _select("resetReason",
-    ["POWER_ON", "PANIC", "TASK_WDT", "INT_WDT", "BROWNOUT", "SW_RESET", "DEEPSLEEP"]
-      .map((r) => ({ v: r, t: r })),
-    (e) => { simDiag.resetReason = e.target.value; repaint(); })));
-  root.appendChild(_row("Core 0 stage", _num("bootStage", 1,
-    (e) => { simDiag.bootStage = +e.target.value || 0; repaint(); })));
-  root.appendChild(_row("Core 1 stage", _num("core1Stage", 1,
-    (e) => { simDiag.core1Stage = +e.target.value || 0; repaint(); })));
-  root.appendChild(_row("Heap min KB", _num("minHeapKB", 1,
-    (e) => { simDiag.minHeapKB = +e.target.value || 0; repaint(); })));
-
   // -- Feeds / spindle --
   root.appendChild(_el("h3", {}, "Feeds / Spindle"));
   root.appendChild(_row("Feed rate", _num("feedRate", 10, (e) => { pendantMachine.feedRate = +e.target.value || 0; repaint(); })));
@@ -196,10 +183,6 @@ function syncControlsFromState() {
     set("pos" + ax, pendantMachine.pos[i]);
     set("work" + ax, pendantMachine.work[i]);
   });
-  set("resetReason", simDiag.resetReason);
-  set("bootStage", simDiag.bootStage);
-  set("core1Stage", simDiag.core1Stage);
-  set("minHeapKB", simDiag.minHeapKB);
   set("feedRate", pendantMachine.feedRate);
   set("spindleRPM", pendantMachine.spindleRPM);
   set("spindleMaxRPM", pendantMachine.spindleMaxRPM);
