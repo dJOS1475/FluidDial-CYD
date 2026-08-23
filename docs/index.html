@@ -122,6 +122,36 @@
       flex-shrink: 0;
     }
 
+    /* Dev build gets its own row, visually separated from the two supported
+       install paths so it can't be picked up by mistake. */
+    .dev-row {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      margin-top: 8px;
+      padding-top: 18px;
+      border-top: 1px dashed #30363d;
+    }
+
+    .dev-badge {
+      background: #2d213f;
+      border: 1px solid #6f42c1;
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: 0.85rem;
+      color: #a97bff;
+      letter-spacing: 0.02em;
+    }
+
+    .dev-caption {
+      font-size: 0.78rem;
+      color: #6e7681;
+      text-align: center;
+      max-width: 34rem;
+    }
+
     .note {
       background: #1c2128;
       border-left: 3px solid #388bfd;
@@ -196,17 +226,26 @@
           </button>
         </esp-web-install-button>
 
+      </div>
+
+      <div class="dev-row">
+        <div class="dev-badge">v2.2.2 Dev — Pre-Release</div>
         <esp-web-install-button manifest="manifest-dev.json">
           <button slot="activate" style="background:#6f42c1;">
-            <strong>Dev Build</strong>
+            <strong>Install Dev Build</strong>
           </button>
         </esp-web-install-button>
+        <div class="dev-caption">
+          Unreleased test build — not supported. Only use it if you are chasing a
+          specific problem or have been asked to try it. Keeps your settings;
+          run <strong>Update</strong> above to go back to v2.2.1.
+        </div>
       </div>
 
       <div class="note">
         <strong>Update</strong> — installs the latest firmware while preserving saved settings (screen-type detection, transport choice, ESP-NOW machine pairings, jog preferences, rotation). Use this for upgrading from a previous FluidDial-CYD install. <em>When the installer asks, leave the "Erase device" box <strong>unchecked</strong> — ticking it wipes your saved ESP-NOW pairings and you will have to pair again.</em><br /><br />
         <strong>Factory Reset</strong> — wipes the entire device including all saved settings, then installs the firmware fresh. Use this for first-time installs, or to recover a pendant that will not boot cleanly. After reset you'll re-run the touch-screen detection, and on ESP-NOW you'll need to pair with your controller again.<br /><br />
-        <strong style="color:#a97bff;">Dev Build (v2.2.2)</strong> — a pre-release build for testing and fault-finding, <em>not</em> the supported release. It preserves your settings exactly like Update. Use it only if you are chasing a specific problem or have been asked to try it; otherwise stick to Update above. It adds a <strong>LAST RESET</strong> readout on the FluidNC screen showing why the pendant last restarted (crash, watchdog, brownout or normal power-on), which is what makes an intermittent restart diagnosable. To go back, just run Update.
+        <strong style="color:#a97bff;">v2.2.2 Dev (Pre-Release)</strong> — a pre-release build for testing and fault-finding, <em>not</em> the supported release. It preserves your settings exactly like Update. Use it only if you are chasing a specific problem or have been asked to try it; otherwise stick to Update above. It adds a <strong>LAST RESET</strong> readout on the FluidNC screen showing why the pendant last restarted (crash, watchdog, brownout or normal power-on), which is what makes an intermittent restart diagnosable. To go back, just run Update.
       </div>
     </div>
   </div>
