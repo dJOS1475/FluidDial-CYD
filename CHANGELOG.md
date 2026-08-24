@@ -3,6 +3,11 @@
 **ChangeLog:**
 
 
+**2026-08-24**
+
+v2.2.3
+* Fix: **jogging toward one end of an axis silently did nothing — no error, just no motion — on a machine whose homing switch is not at MPos 0.** FluidNC's `homing/mpos_mm` setting lets a switch be assigned any MPos on homing (default 0, but a real per-axis setting — e.g. a switch mounted at the far end of travel, configured with `mpos_mm` equal to `max_travel`). The pendant's jog clamp assumed every switch sits at MPos 0 and derived the safe travel envelope from that assumption alone. On an axis using a non-default `mpos_mm`, the pendant believed the axis was already at its limit while it was still mid-travel, and silently reduced every jog tick toward the far end to zero distance before a `$J` command was ever sent — so FluidNC never even saw the move, and never had the chance to report an error. Found via a user report on a Z axis homed at the top of travel (`mpos_mm: 64`, `max_travel_mm: 64`); confirmed against FluidNC's source and reproduced exactly in the simulator. The pendant now reads `homing/mpos_mm` for X, Y and Z and anchors the envelope on it, so the fix is exact for any configuration rather than tuned to this one case. A machine using the default `mpos_mm: 0` (the vast majority) sees no change in behaviour — the math is algebraically identical to before at that value. Does not apply to A/B/C: those axes have never been subject to this clamp (X/Y/Z-only by design, since a rotary A/B/C has no linear travel envelope to protect).
+
 **2026-08-21**
 
 v2.2.2

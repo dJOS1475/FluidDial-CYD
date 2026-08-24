@@ -748,8 +748,17 @@ static void handleEncoderDelta(int32_t delta) {
             // Soft-limit clamp (absolute): keep the resulting MACHINE position
             // inside the homed travel envelope so cumulative G91 jogs can't walk
             // into a hard stop — the per-tick cap above only bounds a single tick.
-            // Envelope per axis (home = MPos 0): $23 bit clear → homes +, travel
-            // runs [-maxTravel, 0]; bit set → homes −, travel runs [0, +maxTravel].
+            // Envelope per axis, anchored on the switch's assigned MPos
+            // (homeMpos — FluidNC's homing/mpos_mm, 0 by default): $23 bit clear
+            // → homes +, travel runs [homeMpos - maxTravel, homeMpos]; bit set →
+            // homes −, travel runs [homeMpos, homeMpos + maxTravel]. For the
+            // default homeMpos = 0 this is exactly the old fixed-at-zero envelope.
+            // A non-default homeMpos is a real FluidNC setting (e.g. a switch
+            // mounted at the far end of travel, configured with mpos_mm equal to
+            // max_travel) — assuming 0 there previously made the pendant believe
+            // the axis was already at its limit when it was mid-travel, silently
+            // dropping every jog tick toward the far end (distance clamped to
+            // zero before any $J was sent — no error, just no motion).
             // Only engages for a linear axis (X/Y/Z) once travel and the $23 mask
             // are known and the machine isn't in Alarm (MPos unreferenced); until
             // then it falls through to FluidNC's own soft limits unchanged.
@@ -772,8 +781,9 @@ static void handleEncoderDelta(int32_t delta) {
 
                     bool  homesNeg  = (pendantJog.homingDirMask >> axis) & 1;
                     float travelMm  = (float)pendantJog.maxTravel[axis];
-                    float loMm      = homesNeg ? 0.0f      : -travelMm;   // envelope bounds
-                    float hiMm      = homesNeg ? travelMm  :  0.0f;
+                    float homeMm    = (float)pendantJog.homeMpos[axis];   // switch's assigned MPos
+                    float loMm      = homesNeg ? homeMm             : homeMm - travelMm;  // envelope bounds
+                    float hiMm      = homesNeg ? homeMm + travelMm  : homeMm;
                     const float MARGIN_MM = 0.5f;                         // stay off the switch
 
                     float mposDisp  = (axis == 0) ? pendantMachine.workX
@@ -1038,6 +1048,11 @@ static IntConfigItem jogMaxTravelY  ("$131");
 static IntConfigItem jogMaxTravelZ  ("$132");
 static IntConfigItem jogMaxTravelA  ("$133");
 static IntConfigItem jogHomingDirMask("$23");   // homing direction invert mask (envelope sign, per axis)
+// MPos the switch is assigned on homing — usually 0, but a real per-axis
+// setting.  See pendantJog.homeMpos for why the jog clamp needs it.
+static IntConfigItem jogHomeMposX("$/axes/x/homing/mpos_mm");
+static IntConfigItem jogHomeMposY("$/axes/y/homing/mpos_mm");
+static IntConfigItem jogHomeMposZ("$/axes/z/homing/mpos_mm");
 
 // Called from loop_pendant() when HwEvent::CONNECTED arrives.
 // FluidNC version, IP address, WiFi SSID arrive automatically via [VER:] / status
@@ -1072,6 +1087,9 @@ static void requestControllerConfig() {
     jogMaxTravelZ.request();   // Z travel ($132)
     jogMaxTravelA.request();   // A travel ($133)
     jogHomingDirMask.request();// homing direction mask ($23)
+    jogHomeMposX.request();    // X switch mpos (homing/mpos_mm)
+    jogHomeMposY.request();    // Y switch mpos (homing/mpos_mm)
+    jogHomeMposZ.request();    // Z switch mpos (homing/mpos_mm)
     rtcCore1Stage = 208;       // requestControllerConfig done
 }
 
@@ -1316,6 +1334,12 @@ public:
         // $23 homing direction mask — 0 is a valid value (all axes home +), so key
         // off known() rather than a >0 guard.  Drives the per-axis jog envelope sign.
         if (jogHomingDirMask.known()) pendantJog.homingDirMask = jogHomingDirMask.get();
+        // homing/mpos_mm per axis — also key off known(), since 0 (the default,
+        // and by far the most common value) is indistinguishable from "unknown"
+        // if we guarded on it instead.
+        if (jogHomeMposX.known()) pendantJog.homeMpos[0] = jogHomeMposX.get();
+        if (jogHomeMposY.known()) pendantJog.homeMpos[1] = jogHomeMposY.get();
+        if (jogHomeMposZ.known()) pendantJog.homeMpos[2] = jogHomeMposZ.get();
 
         // Macro list is populated in onFilesList() when $File/SendJSON response arrives
         if (hwEventQueue) {

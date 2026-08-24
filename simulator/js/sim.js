@@ -161,8 +161,14 @@ function handleEncoderDelta(delta) {
 
     // Soft-limit clamp (absolute) — mirrors CNC_Pendant_UI.cpp: keep the resulting
     // MACHINE position inside the homed envelope so cumulative G91 jogs can't walk
-    // into a hard stop. Home = MPos 0; $23 bit clear → homes +, envelope
-    // [-maxTravel, 0]; bit set → homes −, envelope [0, +maxTravel]. Engages only
+    // into a hard stop.
+    // Envelope anchored on homeMpos (FluidNC's homing/mpos_mm, 0 by default): bit
+    // clear → homes +, envelope [homeMpos-maxTravel, homeMpos]; bit set → homes −,
+    // envelope [homeMpos, homeMpos+maxTravel]. homeMpos=0 reduces to the old fixed
+    // envelope. A non-default homeMpos is a real setting (switch at the far end of
+    // travel, mpos_mm = max_travel) — assuming 0 there made the pendant think the
+    // axis was already at its limit mid-travel, silently dropping every jog toward
+    // the far end. Engages only
     // for X/Y/Z once travel + $23 are known and the machine isn't in Alarm.
     // Clamps against a PREDICTED position (leads MPos by queued-but-unexecuted
     // jogs) re-seeded from the real MPos when a burst ends and the machine idles.
@@ -172,8 +178,9 @@ function handleEncoderDelta(delta) {
           pendantJog.homingDirMask >= 0 && !pendantMachine.status.startsWith("Alarm")) {
         const homesNeg = (pendantJog.homingDirMask >> axis) & 1;
         const travelMm = pendantJog.maxTravel[axis];
-        const loMm = homesNeg ? 0 : -travelMm;
-        const hiMm = homesNeg ? travelMm : 0;
+        const homeMm   = pendantJog.homeMpos[axis];
+        const loMm = homesNeg ? homeMm             : homeMm - travelMm;
+        const hiMm = homesNeg ? homeMm + travelMm  : homeMm;
         const MARGIN_MM = 0.5;
         const mposDisp = pendantMachine.work[axis];
         const mposMm = pendantMachine.inInches ? mposDisp * 25.4 : mposDisp;

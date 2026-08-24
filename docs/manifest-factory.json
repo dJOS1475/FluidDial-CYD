@@ -1,13 +1,12 @@
 {
   "name": "FluidDial-CYD (Factory Reset — wipes everything)",
-  "version": "2.2.2",
+  "version": "2.2.3",
   "new_install_prompt_erase": true,
-  "_note": "Paths are pinned to a COMMIT, not the vX.Y.Z tag. jsDelivr caches tag->commit resolution permanently, so a tag that has ever been served cannot be repointed — see CHANGELOG v2.1.9. A commit SHA is a fresh, immutable URL and is therefore the only way to correct an already-published release in place.",
   "builds": [
     {
       "chipFamily": "ESP32",
       "parts": [
-        { "path": "https://cdn.jsdelivr.net/gh/dJOS1475/FluidDial-CYD@16e97962d3caa61b3e3ba9098ffadfe52174eef5/docs/merged-flash.bin", "offset": 0 }
+        { "path": "https://cdn.jsdelivr.net/gh/dJOS1475/FluidDial-CYD@v2.2.3/docs/merged-flash.bin", "offset": 0 }
       ]
     }
   ]

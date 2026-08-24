@@ -234,6 +234,17 @@ struct JogState {
     // with the live machine position it lets the jog handler clamp each move so
     // the ABSOLUTE machine position can never leave the homed travel envelope.
     int          homingDirMask     = -1;
+    // MPos FluidNC assigns to the switch on homing (homing/mpos_mm, one per
+    // linear axis).  Defaults to 0 in FluidNC, which is what nearly every
+    // machine uses — but it is a real per-axis setting, not always 0: a switch
+    // mounted at the far end of travel can be configured with mpos_mm equal to
+    // max_travel, so the axis reads its full range as [0, +maxTravel] instead of
+    // [-maxTravel, 0].  The envelope above used to assume the switch was always
+    // at MPos 0, which silently blocked every jog toward the far end on such an
+    // axis (the tick's distance clamped to zero before any $J was ever sent —
+    // no error, just no motion).  Read here so the envelope reflects reality
+    // instead of a default.  0 until the controller has reported it.
+    int          homeMpos[PENDANT_MAX_AXES] = { 0 };
 };
 
 // Save jog preferences (coarseIdx + selectedIncrement) to NVS — defined in CNC_Pendant_UI.cpp

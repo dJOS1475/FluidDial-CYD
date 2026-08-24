@@ -55,7 +55,7 @@ const pendantMachine = {
   rotation: 2,
   spindleMaxRPM: 24000,
   spindleMinRPM: 0,
-  fluidDialVersion: "v2.2.2",
+  fluidDialVersion: "v2.2.3",
   // Empty until a [VER:] report arrives — a plausible-looking default rendered
   // exactly like a real reading.  Screens show "---" while empty, as for IP/SSID.
   fluidNCVersion: "",
@@ -91,6 +91,9 @@ const pendantJog = {
   maxFeedRate: 10000,
   maxTravel: [0, 0, 0, 0],
   homingDirMask: -1,   // $23 homing direction mask; -1 = unknown (see sim.js jog clamp)
+  // MPos the switch is assigned on homing (homing/mpos_mm), 0 = FluidNC default.
+  // Anchors the jog-clamp envelope — see the note in sim.js.
+  homeMpos: [0, 0, 0, 0],
 };
 
 const pendantSdCard = {
