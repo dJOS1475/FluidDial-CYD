@@ -3,6 +3,12 @@
 **ChangeLog:**
 
 
+**2026-08-25**
+
+v2.2.4
+* Fix: **the Work Area screen had its two DRO panels swapped** — MACHINE POS showed work coordinates and WORK POS showed machine coordinates. Introduced in v2.2.2: `MachineState` names these fields inversely (`.pos[]` holds WORK coordinates, `.work[]` holds MACHINE coordinates), so wiring the MACHINE POS panel to `.pos[]` read naturally and was exactly backwards. The Status and Jog screens were unaffected — both already read the right set.
+* Fix: **jogging can now reach the full travel of every axis.** The soft-limit clamp added in v2.1.3 held back 0.5 mm from *both* ends of travel to "stay off the switch", but there is only one switch and the opposite end is a pure soft limit with no hardware behind it. The practical effect was that an axis could never be jogged onto its own zero — it stopped roughly half a millimetre short and the only way to get there was to re-home. Both bounds are now reachable exactly. The clamp still does the job it was added for: an oversized jog is truncated to land precisely on the limit rather than past it, and once at a limit further jogs in that direction are dropped instead of being sent as no-ops. FluidNC's own soft limits (`$20=1`, `$22=1`) remain the authoritative backstop, as originally recommended.
+
 **2026-08-24**
 
 v2.2.3

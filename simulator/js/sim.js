@@ -181,7 +181,11 @@ function handleEncoderDelta(delta) {
         const homeMm   = pendantJog.homeMpos[axis];
         const loMm = homesNeg ? homeMm             : homeMm - travelMm;
         const hiMm = homesNeg ? homeMm + travelMm  : homeMm;
-        const MARGIN_MM = 0.5;
+        // No margin: the axis must be joggable across its FULL travel, right up
+        // to both bounds. v2.1.3 held 0.5 mm back from each end to "stay off the
+        // switch", which made machine zero unreachable without re-homing.
+        // FluidNC's soft limits are the authoritative backstop; this clamp only
+        // stops cumulative G91 jogs walking PAST them while MPos lags.
         const mposDisp = pendantMachine.work[axis];
         const mposMm = pendantMachine.inInches ? mposDisp * 25.4 : mposDisp;
         let distMm = pendantMachine.inInches ? distance * 25.4 : distance;
@@ -195,8 +199,8 @@ function handleEncoderDelta(delta) {
         }
         _jogClamp.lastAxis = axis;
 
-        if (distMm > 0) { let room = (hiMm - MARGIN_MM) - _jogClamp.predMm[axis]; if (room < 0) room = 0; if (distMm > room) distMm = room; }
-        else if (distMm < 0) { let room = (loMm + MARGIN_MM) - _jogClamp.predMm[axis]; if (room > 0) room = 0; if (distMm < room) distMm = room; }
+        if (distMm > 0) { let room = hiMm - _jogClamp.predMm[axis]; if (room < 0) room = 0; if (distMm > room) distMm = room; }
+        else if (distMm < 0) { let room = loMm - _jogClamp.predMm[axis]; if (room > 0) room = 0; if (distMm < room) distMm = room; }
         distance = pendantMachine.inInches ? distMm / 25.4 : distMm;
         if (Math.abs(distance) < 1e-4) return;   // fully blocked at the limit
         _jogClamp.predMm[axis] += distMm;         // commit the queued distance

@@ -784,11 +784,19 @@ static void handleEncoderDelta(int32_t delta) {
                     float homeMm    = (float)pendantJog.homeMpos[axis];   // switch's assigned MPos
                     float loMm      = homesNeg ? homeMm             : homeMm - travelMm;  // envelope bounds
                     float hiMm      = homesNeg ? homeMm + travelMm  : homeMm;
-                    const float MARGIN_MM = 0.5f;                         // stay off the switch
 
-                    float mposDisp  = (axis == 0) ? pendantMachine.workX
-                                    : (axis == 1) ? pendantMachine.workY
-                                                  : pendantMachine.workZ;   // MPos, display units
+                    // No margin: the axis must be joggable across its FULL travel,
+                    // right up to both bounds.  v2.1.3 held 0.5 mm back from each
+                    // end to "stay off the switch", which cost the last half
+                    // millimetre at both extremes and made machine zero
+                    // unreachable without re-homing.  FluidNC's own soft limits
+                    // are the authoritative backstop (and were always documented
+                    // as such) — this clamp only exists to stop cumulative G91
+                    // jogs walking PAST them while the reported MPos lags.
+
+                    // .work[] is MACHINE coords (MPos) — the inverted naming that
+                    // swapped the Work Area panels; the clamp needs MPos here.
+                    float mposDisp  = pendantMachine.work[axis];   // MPos, display units
                     float mposMm    = pendantMachine.inInches ? mposDisp * 25.4f : mposDisp;
                     float distMm    = pendantMachine.inInches ? distance * 25.4f : distance;
 
@@ -808,11 +816,11 @@ static void handleEncoderDelta(int32_t delta) {
                     // Clamp against the predicted position; only ever REDUCE the
                     // move toward the limit — never flip its sign.
                     if (distMm > 0.0f) {
-                        float room = (hiMm - MARGIN_MM) - predMm[axis];
+                        float room = hiMm - predMm[axis];
                         if (room < 0.0f) room = 0.0f;
                         if (distMm > room) distMm = room;
                     } else if (distMm < 0.0f) {
-                        float room = (loMm + MARGIN_MM) - predMm[axis];
+                        float room = loMm - predMm[axis];
                         if (room > 0.0f) room = 0.0f;
                         if (distMm < room) distMm = room;
                     }

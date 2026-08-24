@@ -76,9 +76,12 @@ void updateWorkMachinePos() {
         pz = pendantMachine.workZ; pa = pendantMachine.workA;
     }
 
+    // MACHINE POS panel.  NOTE the inverted field naming in MachineState:
+    // .work[] holds MACHINE coordinates (MPos) and .pos[] holds WORK coordinates.
+    // Reading .pos[] here is what swapped the two DRO panels in v2.2.2.
     // Sized PENDANT_MAX_AXES; numAxes is clamped to that in onDROChange.
-    float positions[PENDANT_MAX_AXES];
-    for (int i = 0; i < PENDANT_MAX_AXES; i++) positions[i] = pendantMachine.pos[i];
+    float machinePos[PENDANT_MAX_AXES];
+    for (int i = 0; i < PENDANT_MAX_AXES; i++) machinePos[i] = pendantMachine.work[i];
     // Three columns once there are more than 4 axes — see screen_status.
     const int nCols = (pendantMachine.numAxes > 4) ? 3 : 2;
     if (hasSprite) spriteAxisDisplay.fillSprite(COLOR_BACKGROUND);
@@ -87,7 +90,7 @@ void updateWorkMachinePos() {
     g->setTextSize(2);
     for (int i = 0; i < pendantMachine.numAxes; i++) {
         g->setCursor(ox + (i % nCols) * (230 / nCols), oy + 5 + (i / nCols) * 20);
-        g->print(AXIS_NAMES[i]); g->print(":"); g->print(positions[i], 1);
+        g->print(AXIS_NAMES[i]); g->print(":"); g->print(machinePos[i], 1);
     }
     if (hasSprite) spriteAxisDisplay.pushSprite(5, 108);
 }
@@ -111,8 +114,9 @@ void updateWorkAreaPos() {
     }
 
 
+    // WORK POS panel — .pos[] is the WORK coordinate set (see the note above).
     float workPos[PENDANT_MAX_AXES];
-    for (int i = 0; i < PENDANT_MAX_AXES; i++) workPos[i] = pendantMachine.work[i];
+    for (int i = 0; i < PENDANT_MAX_AXES; i++) workPos[i] = pendantMachine.pos[i];
     const int nCols = (pendantMachine.numAxes > 4) ? 3 : 2;
     if (hasSprite) spriteValueDisplay.fillSprite(COLOR_BACKGROUND);
     else           display.fillRect(5, 166, 230, 45, COLOR_BACKGROUND);
