@@ -85,8 +85,8 @@ function updateStatusCurrentFile() {
 
 function updateStatusAxisPositions() {
   if (currentPendantScreen !== PSCREEN_STATUS) return;
-  // MACHINE coordinates (workX/Y/Z/A = MPos); posX/Y/Z are work coords.
-  const pos = pendantMachine.work;   // sized PENDANT_MAX_AXES; numAxes is clamped
+  // MACHINE coordinates (mpos[]).
+  const pos = pendantMachine.mpos;   // sized PENDANT_MAX_AXES; numAxes is clamped
   const numAxes = pendantMachine.numAxes;
   const P = panel(230, 65, 5, 140);
   const g = P.g, ox = P.ox, oy = P.oy;

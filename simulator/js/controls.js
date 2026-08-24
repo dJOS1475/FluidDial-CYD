@@ -106,22 +106,18 @@ function buildControls() {
     (e) => { pendantProbing.selectedCoordIndex = +e.target.value; pendantProbing.selectedCoordSystem = ["G54", "G55", "G56", "G57"][+e.target.value]; repaint(); })));
 
   // -- Positions (machine / work) --
-  // One field per axis up to PENDANT_MAX_AXES.  Writes the canonical pos/work
-  // arrays and mirrors the first four into posX..posA, exactly as onDROChange
-  // does in the firmware, so the two can never disagree.
+  // One field per axis up to PENDANT_MAX_AXES, writing the canonical arrays.
   root.appendChild(_el("h3", {}, "Position (work)"));
   AXIS_NAMES.forEach((ax, i) => {
-    root.appendChild(_row(ax, _num("pos" + ax, 0.1, (e) => {
-      pendantMachine.pos[i] = +e.target.value || 0;
-      if (i < 4) pendantMachine["pos" + ax] = pendantMachine.pos[i];
+    root.appendChild(_row(ax, _num("wpos" + ax, 0.1, (e) => {
+      pendantMachine.wpos[i] = +e.target.value || 0;
       repaint();
     })));
   });
   root.appendChild(_el("h3", {}, "Position (machine)"));
   AXIS_NAMES.forEach((ax, i) => {
-    root.appendChild(_row(ax, _num("work" + ax, 0.1, (e) => {
-      pendantMachine.work[i] = +e.target.value || 0;
-      if (i < 4) pendantMachine["work" + ax] = pendantMachine.work[i];
+    root.appendChild(_row(ax, _num("mpos" + ax, 0.1, (e) => {
+      pendantMachine.mpos[i] = +e.target.value || 0;
       repaint();
     })));
   });
@@ -180,8 +176,8 @@ function syncControlsFromState() {
   set("units", pendantMachine.inInches ? "in" : "mm");
   set("wcs", String(pendantProbing.selectedCoordIndex));
   AXIS_NAMES.forEach((ax, i) => {
-    set("pos" + ax, pendantMachine.pos[i]);
-    set("work" + ax, pendantMachine.work[i]);
+    set("wpos" + ax, pendantMachine.wpos[i]);
+    set("mpos" + ax, pendantMachine.mpos[i]);
   });
   set("feedRate", pendantMachine.feedRate);
   set("spindleRPM", pendantMachine.spindleRPM);

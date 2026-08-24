@@ -35,7 +35,7 @@ function drawProbingWorkScreen() {
 
 function updateWorkMachinePos() {
   if (currentPendantScreen !== PSCREEN_PROBING_WORK) return;
-  const pos = pendantMachine.work;
+  const pos = pendantMachine.mpos;
   // Three columns once there are more than 4 axes — see status.js.
   const nCols = pendantMachine.numAxes > 4 ? 3 : 2;
   display.fillRect(5, 108, 230, 45, COLOR_BACKGROUND);
@@ -48,7 +48,7 @@ function updateWorkMachinePos() {
 
 function updateWorkAreaPos() {
   if (currentPendantScreen !== PSCREEN_PROBING_WORK) return;
-  const pos = pendantMachine.pos;
+  const pos = pendantMachine.wpos;
   const nCols = pendantMachine.numAxes > 4 ? 3 : 2;
   display.fillRect(5, 166, 230, 45, COLOR_BACKGROUND);
   display.setTextColor(COLOR_CYAN); display.setTextSize(2);

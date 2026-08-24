@@ -229,11 +229,11 @@ void updateJogAxisDisplay() {
 
     // Snapshot under the lock; skip the frame if briefly held.  Panel is
     // 230 x 55, pushed at (5, 40); shared 16-bit scratch, direct-draw fallback.
-    // Jog & Homing shows MACHINE coordinates (workX/Y/Z/A = MPos) — homing and
-    // travel-limit reasoning are all in machine space.  (posX/Y/Z are work coords.)
+    // Jog & Homing shows MACHINE coordinates (mpos[]) — homing and travel-limit
+    // reasoning are all in machine space.
     float positions[PENDANT_MAX_AXES];
     if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) != pdTRUE) return;
-    for (int i = 0; i < PENDANT_MAX_AXES; i++) positions[i] = pendantMachine.work[i];
+    for (int i = 0; i < PENDANT_MAX_AXES; i++) positions[i] = pendantMachine.mpos[i];
     xSemaphoreGive(stateMutex);
 
     int ox, oy;

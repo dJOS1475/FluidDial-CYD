@@ -155,12 +155,12 @@ void updateStatusCurrentFile() {
 void updateStatusAxisPositions() {
     if (currentPendantScreen != PSCREEN_STATUS) return;
 
-    // Status shows MACHINE coordinates (workX/Y/Z/A = MPos).  (posX/Y/Z are work.)
+    // Status shows MACHINE coordinates (mpos[]).
     float positions[PENDANT_MAX_AXES];
     int   numAxes;
     bool  inInch;
     if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) != pdTRUE) return;
-    for (int i = 0; i < PENDANT_MAX_AXES; i++) positions[i] = pendantMachine.work[i];
+    for (int i = 0; i < PENDANT_MAX_AXES; i++) positions[i] = pendantMachine.mpos[i];
     numAxes = pendantMachine.numAxes;
     inInch  = pendantMachine.inInches;
     xSemaphoreGive(stateMutex);
@@ -197,7 +197,7 @@ void updateStatusAxisPositions() {
     const int   prefDec = inInch ? 3 : 1;
     char        posBuf[20];
 
-    // AXIS_NAMES / pendantMachine.work are sized PENDANT_MAX_AXES; numAxes is
+    // AXIS_NAMES / pendantMachine.mpos are sized PENDANT_MAX_AXES; numAxes is
     // already clamped to that in onDROChange, so this loop cannot run off the end.
     g->setTextColor(COLOR_ORANGE);
     g->setTextSize(2);

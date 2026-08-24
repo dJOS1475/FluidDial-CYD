@@ -66,29 +66,24 @@ void updateWorkMachinePos() {
     const int   ox = hasSprite ? 0 : 5;
     const int   oy = hasSprite ? 0 : 108;
 
-    float px, py, pz, pa;
-    if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
-        px = pendantMachine.workX; py = pendantMachine.workY;
-        pz = pendantMachine.workZ; pa = pendantMachine.workA;
-        xSemaphoreGive(stateMutex);
-    } else {
-        px = pendantMachine.workX; py = pendantMachine.workY;
-        pz = pendantMachine.workZ; pa = pendantMachine.workA;
-    }
-
-    // MACHINE POS panel.  NOTE the inverted field naming in MachineState:
-    // .work[] holds MACHINE coordinates (MPos) and .pos[] holds WORK coordinates.
-    // Reading .pos[] here is what swapped the two DRO panels in v2.2.2.
+    // MACHINE POS panel.  Snapshot under the lock — the previous version took the
+    // mutex only to fill four locals that nothing read, then did the real array
+    // read outside it, which is the opposite of the intent.
     // Sized PENDANT_MAX_AXES; numAxes is clamped to that in onDROChange.
     float machinePos[PENDANT_MAX_AXES];
-    for (int i = 0; i < PENDANT_MAX_AXES; i++) machinePos[i] = pendantMachine.work[i];
+    int   numAxes;
+    if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) != pdTRUE) return;
+    for (int i = 0; i < PENDANT_MAX_AXES; i++) machinePos[i] = pendantMachine.mpos[i];
+    numAxes = pendantMachine.numAxes;
+    xSemaphoreGive(stateMutex);
+
     // Three columns once there are more than 4 axes — see screen_status.
-    const int nCols = (pendantMachine.numAxes > 4) ? 3 : 2;
+    const int nCols = (numAxes > 4) ? 3 : 2;
     if (hasSprite) spriteAxisDisplay.fillSprite(COLOR_BACKGROUND);
     else           display.fillRect(5, 108, 230, 45, COLOR_BACKGROUND);
     g->setTextColor(COLOR_ORANGE);
     g->setTextSize(2);
-    for (int i = 0; i < pendantMachine.numAxes; i++) {
+    for (int i = 0; i < numAxes; i++) {
         g->setCursor(ox + (i % nCols) * (230 / nCols), oy + 5 + (i / nCols) * 20);
         g->print(AXIS_NAMES[i]); g->print(":"); g->print(machinePos[i], 1);
     }
@@ -103,26 +98,20 @@ void updateWorkAreaPos() {
     const int   ox = hasSprite ? 0 : 5;
     const int   oy = hasSprite ? 0 : 166;
 
-    float wx, wy, wz, wa;
-    if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
-        wx = pendantMachine.posX; wy = pendantMachine.posY;
-        wz = pendantMachine.posZ; wa = pendantMachine.posA;
-        xSemaphoreGive(stateMutex);
-    } else {
-        wx = pendantMachine.posX; wy = pendantMachine.posY;
-        wz = pendantMachine.posZ; wa = pendantMachine.posA;
-    }
-
-
-    // WORK POS panel — .pos[] is the WORK coordinate set (see the note above).
+    // WORK POS panel — snapshot under the lock, as above.
     float workPos[PENDANT_MAX_AXES];
-    for (int i = 0; i < PENDANT_MAX_AXES; i++) workPos[i] = pendantMachine.pos[i];
-    const int nCols = (pendantMachine.numAxes > 4) ? 3 : 2;
+    int   numAxes;
+    if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) != pdTRUE) return;
+    for (int i = 0; i < PENDANT_MAX_AXES; i++) workPos[i] = pendantMachine.wpos[i];
+    numAxes = pendantMachine.numAxes;
+    xSemaphoreGive(stateMutex);
+
+    const int nCols = (numAxes > 4) ? 3 : 2;
     if (hasSprite) spriteValueDisplay.fillSprite(COLOR_BACKGROUND);
     else           display.fillRect(5, 166, 230, 45, COLOR_BACKGROUND);
     g->setTextColor(COLOR_CYAN);
     g->setTextSize(2);
-    for (int i = 0; i < pendantMachine.numAxes; i++) {
+    for (int i = 0; i < numAxes; i++) {
         g->setCursor(ox + (i % nCols) * (230 / nCols), oy + 5 + (i / nCols) * 20);
         g->print(AXIS_NAMES[i]); g->print(":"); g->print(workPos[i], 1);
     }

@@ -70,8 +70,8 @@ function handlePendantTouch(x, y) {
 }
 
 // Persistent state for the jog soft-limit clamp's predicted position (mirrors
-// the function-static predMm/lastAxis/lastTickMs in CNC_Pendant_UI.cpp).
-const _jogClamp = { predMm: [NaN, NaN, NaN], lastTickMs: 0, lastAxis: -1 };
+// the function-static predMm in CNC_Pendant_UI.cpp).
+const _jogClamp = { predMm: [NaN, NaN, NaN] };
 
 // Continuous-jog (MPG-style) dial-stop tracking (mirrors CNC_Pendant_UI.cpp).
 const JOG_CONTINUOUS_MS = 100, JOG_STOP_MS = 150, JOG_STOP_MIN_MS = 60;
@@ -186,18 +186,23 @@ function handleEncoderDelta(delta) {
         // switch", which made machine zero unreachable without re-homing.
         // FluidNC's soft limits are the authoritative backstop; this clamp only
         // stops cumulative G91 jogs walking PAST them while MPos lags.
-        const mposDisp = pendantMachine.work[axis];
+        const mposDisp = pendantMachine.mpos[axis];
         const mposMm = pendantMachine.inInches ? mposDisp * 25.4 : mposDisp;
         let distMm = pendantMachine.inInches ? distance * 25.4 : distance;
 
-        const now = (typeof millis === "function") ? millis() : Date.now();
-        const interval = now - _jogClamp.lastTickMs; _jogClamp.lastTickMs = now;
-        const newBurst = interval > 400 || axis !== _jogClamp.lastAxis;
-        if (Number.isNaN(_jogClamp.predMm[axis]) ||
-            (newBurst && pendantMachine.status.startsWith("Idle"))) {
+        // Re-seed whenever the machine is demonstrably settled: Idle AND nothing
+        // in flight. predMm may only lead MPos by moves that are actually QUEUED,
+        // so a drained planner makes MPos authoritative. Previously this required
+        // a new burst, which left the prediction permanently wrong whenever a jog
+        // was issued but not executed — FluidNC rejects a jog that would breach a
+        // soft limit ("error:15"), yet predMm had already committed the distance,
+        // so the clamp then reported zero room and stranded the axis just short of
+        // the limit until the user jogged away and back.
+        const settled = pendantMachine.status.startsWith("Idle") &&
+                        pending_nowait_sends === 0;
+        if (Number.isNaN(_jogClamp.predMm[axis]) || settled) {
           _jogClamp.predMm[axis] = mposMm;
         }
-        _jogClamp.lastAxis = axis;
 
         if (distMm > 0) { let room = hiMm - _jogClamp.predMm[axis]; if (room < 0) room = 0; if (distMm > room) distMm = room; }
         else if (distMm < 0) { let room = loMm - _jogClamp.predMm[axis]; if (room > 0) room = 0; if (distMm < room) distMm = room; }
@@ -211,15 +216,9 @@ function handleEncoderDelta(delta) {
     send_line_nowait(`$J=G91 ${g21} ${AXIS_NAMES[pendantJog.selectedAxis]}${fmtF(distance, 3)} F${pendantJog.jogSpeedMm}`);
     // sim convenience: reflect the jog in both the DRO (work) and the machine
     // position so the Work Area screen and the soft-limit clamp stay consistent.
-    // Canonical arrays are the source of truth; the named members mirror the
-    // first four, exactly as onDROChange does in the firmware.
-    const ax      = pendantJog.selectedAxis;
-    const axisKey = ax < 4 ? ["posX", "posY", "posZ", "posA"][ax]  : null;
-    const machKey = ax < 4 ? ["workX", "workY", "workZ", "workA"][ax] : null;
-    pendantMachine.pos [ax] += distance;
-    pendantMachine.work[ax] += distance;
-    if (axisKey) pendantMachine[axisKey] = pendantMachine.pos [ax];
-    if (machKey) pendantMachine[machKey] = pendantMachine.work[ax];
+    const ax = pendantJog.selectedAxis;
+    pendantMachine.wpos[ax] += distance;
+    pendantMachine.mpos[ax] += distance;
     syncControlsFromState();
     updateJogAxisDisplay();
     return;

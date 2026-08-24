@@ -179,9 +179,9 @@ function probeRoutineCount() {
 }
 
 function probeDrawPosPanel(y, h = 28) {
-  const px = pendantMachine.posX,
-    py = pendantMachine.posY,
-    pz = pendantMachine.posZ;
+  const px = pendantMachine.wpos[0],
+    py = pendantMachine.wpos[1],
+    pz = pendantMachine.wpos[2];
   const inInch = pendantMachine.inInches;
   const uu = inInch ? "in" : "mm";
   const P = panel(230, h, 5, y);

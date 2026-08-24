@@ -101,7 +101,7 @@ void probeDrawPosPanel(int y, int h) {
     float px, py, pz;
     bool  inInch;
     if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) != pdTRUE) return;
-    px = pendantMachine.posX; py = pendantMachine.posY; pz = pendantMachine.posZ;
+    px = pendantMachine.wpos[0]; py = pendantMachine.wpos[1]; pz = pendantMachine.wpos[2];
     inInch = pendantMachine.inInches;
     xSemaphoreGive(stateMutex);
 

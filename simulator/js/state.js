@@ -38,13 +38,12 @@ const pendantMachine = {
   status: "N/C",
   currentFile: "",
   jobPercent: 0,
-  // Canonical per-axis positions — anything that ITERATES axes uses these.
-  // posX..posA below are kept only for call sites naming a specific axis; both
-  // are written from the same place so they cannot drift.
-  pos:  [0, 0, 0, 0, 0, 0],
-  work: [0, 0, 0, 0, 0, 0],
-  posX: 0, posY: 0, posZ: 0, posA: 0,
-  workX: 0, workY: 0, workZ: 0, workA: 0,
+  // Canonical per-axis positions, named for FluidNC's own status-report terms
+  // so they cannot be read the wrong way round. Previously pos[] (work) and
+  // work[] (machine) plus a parallel set of posX../workX.. scalars — that
+  // inversion swapped both Work Area DRO panels in v2.2.2.
+  wpos: [0, 0, 0, 0, 0, 0],   // WPos — work coordinates (DRO)
+  mpos: [0, 0, 0, 0, 0, 0],   // MPos — machine coordinates
   feedRate: 0,
   spindleRPM: 0,
   feedOverride: 100,
@@ -55,7 +54,7 @@ const pendantMachine = {
   rotation: 2,
   spindleMaxRPM: 24000,
   spindleMinRPM: 0,
-  fluidDialVersion: "v2.2.4",
+  fluidDialVersion: "v2.2.5",
   // Empty until a [VER:] report arrives — a plausible-looking default rendered
   // exactly like a real reading.  Screens show "---" while empty, as for IP/SSID.
   fluidNCVersion: "",
@@ -79,8 +78,8 @@ const pendantMachine = {
 const pendantJog = {
   selectedAxis: 0,
   homingAxis: -1,
-  increment: 0.01,
-  selectedIncrement: 1,
+  increment: 1.0,          // matches selectedIncrement (slot 2 = 1 mm)
+  selectedIncrement: 2,    // slots are 0.01 / 0.1 / 1 / dial
   // Slot 3 of the increment row is a dial box holding the coarse increments
   // (10/50/100 mm, .5/2.0/4.0 in); coarseIdx picks which one.
   coarseIdx: 0,

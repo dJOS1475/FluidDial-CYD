@@ -777,7 +777,6 @@ static void handleEncoderDelta(int32_t delta) {
                     !pendantMachine.status.startsWith("Alarm")) {
 
                     static float predMm[3]  = { NAN, NAN, NAN };  // predicted MPos incl. queued jogs
-                    static int   lastAxis   = -1;
 
                     bool  homesNeg  = (pendantJog.homingDirMask >> axis) & 1;
                     float travelMm  = (float)pendantJog.maxTravel[axis];
@@ -794,24 +793,37 @@ static void handleEncoderDelta(int32_t delta) {
                     // as such) — this clamp only exists to stop cumulative G91
                     // jogs walking PAST them while the reported MPos lags.
 
-                    // .work[] is MACHINE coords (MPos) — the inverted naming that
-                    // swapped the Work Area panels; the clamp needs MPos here.
-                    float mposDisp  = pendantMachine.work[axis];   // MPos, display units
+                    float mposDisp  = pendantMachine.mpos[axis];   // MPos, display units
                     float mposMm    = pendantMachine.inInches ? mposDisp * 25.4f : mposDisp;
                     float distMm    = pendantMachine.inInches ? distance * 25.4f : distance;
 
-                    // Re-seed the prediction from the real MPos at the start of a
-                    // burst (gap since last tick, or axis change) once the machine
-                    // has settled to Idle — always on first use, and right after a
-                    // continuous-jog JogCancel flushed the queue (jogForceReseed),
-                    // since predMm then holds distance that will never execute.
-                    bool newBurst = (interval > 400) || (axis != lastAxis);
-                    if (isnan(predMm[axis]) || jogForceReseed ||
-                        (newBurst && pendantMachine.status.startsWith("Idle"))) {
+                    // Re-seed the prediction from the real MPos whenever the
+                    // machine is demonstrably settled: Idle AND nothing in flight.
+                    // predMm is only allowed to lead MPos by moves that are
+                    // actually QUEUED, so when the planner is drained and no send
+                    // is awaiting a reply, MPos is authoritative by definition.
+                    //
+                    // This used to require a new burst (>400 ms gap or axis
+                    // change), which left the prediction permanently wrong if a
+                    // jog was ever issued but not executed.  FluidNC REJECTS a
+                    // jog that would breach a soft limit ("error:15 Travel
+                    // exceeded") — the move never happens, but predMm had already
+                    // committed the distance.  From then on the clamp computed
+                    // zero room and refused to move any closer, leaving the axis
+                    // stranded a fraction short of the limit until the user
+                    // happened to jog away and back (which supplied the >400 ms
+                    // gap and re-seeded).  Now it self-corrects on the next
+                    // settled tick, whatever caused the drift.
+                    //
+                    // Continuous jogging is unaffected: the machine reports "Jog",
+                    // not "Idle", for the whole spin, so the prediction still
+                    // leads MPos exactly as intended while moves are queued.
+                    const bool settled = pendantMachine.status.startsWith("Idle") &&
+                                         pending_nowait_sends == 0;
+                    if (isnan(predMm[axis]) || jogForceReseed || settled) {
                         predMm[axis] = mposMm;
                     }
                     jogForceReseed = false;
-                    lastAxis = axis;
 
                     // Clamp against the predicted position; only ever REDUCE the
                     // move toward the limit — never flip its sign.
@@ -1150,23 +1162,11 @@ public:
                                                         : n_axes;
             pendantMachine.numAxes       = nAx;
 
-            // Canonical per-axis positions — the only thing axis LOOPS may read.
+            // Canonical per-axis positions — the only representation there is.
             for (int i = 0; i < PENDANT_MAX_AXES; i++) {
-                pendantMachine.pos [i] = (i < nAx) ? myAxes[i]        / 10000.0f : 0.0f;
-                pendantMachine.work[i] = (i < nAx) ? myMachineAxes[i] / 10000.0f : 0.0f;
+                pendantMachine.wpos[i] = (i < nAx) ? myAxes[i]        / 10000.0f : 0.0f;
+                pendantMachine.mpos[i] = (i < nAx) ? myMachineAxes[i] / 10000.0f : 0.0f;
             }
-
-            // Named aliases for the many call sites that mean one specific axis
-            // (probing, work-zero, jog envelope).  Written here, from the same
-            // source as the array above, so the two cannot drift apart.
-            pendantMachine.posX          = pendantMachine.pos[0];
-            pendantMachine.posY          = pendantMachine.pos[1];
-            pendantMachine.posZ          = pendantMachine.pos[2];
-            pendantMachine.posA          = pendantMachine.pos[3];
-            pendantMachine.workX         = pendantMachine.work[0];
-            pendantMachine.workY         = pendantMachine.work[1];
-            pendantMachine.workZ         = pendantMachine.work[2];
-            pendantMachine.workA         = pendantMachine.work[3];
             pendantMachine.feedRate      = (int)myFeed;
             pendantMachine.spindleRPM    = (int)mySpeed;
             pendantMachine.feedOverride  = (int)myFro;
@@ -2056,7 +2056,11 @@ void setup_pendant() {
     preferences.begin("pendant", false);
     int  savedRotation = preferences.getInt("rotation",    2);
     int  savedCoarse   = preferences.getInt("jogCoarseIdx", 0);
-    int  savedSelInc   = preferences.getInt("jogSelInc",    1);
+    // Default slot 2 = 1 mm (slots are 0.01 / 0.1 / 1 / dial).  This fallback is
+    // the real fresh-build default — it overwrites the struct initialiser on
+    // every boot.  Existing pendants keep whatever they last selected, since the
+    // key is already present in their NVS.
+    int  savedSelInc   = preferences.getInt("jogSelInc",    2);
     preferences.end();
 
     // Clamp saved indices to valid slots — guards against a corrupted NVS entry,

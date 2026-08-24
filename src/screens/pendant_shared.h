@@ -128,20 +128,18 @@ struct MachineState {
     String status        = "N/C";
     String currentFile   = "";
     int    jobPercent    = 0;     // 0-100, valid only while currentFile is non-empty
-    // Canonical positions, one slot per axis the controller reports.  Anything
-    // that ITERATES axes must use these; posX..posA below are kept only for the
-    // many call sites that name a specific axis (probing, work-zero, etc.).
-    // Both are written from the same place (onDROChange) so they cannot diverge.
-    float  pos [PENDANT_MAX_AXES] = { 0.0f };   // work coordinates (DRO)
-    float  work[PENDANT_MAX_AXES] = { 0.0f };   // machine coordinates (MPos)
-    float  posX          = 0.0f;
-    float  posY          = 0.0f;
-    float  posZ          = 0.0f;
-    float  posA          = 0.0f;
-    float  workX         = 0.0f;
-    float  workY         = 0.0f;
-    float  workZ         = 0.0f;
-    float  workA         = 0.0f;
+    // Canonical positions, one slot per axis the controller reports.  Named to
+    // match FluidNC's own status-report terms so they cannot be read the wrong
+    // way round: WPos is the work coordinate, MPos the machine coordinate.
+    //
+    // These used to be `pos[]` (work) and `work[]` (machine) — `work*` was named
+    // after the Work Area SCREEN that consumes it, not after work coordinates —
+    // alongside a parallel set of posX..posA / workX..workA scalars.  The
+    // inversion swapped both DRO panels on that screen in v2.2.2 (fixed v2.2.4);
+    // the duplicate representation is what let it happen silently.  One
+    // representation, named for what it holds.
+    float  wpos[PENDANT_MAX_AXES] = { 0.0f };   // WPos — work coordinates (DRO)
+    float  mpos[PENDANT_MAX_AXES] = { 0.0f };   // MPos — machine coordinates
     int    feedRate      = 0;
     int    spindleRPM    = 0;
 
@@ -210,8 +208,8 @@ struct JogState {
     // Homing state, cleared when homing ends, so after homing the DRO returns
     // to the jog-selected axis without disturbing selectedAxis.
     int          homingAxis        = -1;
-    float        increment         = 0.01f;
-    int          selectedIncrement = 1;     // index within the active increment set (0..3)
+    float        increment         = 1.0f;  // matches selectedIncrement default (slot 2)
+    int          selectedIncrement = 2;     // index within the active increment set (0..3); 2 = 1 mm
     // Slot 3 of the increment row is a dial box rather than a fixed value: it holds
     // the coarse increments (10/50/100 mm, .5/2.0/4.0 in) and the jog dial steps
     // between them while incDialMode is on.  This replaced a hidden triple-tap that
