@@ -6,6 +6,7 @@
  *   G91 G21
  *   G38.2 Z-{maxZTravel} F{probeRate}
  *   G90
+ *   G53 G0 Z#5063                ; back to the trigger point (kills decel overshoot)
  *   G10 L20 P{n} Z{plateThick}   ; for touch plate
  *   G10 L20 P{n} Z{ballDia/2}    ; for 3D probe (centre offset)
  *   G91
@@ -50,6 +51,7 @@ static void runProbeZ() {
     probeSeekFine("Z", -pendantProbeV2.maxZTravel,
                   pendantProbeV2.seekRate, pendantProbeV2.probeRate);
     send_line("G90");
+    probeReturnToTrigger("Z");   // undo the deceleration overshoot before zeroing
     snprintf(buf, sizeof(buf), "G10 L20 P%d Z%.3f", pNum, zOffset);
     send_line(buf);
     send_line("G91");

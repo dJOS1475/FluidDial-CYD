@@ -11,6 +11,8 @@
  *
  * G-code generated internally using G91 (relative) mode throughout.
  * Ball radius / plate-edge compensation applied to G10 L20.
+ * Each axis returns to its G38.2 trigger point (G53 G0 to #5061/#5062/#5063)
+ * before being zeroed, so the deceleration overshoot never enters the offset.
  */
 
 #include "pendant_shared.h"
@@ -72,6 +74,7 @@ static void runProbeCorner() {
         send_line("G91 G21");
         probeSeekFine("Z", -maxZ, seekF, rate);   // two-pass surface touch
         send_line("G90");
+        probeReturnToTrigger("Z");   // undo the deceleration overshoot before zeroing
         snprintf(buf, sizeof(buf), "G10 L20 P%d Z%.3f", pNum, platZ);
         send_line(buf);
         send_line("G91");
@@ -103,6 +106,7 @@ static void runProbeCorner() {
         //     probing +X: edge is edgeOfs ahead of trigger → supply -edgeOfs
         //     probing -X: edge is edgeOfs behind trigger   → supply +edgeOfs
         send_line("G90");
+        probeReturnToTrigger("X");   // undo the deceleration overshoot before zeroing
         float xWCS = xDir > 0 ? -edgeOfsX : +edgeOfsX;
         snprintf(buf, sizeof(buf), "G10 L20 P%d X%.3f", pNum, xWCS);
         send_line(buf);
@@ -118,6 +122,7 @@ static void runProbeCorner() {
         // Two-pass probe toward Y wall
         probeSeekFine("Y", yDir * (over + 20.0f), seekF, rate);
         send_line("G90");
+        probeReturnToTrigger("Y");   // undo the deceleration overshoot before zeroing
         float yWCS = yDir > 0 ? -edgeOfsY : +edgeOfsY;
         snprintf(buf, sizeof(buf), "G10 L20 P%d Y%.3f", pNum, yWCS);
         send_line(buf);

@@ -41,7 +41,8 @@
 #include "screen_probe_bore_boss.h"
 
 // Two-pass probe along a unit direction (ux,uy): fast seek to contact, back off,
-// slow re-probe.  Ends at the fine trigger (machine pos in #5061/#5062).  G91.
+// slow re-probe.  Comes to rest just past the trigger (deceleration overshoot); the
+// trigger point itself is in #5061/#5062, which is what we store.  G91.
 static void probeRadial2Pass(float ux, float uy, float seekDist, float seekF, float fineF) {
     const float BACKOFF = 1.5f;
     char b[96];
@@ -330,6 +331,7 @@ static void runProbeBoss() {
     send_line("G91");
     snprintf(buf, sizeof(buf), "G38.2 Z-%.3f F%.0f", maxZ, fineF);  send_line(buf);
     send_line("G90");
+    probeReturnToTrigger("Z");   // undo the deceleration overshoot before zeroing
     snprintf(buf, sizeof(buf), "G10 L20 P%d Z%.3f", pNum, platZ);   send_line(buf);
     send_line("G91");
     snprintf(buf, sizeof(buf), "G0 Z%.3f F500", retZ);             send_line(buf);  // to top+retZ

@@ -16,6 +16,7 @@ function runProbeZ() {
   // Two-pass: fast seek down to the surface, then slow re-probe for precision.
   probeSeekFine("Z", -pendantProbeV2.maxZTravel, pendantProbeV2.seekRate, pendantProbeV2.probeRate);
   send_line("G90");
+  probeReturnToTrigger("Z");   // undo the deceleration overshoot before zeroing
   send_line(`G10 L20 P${pNum} Z${fmtF(zOffset, 3)}`);
   send_line("G91");
   send_line(`G0 Z${fmtF(pendantProbeV2.retractDist, 3)}`);

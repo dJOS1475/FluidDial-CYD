@@ -3,6 +3,11 @@
 **ChangeLog:**
 
 
+**2026-09-15**
+
+v2.2.6
+* Fix: **every probe routine set its work zero at the point the machine *stopped*, not the point the probe *triggered*** — so the deceleration overshoot went straight into the work offset. `G38.2` records the exact position where the probe input fired, but unless FluidNC's `hard_stop` is enabled the machine coasts past it while decelerating, typically 0.2-0.3 mm and more at higher probe feeds. The pendant then issued `G10 L20 P# Z<offset>` from wherever the axis had come to rest, so a Z zero landed consistently *below* the touch-plate surface by the overshoot distance. Reported by a user probing with a router bit on an aluminium plate — the bit left a witness mark from the overtravel on every probe, and their workaround was to set `hard_stop = true`, which works only by removing the overshoot rather than accounting for it. Every routine now returns to the true trigger point — a `G53 G0` to the probe-result parameters `#5061`/`#5062`/`#5063` — before writing the zero. This affects **Z Surface** (Z), **XYZ Corner** (all three axes) and the **Boss** top-surface touch. Bore and Boss *XY* centre-finding were already correct: they read `#5061`/`#5062` and `G53`-move to the computed centre before zeroing, and that proven pattern is what the other routines now share. The corrective move is always a retreat away from the work, so it is safe at rapid and needs no extra clearance. `hard_stop` is no longer needed for accurate zeros and can be returned to its default.
+
 **2026-08-25**
 
 v2.2.5

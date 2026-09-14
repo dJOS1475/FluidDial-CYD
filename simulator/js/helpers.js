@@ -360,13 +360,26 @@ function probeDialStep(delta, baseStep) {
 }
 
 // Crash-safe two-pass approach: fast seek to contact, back off, slow re-probe.
-// Ends AT the fine trigger so the caller can set a WCS axis there.  Stays G91.
+// Ends just PAST the fine trigger — G38.2 records where the probe input fired,
+// but the machine keeps moving while it decelerates.  The trigger point itself is
+// in #5061/#5062/#5063; callers must probeReturnToTrigger() before zeroing a WCS
+// axis, or they bake the overshoot into the work offset.  Stays G91.
 function probeSeekFine(axis, seekDist, seekF, fineF) {
   const BACKOFF = 1.5;
   const dir = seekDist >= 0 ? 1 : -1;
   send_line(`G38.2 ${axis}${fmtF(seekDist, 3)} F${fmtF(seekF, 0)}`);
   send_line(`G0 ${axis}${fmtF(-dir * BACKOFF, 3)} F1000`);
   send_line(`G38.2 ${axis}${fmtF(dir * (BACKOFF + 1), 3)} F${fmtF(fineF, 0)}`);
+}
+
+// Move back to the exact G38.2 trigger point (#5061/#5062/#5063) before zeroing a
+// WCS axis.  G38.2 *reports* the trigger position, but the machine coasts past it
+// while decelerating unless FluidNC's hard_stop is set, so zeroing where it came
+// to rest bakes that overshoot straight into the work offset.  Always a retreat
+// away from the work, so safe at rapid.  Must be called in G90.
+function probeReturnToTrigger(axis) {
+  const param = axis === "X" ? "5061" : axis === "Y" ? "5062" : "5063";
+  send_line(`G53 G0 ${axis}#${param}`);
 }
 
 // Work-area selector button — styled like the Z-Surface "Sets" box.

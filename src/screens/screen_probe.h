@@ -104,7 +104,15 @@ void probeActivateWcs();
 float probeDialStep(int delta, float baseStep);
 
 // Crash-safe two-pass approach along one axis: fast seek to contact, back off a
-// little, then slow re-probe.  Ends AT the fine trigger (no trailing retract) so
-// the caller can set a WCS axis there, or save the trigger param.  Stays in the
-// caller's G91 frame; seekDist is signed (e.g. "Z", -maxZ for a downward probe).
+// little, then slow re-probe.  Ends just PAST the fine trigger by the machine's
+// deceleration distance (see probeReturnToTrigger) — the exact trigger point is
+// left in #5061/#5062/#5063.  No trailing retract.  Stays in the caller's G91
+// frame; seekDist is signed (e.g. "Z", -maxZ for a downward probe).
 void probeSeekFine(const char* axis, float seekDist, float seekF, float fineF);
+
+// Move back to the exact G38.2 trigger point (#5061/#5062/#5063) before zeroing a
+// WCS axis.  G38.2 *reports* the trigger position, but the machine coasts past it
+// while decelerating unless FluidNC's hard_stop is set, so zeroing where it came
+// to rest bakes that overshoot straight into the work offset.  Always a retreat
+// away from the work, so safe at rapid.  Must be called in G90.  axis = "X"|"Y"|"Z".
+void probeReturnToTrigger(const char* axis);

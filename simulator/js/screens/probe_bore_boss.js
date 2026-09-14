@@ -9,7 +9,8 @@
  * true vertical diameter and contact head-on even from an off-centre start. */
 
 // Two-pass probe along a unit direction (ux,uy): fast seek, back off, slow
-// re-probe. Ends at the fine trigger (machine pos in #5061/#5062). G91.
+// re-probe. Comes to rest just past the trigger (deceleration overshoot); the
+// trigger point itself is in #5061/#5062, which is what we store. G91.
 function probeRadial2Pass(ux, uy, seekDist, seekF, fineF) {
   const BACKOFF = 1.5;
   send_line(`G38.2 G91 X${fmtF(seekDist * ux, 3)} Y${fmtF(seekDist * uy, 3)} F${fmtF(seekF, 0)}`);
@@ -191,6 +192,7 @@ function runProbeBoss() {
   send_line("G91");
   send_line(`G38.2 Z-${fmtF(maxZ, 3)} F${fmtF(fineF, 0)}`);
   send_line("G90");
+  probeReturnToTrigger("Z");   // undo the deceleration overshoot before zeroing
   send_line(`G10 L20 P${pNum} Z${fmtF(platZ, 3)}`);
   send_line("G91");
   send_line(`G0 Z${fmtF(retZ, 3)} F500`);

@@ -33,6 +33,15 @@ writes so the WCS lands on the real surface:
 > for the plate's wall thickness on each axis (see [Calibration](#calibration)).
 > Plate **width** is saved for reference only and is not applied to the moves.
 
+**Deceleration overshoot is removed.** `G38.2` records the exact position where the
+probe input fired, but the machine keeps moving while it decelerates and comes to
+rest slightly *past* that point (typically 0.2–0.3 mm, more at higher probe feed
+rates) unless FluidNC's `hard_stop` is enabled. Zeroing where the machine stopped
+would bake that overshoot straight into the work offset. Every routine therefore
+returns to the true trigger point — `G53 G0` to the probe-result parameters
+`#5061`/`#5062`/`#5063` — *before* it writes the zero. The corrective move is always
+a retreat away from the work, and you do **not** need `hard_stop` for accurate zeros.
+
 **Two-pass, crash-safe probing.** Every wall/surface is found with two moves:
 a **fast seek** (at *Seek rate*) to make first contact, a small back-off, then a
 **slow re-probe** (at *Probe rate*) for an accurate trigger. Crucially, *every*
@@ -131,8 +140,9 @@ with a diagram of the probe descending onto a surface.
 **Result line:** *Sets Z0* (into the selected Work Area).
 
 **How it works:** seeks down (fast) until contact, backs off, re-probes down
-(slow), then `G10 L20 P# Z<offset>` sets Z0 with the ball-radius / plate-thickness
-offset applied, and lifts by *Retract dist*.
+(slow), returns to the exact trigger point (`G53 G0 Z#5063`), then
+`G10 L20 P# Z<offset>` sets Z0 with the ball-radius / plate-thickness offset
+applied, and lifts by *Retract dist*.
 
 ---
 
@@ -162,6 +172,8 @@ with a top-down diagram of the corner and the X/Y probe arrows.
 *Probe depth*, then probes the **X** edge (two-pass) and sets X0, and the **Y**
 edge (two-pass) and sets Y0 — each with edge compensation (ball radius for the 3D
 probe, or the plate's XY-offset wall thickness for the XYZ plate) — then lifts.
+Each of the three axes returns to its own trigger point (`#5063`/`#5061`/`#5062`)
+before being zeroed, so no deceleration overshoot enters any of the three offsets.
 
 ---
 

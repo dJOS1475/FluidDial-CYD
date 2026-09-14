@@ -28,6 +28,7 @@ function runProbeCorner() {
     send_line("G91 G21");
     probeSeekFine("Z", -maxZ, seekF, rate);   // two-pass surface touch
     send_line("G90");
+    probeReturnToTrigger("Z");   // undo the deceleration overshoot before zeroing
     send_line(`G10 L20 P${pNum} Z${fmtF(platZ, 3)}`);
     send_line("G91");
     send_line(`G0 Z${fmtF(retZ, 3)} F1000`);
@@ -39,12 +40,14 @@ function runProbeCorner() {
     send_line(`G0 X${fmtF(-xDir * over, 3)} F1000`);
     probeSeekFine("X", xDir * (over + 20), seekF, rate);   // two-pass toward X wall
     send_line("G90");
+    probeReturnToTrigger("X");   // undo the deceleration overshoot before zeroing
     send_line(`G10 L20 P${pNum} X${fmtF(xDir > 0 ? -edgeOfsX : edgeOfsX, 3)}`);
     send_line("G91");
     send_line(`G0 X${fmtF(-xDir * retXY, 3)} F1000`);
     send_line(`G0 Y${fmtF(-yDir * over, 3)} F1000`);
     probeSeekFine("Y", yDir * (over + 20), seekF, rate);   // two-pass toward Y wall
     send_line("G90");
+    probeReturnToTrigger("Y");   // undo the deceleration overshoot before zeroing
     send_line(`G10 L20 P${pNum} Y${fmtF(yDir > 0 ? -edgeOfsY : edgeOfsY, 3)}`);
     send_line("G91");
     send_line(`G0 Y${fmtF(-yDir * retXY, 3)} F1000`);

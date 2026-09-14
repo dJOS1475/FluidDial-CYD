@@ -335,7 +335,10 @@ float probeDialStep(int delta, float baseStep) {
 }
 
 // Crash-safe two-pass approach: fast seek to contact, back off, slow re-probe.
-// Ends AT the fine trigger so the caller can set a WCS axis there.  Stays G91.
+// Ends just PAST the fine trigger — G38.2 records where the probe input fired,
+// but the machine keeps moving while it decelerates.  The trigger point itself is
+// in #5061/#5062/#5063; callers must probeReturnToTrigger() before zeroing a WCS
+// axis, or they bake the overshoot into the work offset.  Stays G91.
 void probeSeekFine(const char* axis, float seekDist, float seekF, float fineF) {
     const float BACKOFF = 1.5f;
     int  dir = (seekDist >= 0.0f) ? 1 : -1;
@@ -343,6 +346,18 @@ void probeSeekFine(const char* axis, float seekDist, float seekF, float fineF) {
     snprintf(b, sizeof(b), "G38.2 %s%.3f F%.0f", axis, seekDist, seekF);                send_line(b);
     snprintf(b, sizeof(b), "G0 %s%.3f F1000",    axis, -dir * BACKOFF);                 send_line(b);
     snprintf(b, sizeof(b), "G38.2 %s%.3f F%.0f", axis, dir * (BACKOFF + 1.0f), fineF);  send_line(b);
+}
+
+// Move back to the exact G38.2 trigger point before zeroing a WCS axis — see the
+// header for why.  Uses the same G53-to-a-probe-parameter idiom as the bore/boss
+// centre move.  Caller must already be in G90.
+void probeReturnToTrigger(const char* axis) {
+    const char* param = (*axis == 'X') ? "5061"
+                      : (*axis == 'Y') ? "5062"
+                                       : "5063";
+    char b[32];
+    snprintf(b, sizeof(b), "G53 G0 %s#%s", axis, param);
+    send_line(b);
 }
 
 // Work-area selector button — styled like the Z-Surface "Sets" box (rounded
