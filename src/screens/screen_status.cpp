@@ -138,7 +138,15 @@ void updateStatusCurrentFile() {
         g->setCursor(ox + 5, oy + 5);
         g->print("READY — press green to run");
         g->setCursor(ox + 5, oy + 20);
-        g->print(pendantSdCard.loadedFile);
+        // loadedFile is a full path now that files can live in subfolders, and
+        // the panel only fits ~37 chars at this size.  Trim from the LEFT so the
+        // filename itself always survives.
+        {
+            String f = pendantSdCard.loadedFile;
+            const int maxChars = 37;
+            if (f.length() > maxChars) f = "..." + f.substring(f.length() - (maxChars - 3));
+            g->print(f);
+        }
     } else {
         g->setTextColor(COLOR_GRAY_TEXT);
         g->setTextSize(1);

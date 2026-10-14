@@ -359,6 +359,116 @@ function probeDialStep(delta, baseStep) {
   return baseStep * mult;
 }
 
+// ===== List paging (shared by the SD Card and Macros screens) =====
+// Both screens show LIST_ROWS rows at a time out of a longer list, and page
+// through it a whole screen at a time.  scrollOffset stays the single source of
+// truth (it is the row-loop base, the touch hit-test base, and part of the
+// render-dirty key) and is always kept on a page boundary.
+const LIST_ROWS = 5;
+
+function listPageCount(count) {
+  return Math.max(1, Math.ceil(count / LIST_ROWS));
+}
+
+function listPageIndex(scrollOffset) {
+  return Math.floor(scrollOffset / LIST_ROWS);
+}
+
+// Step the page by `delta` detents (collapsed to +/-1) and clamp at both ends —
+// clamped rather than wrapping, like every other dial-driven field in the UI.
+// Returns the new scrollOffset, or -1 if nothing changed (so callers can skip
+// the repaint entirely).
+function listPageStep(delta, count, scrollOffset) {
+  const pages = listPageCount(count);
+  const cur = listPageIndex(scrollOffset);
+  const next = constrain(cur + (delta > 0 ? 1 : -1), 0, pages - 1);
+  return next === cur ? -1 : next * LIST_ROWS;
+}
+
+// Advance one page, wrapping back to the first — used by a tap on the page
+// readout, where there is only one control and it has to reach every page.
+function listPageAdvanceWrap(count, scrollOffset) {
+  const pages = listPageCount(count);
+  if (pages <= 1) return -1;
+  return ((listPageIndex(scrollOffset) + 1) % pages) * LIST_ROWS;
+}
+
+// "Page 3 of 20", plus a trailing "+" when the controller had MORE entries than
+// the list can hold — the pendant shows the alphabetically-first `count` of them.
+function listPageLabel(count, scrollOffset, truncated) {
+  return `Page ${listPageIndex(scrollOffset) + 1} of ${listPageCount(count)}${truncated ? "+" : ""}`;
+}
+
+// ---- List breadcrumb + row geometry (SD Card / Macros) ----
+// The breadcrumb occupies the top of the list panel; rows run beneath it at a
+// 36 px pitch so five still fit in the 200 px panel.
+const LIST_CRUMB_H  = 16;   // breadcrumb band, local y 0..16
+const LIST_ROW_Y0   = 18;   // first row, local
+const LIST_ROW_PITCH= 36;
+const LIST_ROW_H    = 32;
+
+// Touch region for row i — the FULL row pitch, not the drawn height, so the 4 px
+// gap between rows doesn't swallow taps.  Row 4 ends at 238, clear of the footer.
+function listRowHitY(i) { return 40 + LIST_ROW_Y0 + i * LIST_ROW_PITCH; }
+function listRowHitH()  { return LIST_ROW_PITCH; }
+
+// Fit a path into `maxChars` by dropping leading segments — the folder you are
+// IN matters more than how you got there, so truncation eats the left.
+function crumbText(path, maxChars) {
+  if (path.length <= maxChars) return path;
+  const parts = path.split("/").filter(Boolean);
+  let out = parts[parts.length - 1];
+  for (let i = parts.length - 2; i >= 0; i--) {
+    const next = parts[i] + "/" + out;
+    if (next.length + 2 > maxChars) break;
+    out = next;
+  }
+  return ".../" + out;
+}
+
+function drawListCrumb(ox, oy, text, color) {
+  display.setTextSize(1);
+  display.setTextColor(color || COLOR_GRAY_TEXT);
+  display.setCursor(ox + 5, oy + 4);
+  display.print(crumbText(text, 36));
+}
+
+// ---- Three-column list footer: dial hint | page readout | Refresh ----
+// Col 0 tells you the dial pages the list, col 1 shows where you are.  Both are
+// tappable and both advance a page, so the row behaves the way it looks —
+// teal keeps the hint distinct from the green Refresh beside it and the blue
+// Main Menu directly below.
+const LIST_HINT_BG = COLOR_TEAL;
+
+// Draws the whole footer row at `y`.  `pages`/`page` are 1-based.
+function drawListFooter(y, page, pages, truncated, live) {
+  // Single page: nothing can be paged, so the hint drops its teal and both
+  // columns sit at the same plain grey with dimmed text — present, but clearly
+  // doing nothing.  Multi-page: teal hint, grey readout, white text.
+  const idleBg = COLOR_BUTTON_GRAY, idleFg = COLOR_GRAY_TEXT;
+
+  drawMultiLineButton(rowBtnX(3, 0), y, rowBtnWAt(3, 0), 36,
+                      "JOG", "- / +",
+                      live ? LIST_HINT_BG : idleBg,
+                      live ? COLOR_WHITE  : idleFg, 1);
+
+  const val = pages > 0 ? `${page}/${pages}${truncated ? "+" : ""}` : "-/-";
+  drawMultiLineButton(rowBtnX(3, 1), y, rowBtnWAt(3, 1), 36, "PAGE", val,
+                      COLOR_BUTTON_GRAY,
+                      live ? COLOR_WHITE : idleFg, 1);
+
+  drawButton(rowBtnX(3, 2), y, rowBtnWAt(3, 2), 36, "Refresh",
+             COLOR_DARK_GREEN, COLOR_WHITE, 1);
+}
+
+// Did this touch land on either page-advancing footer column (the JOG hint or
+// the PAGE readout)?  Both do the same thing, so they share one test.
+function listFooterPageTap(x, y, footerY) {
+  const x0 = rowBtnX(3, 0);
+  const x1 = rowBtnX(3, 1) + rowBtnWAt(3, 1);
+  return isTouchInBounds(x, y, x0, footerY, x1 - x0, 36);
+}
+
 // Crash-safe two-pass approach: fast seek to contact, back off, slow re-probe.
 // Ends just PAST the fine trigger — G38.2 records where the probe input fired,
 // but the machine keeps moving while it decelerates.  The trigger point itself is

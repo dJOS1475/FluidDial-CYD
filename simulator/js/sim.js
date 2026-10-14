@@ -303,6 +303,12 @@ function handleEncoderDelta(delta) {
       updateSpindleOverrideDisplay();
     }
     return;
+  } else if (currentPendantScreen === PSCREEN_SD_CARD) {
+    handleSDCardDial(delta);
+    return;
+  } else if (currentPendantScreen === PSCREEN_MACROS) {
+    handleMacrosDial(delta);
+    return;
   } else if (currentPendantScreen === PSCREEN_FLUIDNC) {
     const newRot = pendantMachine.rotation === 2 ? 0 : 2;
     pendantMachine.rotation = newRot;

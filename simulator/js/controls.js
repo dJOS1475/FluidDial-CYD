@@ -151,6 +151,60 @@ function buildControls() {
     _ctl["ip"] = i; return i;
   })()));
 
+  // -- Lists (SD card / macros) --
+  // The pendant caps its SD list at SD_MAX_FILES and drops the rest, so these
+  // values exercise every case: empty, a short last page, an exact fill, and a
+  // listing the controller returned MORE of than the pendant can hold.
+  root.appendChild(_el("h3", {}, "Lists"));
+  root.appendChild(_row("SD files", _select("sdFiles", [
+    { v: "0",   t: "0 (empty)" },
+    { v: "7",   t: "7 (2 pages)" },
+    { v: "23",  t: "23 (5 pages, short last)" },
+    { v: "100", t: "100 (20 pages, exact)" },
+    { v: "137", t: "137 (truncated to 100)" },
+  ], (e) => {
+    simSetSdFileCount(+e.target.value);
+    if (currentPendantScreen === PSCREEN_SD_CARD) {
+      pendantSdCard.scrollOffset = 0;
+      pendantSdCard.selectedFile = 0;
+      pendantSdCard.pendingRun   = false;
+      pendantSdCard.loading      = true;
+      pendantSdCard.loadFailed   = false;
+      pendantSdCard.loadStartMs  = millis();
+      request_file_list("/sd");
+    }
+    repaint();
+  })));
+
+  // Mock-up only: footer variant + folder-tree seed, so the layout options can
+  // be compared side by side before one is chosen.
+  root.appendChild(_row("SD source", _select("sdSource", [
+    { v: "flat", t: "Flat list (no folders)" },
+    { v: "tree", t: "Folder tree" },
+  ], (e) => {
+    simSdUseTree = e.target.value === "tree";
+    pendantSdCard.curPath = "/sd"; pendantSdCard.dirLevel = 0;
+    pendantSdCard.scrollOffset = 0; pendantSdCard.selectedFile = 0;
+    pendantSdCard.pendingRun = false;
+    request_file_list("/sd");
+  })));
+
+  root.appendChild(_row("Jump to folder", _select("sdJump", [
+    { v: "/sd", t: "/sd (root)" },
+    { v: "/sd/jobs", t: "/sd/jobs" },
+    { v: "/sd/jobs/weekend", t: "/sd/jobs/weekend" },
+    { v: "/sd/jobs/weekend/parts", t: "/sd/jobs/weekend/parts (deep)" },
+    { v: "/sd/jobs/weekend/parts/revision_b_final", t: "...revision_b_final (very deep)" },
+  ], (e) => {
+    simSdUseTree = true;
+    _ctl["sdSource"].value = "tree";
+    pendantSdCard.curPath = e.target.value;
+    pendantSdCard.dirLevel = e.target.value.split("/").filter(Boolean).length - 1;
+    pendantSdCard.scrollOffset = 0; pendantSdCard.selectedFile = 0;
+    pendantSdCard.pendingRun = false;
+    request_file_list(e.target.value);
+  })));
+
   // -- Actions --
   root.appendChild(_el("h3", {}, "Actions"));
   const actions = _el("div", { class: "ctl-actions" }, [
@@ -188,6 +242,7 @@ function syncControlsFromState() {
   chk("charging", pendantMachine.batteryCharging);
   set("bars", pendantMachine.wifiSignalBars);
   chk("apmode", pendantMachine.wifiInApMode);
+  set("sdFiles", String(simSdTotal));
   set("ssid", pendantMachine.wifiSSID === "---" ? "" : pendantMachine.wifiSSID);
   set("ip", pendantMachine.ipAddress === "---" ? "" : pendantMachine.ipAddress);
 }

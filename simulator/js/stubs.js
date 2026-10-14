@@ -65,14 +65,38 @@ function requestSpindleConfig() {
 // The real pendant asks the controller and fills the list asynchronously.
 // Here we fulfil the request from the sim's seeded lists after a short delay,
 // so the "Loading..." state is actually visible.
-function request_file_list() {
-  logLine("REQ file list /sd");
+function request_file_list(dirname) {
+  const path = dirname || "/sd";
+  const gen  = pendantSdCard.listGen || 0;   // tag the request
+  logLine(`REQ $Files/ListGCode=${path}`);
   setTimeout(() => {
-    pendantSdCard.files = simSdFiles.slice();
-    pendantSdCard.fileCount = simSdFiles.length;
+    // Drop a reply that we navigated away from while it was in flight —
+    // descend-then-ascend would otherwise fill the wrong folder's list.
+    if ((pendantSdCard.listGen || 0) !== gen) {
+      logLine(`  (stale listing for ${path} dropped)`);
+      return;
+    }
+    const names = [], dirs = [];
+    if (simSdUseTree) {
+      // Mirror the firmware copy-out: ".." first, then folders, then files.
+      // (FluidNC's own comparator puts files FIRST and folders last, so the
+      // pendant has to invert that order itself.)
+      const entries = SIM_SD_TREE[path] || [];
+      if (pendantSdCard.dirLevel > 0) { names.push(".."); dirs.push(true); }
+      for (const e of entries) if (e.dir)  { names.push(e.name); dirs.push(true); }
+      for (const e of entries) if (!e.dir) { names.push(e.name); dirs.push(false); }
+      pendantSdCard.totalFiles = entries.length;
+    } else {
+      for (const f of simSdFiles) { names.push(f); dirs.push(false); }
+      pendantSdCard.totalFiles = simSdTotal;   // pre-cap; drives the "+" marker
+    }
+    pendantSdCard.files = names;
+    pendantSdCard.isDir = dirs;
+    pendantSdCard.fileCount = names.length;
+    pendantSdCard.curPath = path;
     pendantSdCard.loading = false;
     pendantSdCard.loadFailed = false;
-    if (currentPendantScreen === PSCREEN_SD_CARD) updateSDCardFileList();
+    if (currentPendantScreen === PSCREEN_SD_CARD) sdRepaintPaged();
   }, 500);
 }
 let g_expecting_json = false;
@@ -179,7 +203,11 @@ function wifi_stop_ap() {
 }
 
 // ---- seed data for the list screens ----
-const simSdFiles = [
+// A handful of realistic names, then generated filler so long lists can be
+// exercised from the bench "SD files" control.  simSdTotal is what the
+// *controller* would have returned — simSdFiles is capped at SD_MAX_FILES the
+// way the firmware's copy-out loop caps it, so the "+" marker can be shown.
+const SIM_SD_SEED = [
   "bracket_v3.nc",
   "logo_engrave.gcode",
   "pocket_op1.nc",
@@ -188,6 +216,51 @@ const simSdFiles = [
   "spoilboard_surface.nc",
   "test_circle.nc",
 ];
+const SD_MAX_FILES = 100;
+
+let simSdTotal = SIM_SD_SEED.length;   // pre-cap count from the controller
+let simSdFiles = SIM_SD_SEED.slice();  // what the pendant actually holds
+
+// A small tree, keyed by absolute path.  Entries are {name, dir}.  FluidNC
+// returns leaf names only and marks directories with size -1; the pendant sorts
+// folders to the top and synthesises the ".." row itself.
+const SIM_SD_TREE = {
+  "/sd": [
+    { name: "jobs", dir: true }, { name: "fixtures", dir: true },
+    { name: "bracket_v3.nc", dir: false }, { name: "facing_pass.nc", dir: false },
+    { name: "logo_engrave.gcode", dir: false }, { name: "test_circle.nc", dir: false },
+  ],
+  "/sd/jobs": [
+    { name: "weekend", dir: true },
+    { name: "panel_front.nc", dir: false }, { name: "panel_rear.nc", dir: false },
+    { name: "spoilboard_surface.nc", dir: false },
+  ],
+  "/sd/jobs/weekend": [
+    { name: "parts", dir: true }, { name: "batch_01.nc", dir: false },
+  ],
+  "/sd/jobs/weekend/parts": [
+    { name: "a_long_part_name_that_overflows.nc", dir: false },
+    { name: "pocket_op1.nc", dir: false },
+  ],
+  "/sd/fixtures": [{ name: "vise_stop.nc", dir: false }],
+  "/sd/jobs/weekend/parts/revision_b_final": [
+    { name: "deep_part.nc", dir: false },
+  ],
+};
+let simSdUseTree = false;   // bench toggle: flat generated list vs the tree above
+
+// Build a list of `total` names and cap it the way the firmware does.
+function simSetSdFileCount(total) {
+  simSdUseTree = false;
+  simSdTotal = total;
+  const all = [];
+  for (let i = 0; i < total; i++) {
+    all.push(i < SIM_SD_SEED.length ? SIM_SD_SEED[i]
+                                    : `part_${String(i + 1).padStart(3, "0")}_op1.nc`);
+  }
+  all.sort();                              // FluidNC's listing is sorted before copy-out
+  simSdFiles = all.slice(0, SD_MAX_FILES);  // firmware caps here and drops the rest
+}
 const simMacros = [
   { name: "Go to Front", cmd: "cmd:G53 G0 Y0" },
   { name: "Park (rear)", cmd: "cmd:G53 G0 Z0;G53 G0 Y-10" },

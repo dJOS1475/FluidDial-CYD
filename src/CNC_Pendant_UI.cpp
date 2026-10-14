@@ -365,6 +365,74 @@ void drawMultiLineButton(int x, int y, int w, int h, String line1, String line2,
     display.print(line2);
 }
 
+// ── Shared list paging (SD Card / Macros) ────────────────────────────────────
+
+int listPageStep(int delta, int count, int scrollOffset) {
+    int pages = listPageCount(count);
+    int cur   = listPageIndex(scrollOffset);
+    int next  = constrain(cur + (delta > 0 ? 1 : -1), 0, pages - 1);
+    return (next == cur) ? -1 : next * LIST_ROWS;
+}
+
+int listPageAdvanceWrap(int count, int scrollOffset) {
+    int pages = listPageCount(count);
+    if (pages <= 1) return -1;
+    return ((listPageIndex(scrollOffset) + 1) % pages) * LIST_ROWS;
+}
+
+// Fit a path into maxChars by dropping LEADING segments — the folder you are in
+// matters more than how you got there, so truncation eats the left.
+static void crumbText(const char* path, char* out, size_t outSz, int maxChars) {
+    int len = (int)strlen(path);
+    if (len <= maxChars) { strlcpy(out, path, outSz); return; }
+    // Walk back from the end to the earliest '/' that still fits after "...".
+    int budget = maxChars - 3;
+    int start  = len - budget;
+    const char* cut = strchr(path + start, '/');
+    if (!cut) cut = path + start;
+    snprintf(out, outSz, "...%s", cut);
+}
+
+// Draws into the caller's target so it lands inside the list sprite and repaints
+// atomically with the rows — no separate pass, no flicker.
+void drawListCrumb(LovyanGFX* g, int ox, int oy, const char* text) {
+    char buf[64];
+    crumbText(text, buf, sizeof(buf), 36);
+    g->setTextSize(1);
+    g->setTextColor(COLOR_GRAY_TEXT);
+    g->setCursor(ox + 5, oy + 4);
+    g->print(buf);
+}
+
+// Three-column footer: jog hint | page readout | Refresh.  The hint carries teal
+// so it stays distinct from the green Refresh beside it and the blue Main Menu
+// below.  With a single page nothing can be paged, so the hint drops to the same
+// plain grey as the readout and both dim their text.
+void drawListFooter(int y, int page, int pages, bool truncated, bool live) {
+    drawMultiLineButton(rowBtnX(3, 0), y, rowBtnWAt(3, 0), 36, "JOG", "- / +",
+                        live ? COLOR_TEAL  : COLOR_BUTTON_GRAY,
+                        live ? COLOR_WHITE : COLOR_GRAY_TEXT, 1);
+
+    char val[16];
+    if (pages > 0) snprintf(val, sizeof(val), "%d/%d%s", page, pages, truncated ? "+" : "");
+    else           strlcpy(val, "-/-", sizeof(val));
+    drawMultiLineButton(rowBtnX(3, 1), y, rowBtnWAt(3, 1), 36, "PAGE", val,
+                        COLOR_BUTTON_GRAY,
+                        live ? COLOR_WHITE : COLOR_GRAY_TEXT, 1);
+
+    drawButton(rowBtnX(3, 2), y, rowBtnWAt(3, 2), 36, "Refresh",
+               COLOR_DARK_GREEN, COLOR_WHITE, 1);
+}
+
+// Both page-advancing footer columns share one hit-test — and because they do the
+// identical thing, the region spans them as a single block rather than two, so the
+// 2 px gutter between the buttons isn't dead space.
+bool listFooterPageTap(int tx, int ty, int footerY) {
+    const int x0 = rowBtnX(3, 0);
+    const int x1 = rowBtnX(3, 1) + rowBtnWAt(3, 1);
+    return isTouchInBounds(tx, ty, x0, footerY, x1 - x0, 36);
+}
+
 // ── Battery icon ─────────────────────────────────────────────────────────────
 // Draws a small battery body + nub at the top-right of the title bar.
 // Called from drawTitle() on every full screen redraw, and from
@@ -611,6 +679,15 @@ void navigateTo(PendantScreen next) {
 
 // ===== Touch Dispatch (Core 1) =====
 static uint32_t lastNavMs = 0;  // timestamp of last screen navigation
+
+// Arm the same 350 ms bounce guard a navigation uses, without changing screen.
+// Touch is sampled on a 200 ms REPEATING debounce while the finger is down, not
+// on press/release, so any action that redraws the screen under the finger must
+// suppress the next sample or it lands on the new content.  Folder navigation is
+// the case that needs this: it replaces the whole list but stays on PSCREEN_SD_CARD,
+// so without this a held tap on a folder re-fires onto row 0 of the folder it just
+// opened — which is "..", bouncing straight back out.
+void suppressTouchBounce() { lastNavMs = (uint32_t)milliseconds(); }
 
 static void handlePendantTouch(int x, int y) {
     // Ignore touch events for 350 ms after a navigation to prevent the same
@@ -965,6 +1042,11 @@ static void handleEncoderDelta(int32_t delta) {
             updateSpindleOverrideDisplay();
         }
         return;
+    } else if (currentPendantScreen == PSCREEN_SD_CARD) {
+        // Dial pages the file list — one detent per screen of rows, clamped.
+        handleSDCardDial(delta);
+    } else if (currentPendantScreen == PSCREEN_MACROS) {
+        handleMacrosDial(delta);
     } else if (currentPendantScreen == PSCREEN_FLUIDNC) {
         // Toggle display rotation. NVS write is deferred to exitFluidNC() —
         // a rapid spin would otherwise hammer flash with redundant writes.
@@ -1282,21 +1364,42 @@ public:
                 pendantMacros.count      = 0;
                 pendantMacros.cacheValid = true;  // mark cache warm for re-entry
                 for (auto* m : macros) {
-                    if (pendantMacros.count >= 20) break;
+                    if (pendantMacros.count >= MACRO_MAX) break;
                     if (m->name.empty()) continue;
-                    pendantMacros.content[pendantMacros.count]  = String(m->name.c_str());
-                    pendantMacros.filename[pendantMacros.count] = String(m->filename.c_str());
+                    strlcpy(pendantMacros.content[pendantMacros.count],  m->name.c_str(),     MACRO_NAME_MAX);
+                    strlcpy(pendantMacros.filename[pendantMacros.count], m->filename.c_str(), MACRO_PATH_MAX);
                     pendantMacros.count++;
                 }
             } else {
-                // SD card file list from $Files/ListGCode
-                pendantSdCard.fileCount    = 0;
-                pendantSdCard.scrollOffset = 0;
-                for (auto& fi : fileVector) {
-                    if (!fi.isDir() && pendantSdCard.fileCount < 20) {
-                        pendantSdCard.files[pendantSdCard.fileCount++] = String(fi.fileName.c_str());
+                // SD card listing from $Files/ListGCode.
+                //
+                // Order: ".." (when below the root), then folders, then files.
+                // FluidNC's own comparator sorts files FIRST and folders last
+                // (fileinfoCompare, FileParser.cpp) — that comparator is shared
+                // with the old FileSelectScene, so rather than change it we
+                // invert the order here with two passes.
+                int n = 0;
+                if (pendantSdCard.dirLevel > 0) {
+                    strlcpy(pendantSdCard.files[n], "..", SD_NAME_MAX);
+                    pendantSdCard.isDir[n] = true;
+                    n++;
+                }
+                int realEntries = 0;
+                for (int pass = 0; pass < 2; pass++) {
+                    const bool wantDirs = (pass == 0);
+                    for (auto& fi : fileVector) {
+                        if (fi.isDir() != wantDirs) continue;
+                        realEntries++;
+                        if (n >= SD_MAX_FILES + 1) continue;   // keep counting for the "+" marker
+                        strlcpy(pendantSdCard.files[n], fi.fileName.c_str(), SD_NAME_MAX);
+                        pendantSdCard.isDir[n] = wantDirs;
+                        n++;
                     }
                 }
+                pendantSdCard.fileCount    = n;
+                pendantSdCard.totalFiles   = realEntries + (pendantSdCard.dirLevel > 0 ? 1 : 0);
+                pendantSdCard.scrollOffset = 0;
+                pendantSdCard.selectedFile = 0;
             }
             xSemaphoreGive(stateMutex);
         }
@@ -1314,6 +1417,17 @@ public:
             pendantMacros.loading    = false;
             pendantMacros.count      = 0;
             pendantMacros.loadFailed = true;
+            if (hwEventQueue) {
+                HwEvent ev = { HwEvent::STATE_UPDATE, 0 };
+                xQueueSend(hwEventQueue, &ev, 0);
+            }
+        } else if (currentPendantScreen == PSCREEN_SD_CARD) {
+            // A listing that produced nothing usable — e.g. descending into a
+            // folder the controller won't list.  Without this the screen would
+            // sit on "Loading..." until the 10 s UI deadline expired.
+            pendantSdCard.loading    = false;
+            pendantSdCard.fileCount  = 0;
+            pendantSdCard.loadFailed = true;
             if (hwEventQueue) {
                 HwEvent ev = { HwEvent::STATE_UPDATE, 0 };
                 xQueueSend(hwEventQueue, &ev, 0);

@@ -35,8 +35,13 @@ function updateMacrosFileList() {
   if (pendantMacros.loading && pendantMacros.loadStartMs !== 0 && millis() - pendantMacros.loadStartMs > 35000) {
     pendantMacros.loading = false; pendantMacros.loadFailed = true;
   }
+  // Footer first: it sits outside the list panel, so it must track count changes
+  // (a macro list arriving) independently of the list itself.
+  drawMacrosFooter();
+
   const ox = 5, oy = 40;
   display.fillRect(5, 40, 230, 200, COLOR_BACKGROUND);
+  drawListCrumb(ox, oy, pendantMacros.sourceFile || "macrocfg.json");
 
   if (pendantMacros.loading) {
     display.setTextColor(COLOR_GRAY_TEXT); display.setTextSize(2);
@@ -58,20 +63,42 @@ function updateMacrosFileList() {
       if (displayIndex === pendantMacros.selected && pendantMacros.pendingRun) bg = COLOR_DARK_GREEN;
       else if (displayIndex === pendantMacros.selected) bg = COLOR_BUTTON_ACTIVE;
       else bg = COLOR_BUTTON_GRAY;
-      display.fillRoundRect(ox, oy + i * 40, 230, 36, 8, bg);
+      const ry = oy + LIST_ROW_Y0 + i * LIST_ROW_PITCH;
+      display.fillRoundRect(ox, ry, 230, LIST_ROW_H, 8, bg);
       display.setTextColor(COLOR_WHITE); display.setTextSize(1);
-      display.setCursor(ox + 5, oy + 12 + i * 40); display.print(macroLabel(displayIndex));
+      display.setCursor(ox + 5, ry + 11); display.print(macroLabel(displayIndex));
     }
   }
+}
+
+// Dial — pages the macro list one screen at a time, clamped.  The << / >> buttons
+// still step a single row; the dial is the fast way through a long list.
+function handleMacrosDial(delta) {
+  const next = listPageStep(delta, pendantMacros.count, pendantMacros.scrollOffset);
+  if (next < 0) return;
+  pendantMacros.scrollOffset = next;
+  updateMacrosFileList();
+  drawMacrosFooter();
+}
+
+// Own dirty check, mirroring the firmware — see drawSDFooter().
+let _macrosFooterLast = null;
+function drawMacrosFooter(force) {
+  const pages = listPageCount(pendantMacros.count);
+  const page  = listPageIndex(pendantMacros.scrollOffset) + 1;
+  const shown = pendantMacros.count === 0 ? 0 : pages;
+  const live  = pendantMacros.count > 0 && pages > 1;
+  const sig = `${page}/${shown}/${live}`;
+  if (!force && _macrosFooterLast === sig) return;
+  _macrosFooterLast = sig;
+  drawListFooter(242, page, shown, false, live);
 }
 
 function drawMacrosScreen() {
   display.fillScreen(COLOR_BACKGROUND);
   drawTitle("MACROS");
   updateMacrosFileList();
-  drawButton(5, 242, 72, 36, "<<", COLOR_BUTTON_GRAY, COLOR_WHITE, 2);
-  drawButton(83, 242, 72, 36, "Refresh", COLOR_DARK_GREEN, COLOR_WHITE, 1);
-  drawButton(161, 242, 72, 36, ">>", COLOR_BUTTON_GRAY, COLOR_WHITE, 2);
+  drawMacrosFooter(true);   // fillScreen() wiped it — force past the dirty check
   if (pendantMacros.pendingRun) {
     drawButton(5, 282, 110, 36, "Cancel", COLOR_BUTTON_GRAY, COLOR_WHITE, 2);
     drawButton(121, 282, 114, 36, "Run", COLOR_DARK_GREEN, COLOR_WHITE, 2);
@@ -82,7 +109,7 @@ function drawMacrosScreen() {
 
 function handleMacrosTouch(x, y) {
   for (let i = 0; i < 5; i++) {
-    if (isTouchInBounds(x, y, 5, 40 + i * 40, 230, 36)) {
+    if (isTouchInBounds(x, y, 5, listRowHitY(i), 230, listRowHitH())) {
       const displayIndex = i + pendantMacros.scrollOffset;
       if (displayIndex < pendantMacros.count) {
         pendantMacros.selected = displayIndex;
@@ -92,16 +119,14 @@ function handleMacrosTouch(x, y) {
       return;
     }
   }
-  if (isTouchInBounds(x, y, 5, 242, 72, 36)) {
-    if (pendantMacros.scrollOffset > 0) { pendantMacros.scrollOffset--; updateMacrosFileList(); }
+  // JOG hint and PAGE readout both advance one page, wrapping back to the first.
+  if (listFooterPageTap(x, y, 242)) {
+    const next = listPageAdvanceWrap(pendantMacros.count, pendantMacros.scrollOffset);
+    if (next >= 0) { pendantMacros.scrollOffset = next; updateMacrosFileList(); }
     return;
   }
-  if (isTouchInBounds(x, y, 83, 242, 72, 36)) {
+  if (isTouchInBounds(x, y, rowBtnX(3, 2), 242, rowBtnWAt(3, 2), 36)) {
     if (pendantConnected) { _refreshMacros(); drawMacrosScreen(); }
-    return;
-  }
-  if (isTouchInBounds(x, y, 161, 242, 72, 36)) {
-    if (pendantMacros.scrollOffset + 5 < pendantMacros.count) { pendantMacros.scrollOffset++; updateMacrosFileList(); }
     return;
   }
   if (pendantMacros.pendingRun) {

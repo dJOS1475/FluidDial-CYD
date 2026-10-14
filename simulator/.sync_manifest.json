@@ -1,12 +1,12 @@
 {
   "screens/screen_main_menu.cpp": "493e764558522c0ab84c9c7e991f7fbd14c45748",
-  "screens/screen_status.cpp": "6dcc443e9dd5488737313b3b2d4e07c446b65cf0",
+  "screens/screen_status.cpp": "c4f26a98f8f53d061b0bd7ee09de751ecc70a656",
   "screens/screen_jog_homing.cpp": "1376754891d5f9d00a90fa4524207b6b6625e764",
   "screens/screen_probing_work.cpp": "53e65777ee0c68ff35c8cbad445566ab10635f60",
   "screens/screen_feeds_speeds.cpp": "8040972597d7f01e63556d5616392b3886430a57",
   "screens/screen_spindle_control.cpp": "b778ed5396566df7358a9948d10b973097d32e05",
-  "screens/screen_sd_card.cpp": "267f817c79a90d3d8badd081242e9ed2efc1820f",
-  "screens/screen_macros.cpp": "c537edb1a1f4772a62b29a73d2c8950ed0eecd1f",
+  "screens/screen_sd_card.cpp": "8e368e2b49190fb0516bfc691e456f2bfd8a9605",
+  "screens/screen_macros.cpp": "8c6e966b217d8476382288a9bd1b51e94a0371ce",
   "screens/screen_fluidnc.cpp": "d39b9fba744f81db43fc8d0af2139d80e4b71fd8",
   "screens/screen_connection.cpp": "ead4045f519302a1a47e4ef5cc18ee270b4f2655",
   "screens/screen_espnow.cpp": "20dc49f8a400a8e4e52b23619a82f471518a37fb",
@@ -15,8 +15,8 @@
   "screens/screen_probe_corner.cpp": "cacda10d9ebb06a395a02f1e8989b87ba27b2f23",
   "screens/screen_probe_bore_boss.cpp": "f1679879f3f2972f1edf1b8188a96d670498ee3c",
   "screens/screen_probe_cfg.cpp": "542e3cfec1601fbe1b74b4bc6a9f3ddfc7b24086",
-  "CNC_Pendant_UI.cpp": "b216cad3ae013dcee2a173db658ee66b6d0379e6",
-  "screens/pendant_shared.h": "dafc9dda1a1a4d162d917495513a6dcded5312bc",
-  "cnc_pendant_config.h": "7cbb5f70679efb0e03be844d35e5b00b24e00762",
+  "CNC_Pendant_UI.cpp": "1f1864570bd8b339790541fda1aa2da0c0bc9744",
+  "screens/pendant_shared.h": "37ff2884927d1da29909fc6d34e6c92bf5571bee",
+  "cnc_pendant_config.h": "cbbfe3b966d5046baa9aba500d467275442bd007",
   "screens/screen_probe.h": "71240bf24131a02ca9a28e492f300803679f15b4"
 }

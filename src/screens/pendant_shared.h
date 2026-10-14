@@ -253,21 +253,39 @@ extern void saveJogPrefs();
 extern void overrideSetFeedTarget(int pct);
 extern void overrideSetSpindleTarget(int pct);
 
+// Entries held per directory listing.  Fixed char buffers rather than String:
+// 100 small heap allocations on a screen entered AFTER the radio is up is exactly
+// the fragmentation pattern behind the v2.2.1 ESP-NOW pairing failure (45 KB free,
+// 564-byte largest block).  The +1 slot is the synthesised ".." row, which is extra
+// rather than one of the hundred.
+#define SD_MAX_FILES  100
+#define SD_NAME_MAX   64
+#define SD_PATH_MAX   128   // $Files/ListGCode=<path> shares a 128-byte send buffer
+
 struct SDCardState {
     int    selectedFile  = 0;
     int    scrollOffset  = 0;
-    String files[20];
+    char   files[SD_MAX_FILES + 1][SD_NAME_MAX] = {};
+    bool   isDir[SD_MAX_FILES + 1] = { false };   // parallel to files[]; [0] may be ".."
     int    fileCount     = 0;
+    int    totalFiles    = 0;      // pre-cap count from the controller; > fileCount ⇒ truncated
+    char   curPath[SD_PATH_MAX] = "/sd";   // directory currently listed
+    int    dirLevel      = 0;      // 0 = at /sd; > 0 means ".." is offered
+    uint32_t listGen     = 0;      // bumped per request; stale replies are dropped
     bool   loading       = false;
     bool   pendingRun    = false;  // true = file selected, awaiting Load/Run confirmation
-    String loadedFile    = "";     // set by Load; green button sends run command
+    String loadedFile    = "";     // absolute path set by Load; green button runs it
     bool   loadFailed    = false;  // request didn't complete in time → show retry hint
     unsigned long loadStartMs = 0; // millis() when the current request was issued (UI deadline)
 };
 
+#define MACRO_MAX        100
+#define MACRO_NAME_MAX   64
+#define MACRO_PATH_MAX   64
+
 struct MacroState {
-    String content[20];       // display name for each macro (from preferences.json / macrocfg.json)
-    String filename[20];      // run path: /sd/..., /localfs/..., or cmd:...
+    char   content[MACRO_MAX][MACRO_NAME_MAX] = {};   // display name (from macrocfg.json)
+    char   filename[MACRO_MAX][MACRO_PATH_MAX] = {};  // run path: /sd/..., /localfs/..., or cmd:...
     int    count       = 0;   // number of macros loaded
     int    scrollOffset= 0;
     int    selected    = -1;  // display index of selected macro
@@ -455,6 +473,45 @@ static inline int rowBtnWAt(int n, int i) {
     return (i == n - 1) ? (ROW_X0 + ROW_W - rowBtnX(n, i)) : rowBtnW(n);
 }
 
+// ===== Shared list layout (SD Card / Macros) =====
+// Both screens show LIST_ROWS entries at a time out of a longer list and page
+// through it a whole screen at a time with the jog dial.  A breadcrumb band sits
+// at the top of the 200 px list panel, so rows run beneath it at a 36 px pitch —
+// five still fit.  scrollOffset stays the single source of truth for position and
+// is always kept on a page boundary.
+static const int LIST_ROWS       = 5;
+static const int LIST_CRUMB_H    = 16;   // breadcrumb band, local y 0..16
+static const int LIST_ROW_Y0     = 18;   // first row, local to the list panel
+static const int LIST_ROW_PITCH  = 36;
+static const int LIST_ROW_H      = 32;
+static const int LIST_FOOTER_Y   = 242;
+
+// Touch region for row i.  Deliberately the FULL row pitch, not the drawn row
+// height: the 4 px gap between rows is dead space that would otherwise swallow
+// taps, and spanning it restores the 36 px target the list had before the
+// breadcrumb shortened the rows.  Row 4 ends at 238, clear of the footer at 242.
+static inline int listRowHitY(int i) { return 40 + LIST_ROW_Y0 + i * LIST_ROW_PITCH; }
+static inline int listRowHitH()      { return LIST_ROW_PITCH; }
+
+static inline int listPageCount(int count) {
+    int p = (count + LIST_ROWS - 1) / LIST_ROWS;
+    return p < 1 ? 1 : p;
+}
+static inline int listPageIndex(int scrollOffset) { return scrollOffset / LIST_ROWS; }
+
+// Step the page by one detent and clamp at both ends — clamped rather than
+// wrapping, like every other dial-driven field in the UI.  Returns the new
+// scrollOffset, or -1 if nothing changed so the caller can skip the repaint.
+int  listPageStep(int delta, int count, int scrollOffset);
+// Advance one page, wrapping back to the first — used by a footer tap, where the
+// control has to be able to reach every page on its own.
+int  listPageAdvanceWrap(int count, int scrollOffset);
+// Three-column footer: jog hint | page readout | Refresh.  Both the hint and the
+// readout advance a page, so listFooterPageTap() covers them together.
+void drawListFooter(int y, int page, int pages, bool truncated, bool live);
+bool listFooterPageTap(int tx, int ty, int footerY);
+void drawListCrumb(LovyanGFX* g, int ox, int oy, const char* text);
+
 // ===== Helper Functions (defined in CNC_Pendant_UI.cpp) =====
 bool   isTouchInBounds(int tx, int ty, int x, int y, int w, int h);
 void   drawRoundRect(int x, int y, int w, int h, int r, uint16_t color);
@@ -467,6 +524,9 @@ void   drawCurrentPendantScreen();
 // see the note on releasePanelSprites() in CNC_Pendant_UI.cpp.
 void   initPanelScratch();
 void   navigateTo(PendantScreen next);
+// Arm the touch bounce guard without navigating — for actions that redraw the
+// screen under the finger (see the note on the definition).
+void   suppressTouchBounce();
 
 // ===== Alarm Description Helper =====
 // Returns a short human-readable description for FluidNC/GRBL alarm codes.

@@ -8,6 +8,82 @@
 // Forward declarations for the dirty-state tracker (defined below).
 static void invalidateSDRender();
 
+// Row label — folders get a trailing slash, ".." is spelled out, and anything
+// too long is truncated so it cannot overflow the 230 px row (6 px per char at
+// textSize 1, minus the 5 px indent).
+#define SD_LABEL_MAX 35
+static String sdRowLabel(int i) {
+    if (pendantSdCard.isDir[i] && strcmp(pendantSdCard.files[i], "..") == 0)
+        return "..  (up a folder)";
+    String label = String(pendantSdCard.files[i]) + (pendantSdCard.isDir[i] ? "/" : "");
+    if (label.length() > SD_LABEL_MAX) label = label.substring(0, SD_LABEL_MAX - 3) + "...";
+    return label;
+}
+
+// Absolute path of a listed entry.  "$SD/Run=" needs the full path once files can
+// live in subfolders — the same form the old FileSelectScene/FilePreviewScene pair
+// has always sent (e.g. $SD/Run=/sd/jobs/x.nc).
+static String sdFullPath(int i) {
+    String base = pendantSdCard.curPath;
+    if (base == "/") base = "";
+    return base + "/" + pendantSdCard.files[i];
+}
+
+// Ask the controller for a directory listing and park the screen in its loading
+// state.  The generation counter tags the request so a reply that lands after we
+// have navigated elsewhere is dropped rather than filling the wrong folder.
+static void sdRequestDir(const char* path) {
+    strlcpy(pendantSdCard.curPath, path, SD_PATH_MAX);
+    int level = -1;
+    for (const char* p = pendantSdCard.curPath; *p; p++) if (*p == '/') level++;
+    pendantSdCard.dirLevel     = level < 0 ? 0 : level;
+    pendantSdCard.listGen++;
+    pendantSdCard.scrollOffset = 0;
+    pendantSdCard.selectedFile = 0;
+    pendantSdCard.pendingRun   = false;
+    pendantSdCard.fileCount    = 0;
+    pendantSdCard.loading      = true;
+    pendantSdCard.loadFailed   = false;
+    pendantSdCard.loadStartMs  = millis();
+    if (pendantConnected) request_file_list(pendantSdCard.curPath);
+    drawSDCardScreen();          // the bottom row changes with pendingRun
+    // The list under the finger has just been replaced — don't let a held tap
+    // re-fire onto the new rows (notably ".." at row 0 of the folder we opened).
+    suppressTouchBounce();
+}
+
+static void sdDescend(int i) { sdRequestDir(sdFullPath(i).c_str()); }
+
+static void sdAscend() {
+    if (pendantSdCard.dirLevel <= 0) return;
+    char up[SD_PATH_MAX];
+    strlcpy(up, pendantSdCard.curPath, sizeof(up));
+    char* slash = strrchr(up, '/');
+    if (!slash || slash == up) strlcpy(up, "/sd", sizeof(up));
+    else                       *slash = '\0';
+    sdRequestDir(up);
+}
+
+// Repaint after a page change.  Only the list panel and the footer move, and the
+// footer sits below the list sprite, so painting both directly avoids the
+// full-screen fillScreen() that drawSDCardScreen() would do — no flicker on a
+// fast spin.
+static void drawSDFooter(bool force = false);
+void updateSDCardFileList();
+// updateSDCardFileList() now refreshes the footer itself (each has its own dirty
+// check), so a page change only needs the one call.
+static void sdRepaintPaged() { updateSDCardFileList(); }
+
+// Dial — one detent pages the list by one screen, clamped at both ends.  Does NOT
+// move the selection: Load/Run stay armed on the file you picked, so you can page
+// away and still load it.
+void handleSDCardDial(int delta) {
+    int next = listPageStep(delta, pendantSdCard.fileCount, pendantSdCard.scrollOffset);
+    if (next < 0) return;              // already at the first/last page
+    pendantSdCard.scrollOffset = next;
+    sdRepaintPaged();
+}
+
 void enterSDCard() {
     releasePanelSprites();
 
@@ -17,7 +93,12 @@ void enterSDCard() {
     g_expecting_json = false;  // clear any stuck request state from a prior screen
 
     // Request a fresh file list from the controller
+    // Always re-enter at the card root rather than wherever we were last time.
+    strlcpy(pendantSdCard.curPath, "/sd", SD_PATH_MAX);
+    pendantSdCard.dirLevel     = 0;
+    pendantSdCard.totalFiles   = 0;
     if (pendantConnected) {
+        pendantSdCard.listGen++;
         pendantSdCard.loading      = true;
         pendantSdCard.loadFailed   = false;
         pendantSdCard.loadStartMs  = millis();   // arm the UI loading deadline
@@ -84,6 +165,11 @@ void updateSDCardFileList() {
         pendantSdCard.loadFailed = true;
     }
 
+    // Footer first, with its own dirty check: it lives outside the list sprite and
+    // must track fileCount changes (a listing arriving) even when the list area
+    // itself short-circuits below.
+    drawSDFooter();
+
     // Skip the paint if nothing visible has changed since the last call.
     // Eliminates the 100 ms flicker tick in direct-draw mode.
     SdRenderState cur = {
@@ -126,6 +212,8 @@ void updateSDCardFileList() {
         display.fillRect(5, 40, 230, 200, COLOR_BACKGROUND);
     }
 
+    drawListCrumb(g, ox, oy, pendantSdCard.curPath);
+
     if (pendantSdCard.loading) {
         g->setTextColor(COLOR_GRAY_TEXT);
         g->setTextSize(2);
@@ -147,7 +235,7 @@ void updateSDCardFileList() {
         g->setCursor(ox + 15, oy + 108);
         g->print("Press Refresh to retry.");
     } else {
-        for (int i = 0; i < 5 && i < pendantSdCard.fileCount; i++) {
+        for (int i = 0; i < LIST_ROWS && i < pendantSdCard.fileCount; i++) {
             int displayIndex = i + pendantSdCard.scrollOffset;
             if (displayIndex >= pendantSdCard.fileCount) break;
 
@@ -159,15 +247,42 @@ void updateSDCardFileList() {
             } else {
                 bg = COLOR_BUTTON_GRAY;
             }
-            g->fillRoundRect(ox, oy + i * 40, 230, 36, 8, bg);
-            g->setTextColor(COLOR_WHITE);
+            int ry = oy + LIST_ROW_Y0 + i * LIST_ROW_PITCH;
+            g->fillRoundRect(ox, ry, 230, LIST_ROW_H, 8, bg);
+            // Folders read as navigation, not jobs: cyan, with a trailing slash.
+            g->setTextColor(pendantSdCard.isDir[displayIndex] ? COLOR_CYAN : COLOR_WHITE);
             g->setTextSize(1);
-            g->setCursor(ox + 5, oy + 12 + i * 40);
-            g->print(pendantSdCard.files[displayIndex]);
+            g->setCursor(ox + 5, ry + 11);
+            g->print(sdRowLabel(displayIndex));
         }
     }
 
     if (hasSprite) spriteFileDisplay.pushSprite(5, 40);
+}
+
+// The footer sits BELOW the list sprite, so updateSDCardFileList() never touches
+// it — the list arriving asynchronously would otherwise leave the page count and
+// the jog hint stuck in the empty-list state until a dial turn or tap repainted
+// them.  It gets its own dirty check so the 100 ms tick can call it for free and
+// it repaints the moment the listing lands.  force=true on a full redraw, where
+// fillScreen() has already wiped it.
+static void drawSDFooter(bool force) {
+    int  pages = listPageCount(pendantSdCard.fileCount);
+    int  page  = listPageIndex(pendantSdCard.scrollOffset) + 1;
+    int  shown = pendantSdCard.fileCount == 0 ? 0 : pages;
+    bool trunc = pendantSdCard.totalFiles > pendantSdCard.fileCount;
+    bool live  = pendantSdCard.fileCount > 0 && pages > 1;
+
+    static bool valid = false;
+    static int  lastPage = -1, lastShown = -1;
+    static bool lastTrunc = false, lastLive = false;
+    if (!force && valid && lastPage == page && lastShown == shown &&
+        lastTrunc == trunc && lastLive == live) {
+        return;
+    }
+    drawListFooter(LIST_FOOTER_Y, page, shown, trunc, live);
+    valid = true;
+    lastPage = page; lastShown = shown; lastTrunc = trunc; lastLive = live;
 }
 
 void drawSDCardScreen() {
@@ -179,10 +294,7 @@ void drawSDCardScreen() {
     invalidateSDRender();
     updateSDCardFileList();
 
-    // Static bottom rows
-    drawButton(5,   242, 72, 36, "<<",      COLOR_BUTTON_GRAY, COLOR_WHITE, 2);
-    drawButton(83,  242, 72, 36, "Refresh", COLOR_DARK_GREEN,  COLOR_WHITE, 1);
-    drawButton(161, 242, 72, 36, ">>",      COLOR_BUTTON_GRAY, COLOR_WHITE, 2);
+    drawSDFooter(true);
 
     if (pendantSdCard.pendingRun) {
         drawButton(5,   282, 110, 36, "Load", COLOR_BLUE,       COLOR_WHITE, 2);
@@ -194,48 +306,35 @@ void drawSDCardScreen() {
 
 void handleSDCardTouch(int x, int y) {
     // File row taps — first tap selects & arms confirmation
-    for (int i = 0; i < 5; i++) {
-        if (isTouchInBounds(x, y, 5, 40 + i * 40, 230, 36)) {
+    for (int i = 0; i < LIST_ROWS; i++) {
+        if (isTouchInBounds(x, y, 5, listRowHitY(i), 230, listRowHitH())) {
             int displayIndex = i + pendantSdCard.scrollOffset;
             if (displayIndex < pendantSdCard.fileCount) {
-                pendantSdCard.selectedFile = displayIndex;
-                pendantSdCard.pendingRun   = true;
-                drawSDCardScreen();
+                if (pendantSdCard.isDir[displayIndex]) {
+                    // ".." walks back up; any other folder is descended into.
+                    if (strcmp(pendantSdCard.files[displayIndex], "..") == 0) sdAscend();
+                    else                                                      sdDescend(displayIndex);
+                } else {
+                    pendantSdCard.selectedFile = displayIndex;
+                    pendantSdCard.pendingRun   = true;
+                    drawSDCardScreen();
+                }
             }
             return;
         }
     }
 
-    // << scroll back
-    if (isTouchInBounds(x, y, 5, 242, 72, 36)) {
-        if (pendantSdCard.scrollOffset > 0) {
-            pendantSdCard.scrollOffset--;
-            updateSDCardFileList();
-        }
+    // JOG hint and PAGE readout both advance one page, wrapping back to the first.
+    if (listFooterPageTap(x, y, LIST_FOOTER_Y)) {
+        int next = listPageAdvanceWrap(pendantSdCard.fileCount, pendantSdCard.scrollOffset);
+        if (next >= 0) { pendantSdCard.scrollOffset = next; sdRepaintPaged(); }
         return;
     }
 
-    // Refresh
-    if (isTouchInBounds(x, y, 83, 242, 72, 36)) {
+    // Refresh — re-lists the CURRENT folder, not always the root.
+    if (isTouchInBounds(x, y, rowBtnX(3, 2), LIST_FOOTER_Y, rowBtnWAt(3, 2), 36)) {
         if (pendantConnected) {
-            pendantSdCard.loading      = true;
-            pendantSdCard.loadFailed   = false;
-            pendantSdCard.loadStartMs  = millis();   // re-arm the deadline
-            pendantSdCard.fileCount    = 0;
-            pendantSdCard.scrollOffset = 0;
-            pendantSdCard.selectedFile = 0;
-            pendantSdCard.pendingRun   = false;
-            updateSDCardFileList();
-            request_file_list("/sd");
-        }
-        return;
-    }
-
-    // >> scroll forward
-    if (isTouchInBounds(x, y, 161, 242, 72, 36)) {
-        if (pendantSdCard.scrollOffset + 5 < pendantSdCard.fileCount) {
-            pendantSdCard.scrollOffset++;
-            updateSDCardFileList();
+            sdRequestDir(pendantSdCard.curPath);
         }
         return;
     }
@@ -244,7 +343,7 @@ void handleSDCardTouch(int x, int y) {
     if (pendantSdCard.pendingRun) {
         // LOAD — store filename, navigate to Status; green button will send run command
         if (isTouchInBounds(x, y, 5, 282, 110, 36)) {
-            pendantSdCard.loadedFile = pendantSdCard.files[pendantSdCard.selectedFile];
+            pendantSdCard.loadedFile = sdFullPath(pendantSdCard.selectedFile);
             pendantSdCard.pendingRun = false;
             currentPendantScreen = PSCREEN_STATUS;
             return;
@@ -252,7 +351,7 @@ void handleSDCardTouch(int x, int y) {
         // RUN — send command immediately
         if (isTouchInBounds(x, y, 121, 282, 114, 36)) {
             if (pendantConnected) {
-                String cmd = "$SD/Run=" + pendantSdCard.files[pendantSdCard.selectedFile];
+                String cmd = "$SD/Run=" + sdFullPath(pendantSdCard.selectedFile);
                 send_line(cmd.c_str());
                 pendantSdCard.loadedFile = "";
                 pendantSdCard.pendingRun = false;

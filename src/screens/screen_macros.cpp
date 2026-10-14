@@ -58,6 +58,17 @@ static String macroLabel(int displayIndex) {
     return label;
 }
 
+static void drawMacrosFooter(bool force = false);
+void updateMacrosFileList();
+
+// Dial — one detent pages the macro list by one screen, clamped at both ends.
+void handleMacrosDial(int delta) {
+    int next = listPageStep(delta, pendantMacros.count, pendantMacros.scrollOffset);
+    if (next < 0) return;
+    pendantMacros.scrollOffset = next;
+    updateMacrosFileList();   // refreshes the footer too, via its own dirty check
+}
+
 // Snapshot of last-rendered state.  See screen_sd_card.cpp for rationale —
 // in direct-draw mode the 100 ms tick would otherwise flicker; we skip the
 // paint when nothing visible has changed.
@@ -94,6 +105,11 @@ void updateMacrosFileList() {
         pendantMacros.loadFailed = true;
     }
 
+    // Footer first, with its own dirty check: it lives outside the list sprite and
+    // must track count changes (a macro list arriving) even when the list area
+    // itself short-circuits below.
+    drawMacrosFooter();
+
     MacrosRenderState cur = {
         /*valid*/        true,
         /*connected*/    pendantConnected,
@@ -129,6 +145,8 @@ void updateMacrosFileList() {
         display.fillRect(5, 40, 230, 200, COLOR_BACKGROUND);
     }
 
+    drawListCrumb(g, ox, oy, "macrocfg.json");
+
     if (pendantMacros.loading) {
         g->setTextColor(COLOR_GRAY_TEXT);
         g->setTextSize(2);
@@ -150,7 +168,7 @@ void updateMacrosFileList() {
         g->setCursor(ox + 15, oy + 108);
         g->print("Add macros in FluidNC preferences.");
     } else {
-        for (int i = 0; i < 5 && i < pendantMacros.count; i++) {
+        for (int i = 0; i < LIST_ROWS && i < pendantMacros.count; i++) {
             int displayIndex = i + pendantMacros.scrollOffset;
             if (displayIndex >= pendantMacros.count) break;
 
@@ -162,16 +180,36 @@ void updateMacrosFileList() {
             } else {
                 bg = COLOR_BUTTON_GRAY;
             }
-            g->fillRoundRect(ox, oy + i * 40, 230, 36, 8, bg);
+            int ry = oy + LIST_ROW_Y0 + i * LIST_ROW_PITCH;
+            g->fillRoundRect(ox, ry, 230, LIST_ROW_H, 8, bg);
             g->setTextColor(COLOR_WHITE);
             g->setTextSize(1);
-            g->setCursor(ox + 5, oy + 12 + i * 40);
+            g->setCursor(ox + 5, ry + 11);
             g->print(macroLabel(displayIndex));
         }
     }
 
     if (hasSprite) spriteFileDisplay.pushSprite(5, 40);
     // Receive-path counters, drawn last so they sit on top of the panel.
+}
+
+// See the note on drawSDFooter(): the footer sits below the list sprite, so it
+// needs its own dirty check to pick up a macro list arriving asynchronously.
+static void drawMacrosFooter(bool force) {
+    int  pages = listPageCount(pendantMacros.count);
+    int  page  = listPageIndex(pendantMacros.scrollOffset) + 1;
+    int  shown = pendantMacros.count == 0 ? 0 : pages;
+    bool live  = pendantMacros.count > 0 && pages > 1;
+
+    static bool valid = false;
+    static int  lastPage = -1, lastShown = -1;
+    static bool lastLive = false;
+    if (!force && valid && lastPage == page && lastShown == shown && lastLive == live) {
+        return;
+    }
+    drawListFooter(LIST_FOOTER_Y, page, shown, false, live);
+    valid = true;
+    lastPage = page; lastShown = shown; lastLive = live;
 }
 
 void drawMacrosScreen() {
@@ -182,10 +220,8 @@ void drawMacrosScreen() {
     invalidateMacrosRender();
     updateMacrosFileList();
 
-    // Static bottom rows — drawn once; only redrawn when touch changes pendingRun state
-    drawButton(5,   242, 72, 36, "<<",      COLOR_BUTTON_GRAY, COLOR_WHITE, 2);
-    drawButton(83,  242, 72, 36, "Refresh", COLOR_DARK_GREEN,  COLOR_WHITE, 1);
-    drawButton(161, 242, 72, 36, ">>",      COLOR_BUTTON_GRAY, COLOR_WHITE, 2);
+    // fillScreen() above wiped the footer — force it regardless of the dirty check.
+    drawMacrosFooter(true);
 
     if (pendantMacros.pendingRun) {
         drawButton(5,   282, 110, 36, "Cancel", COLOR_BUTTON_GRAY, COLOR_WHITE, 2);
@@ -197,8 +233,8 @@ void drawMacrosScreen() {
 
 void handleMacrosTouch(int x, int y) {
     // File row taps
-    for (int i = 0; i < 5; i++) {
-        if (isTouchInBounds(x, y, 5, 40 + i * 40, 230, 36)) {
+    for (int i = 0; i < LIST_ROWS; i++) {
+        if (isTouchInBounds(x, y, 5, listRowHitY(i), 230, listRowHitH())) {
             int displayIndex = i + pendantMacros.scrollOffset;
             if (displayIndex < pendantMacros.count) {
                 pendantMacros.selected   = displayIndex;
@@ -209,29 +245,21 @@ void handleMacrosTouch(int x, int y) {
         }
     }
 
-    // << scroll
-    if (isTouchInBounds(x, y, 5, 242, 72, 36)) {
-        if (pendantMacros.scrollOffset > 0) {
-            pendantMacros.scrollOffset--;
+    // JOG hint and PAGE readout both advance one page, wrapping back to the first.
+    if (listFooterPageTap(x, y, LIST_FOOTER_Y)) {
+        int next = listPageAdvanceWrap(pendantMacros.count, pendantMacros.scrollOffset);
+        if (next >= 0) {
+            pendantMacros.scrollOffset = next;
             updateMacrosFileList();
         }
         return;
     }
 
     // Refresh — bust the cache and re-query all macros from controller
-    if (isTouchInBounds(x, y, 83, 242, 72, 36)) {
+    if (isTouchInBounds(x, y, rowBtnX(3, 2), LIST_FOOTER_Y, rowBtnWAt(3, 2), 36)) {
         if (pendantConnected) {
             refreshMacros();
             drawMacrosScreen();
-        }
-        return;
-    }
-
-    // >> scroll
-    if (isTouchInBounds(x, y, 161, 242, 72, 36)) {
-        if (pendantMacros.scrollOffset + 5 < pendantMacros.count) {
-            pendantMacros.scrollOffset++;
-            updateMacrosFileList();
         }
         return;
     }

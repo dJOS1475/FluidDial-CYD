@@ -74,7 +74,16 @@ function updateStatusCurrentFile() {
   if (pendantSdCard.loadedFile.length > 0 && fileStr.length === 0) {
     g.setTextColor(COLOR_GREEN); g.setTextSize(1);
     g.setCursor(ox + 5, oy + 5); g.print("READY - press green to run");
-    g.setCursor(ox + 5, oy + 20); g.print(pendantSdCard.loadedFile);
+    // loadedFile is a full path now that files can live in subfolders, and the
+    // panel only fits ~37 chars at this size.  Trim from the LEFT so the
+    // filename itself always survives.
+    g.setCursor(ox + 5, oy + 20);
+    {
+      let f = pendantSdCard.loadedFile;
+      const maxChars = 37;
+      if (f.length > maxChars) f = "..." + f.substring(f.length - (maxChars - 3));
+      g.print(f);
+    }
   } else {
     g.setTextColor(COLOR_GRAY_TEXT); g.setTextSize(1);
     g.setCursor(ox + 5, oy + 5); g.print("CURRENT FILE");

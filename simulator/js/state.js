@@ -54,7 +54,7 @@ const pendantMachine = {
   rotation: 2,
   spindleMaxRPM: 24000,
   spindleMinRPM: 0,
-  fluidDialVersion: "v2.2.6",
+  fluidDialVersion: "v2.3.0",
   // Empty until a [VER:] report arrives — a plausible-looking default rendered
   // exactly like a real reading.  Screens show "---" while empty, as for IP/SSID.
   fluidNCVersion: "",
@@ -99,7 +99,12 @@ const pendantSdCard = {
   selectedFile: 0,
   scrollOffset: 0,
   files: [],
+  isDir: [],       // parallel to files[]; index 0 may be the synthesised ".." row
+  curPath: "/sd",  // directory currently listed
+  dirLevel: 0,     // 0 = at /sd; >0 means ".." is offered
+  listGen: 0,      // bumped per request; replies tagged with a stale value are dropped
   fileCount: 0,
+  totalFiles: 0,   // what the controller reported BEFORE the cap; > fileCount => list truncated
   loading: false,
   pendingRun: false,
   loadedFile: "",
