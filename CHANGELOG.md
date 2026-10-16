@@ -3,6 +3,11 @@
 **ChangeLog:**
 
 
+**2026-10-17**
+
+v2.3.2
+* Fix: **Ethernet detection over ESP-NOW.** A wired controller connected to the pendant over ESP-NOW showed `WIFI SSID ---` with an IP of `0.0.0.0` instead of **Wired Ethernet**. ESP-NOW needs the controller's radio switched on, and FluidNC reports a WiFi station line in `$I` whenever the radio is in station mode — even with `$network/type` set to Ethernet — so the controller sent `Mode=STA:SSID=:Status=Not connected:IP=0.0.0.0`. The pendant took that as a WiFi report, which also stopped the Ethernet fallback from running. A station line that hasn't joined a network is now read as "radio on", not "on WiFi": it never overrides an Ethernet report (newer FluidNC sends both, in either order), and it leaves the fallback free to run. UART and ESP-NOW go through exactly the same code; only what the controller reports differs. `0.0.0.0` is also no longer shown as an address — a WiFi controller that is configured but not associated now shows its SSID with `---` — and an IP left over from before is cleared when the Ethernet link is reported down.
+
 **2026-10-16**
 
 v2.3.1

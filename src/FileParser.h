@@ -40,6 +40,7 @@ extern std::string wifi_mode, wifi_ip, wifi_connected, wifi_ssid;
 
 // Query the wired link's IP and state.  Only useful (and only answered) on a
 // controller whose $network/type is Ethernet; see the note on the definition.
+extern bool net_reported;          // a Mode= line arrived this connection
 extern bool eth_status_pending;
 void        request_eth_status();
 // Called from handle_other() — the reply arrives as raw text, not [MSG:...].

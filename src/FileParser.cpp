@@ -837,13 +837,28 @@ void parse_wifi(char* arguments) {
 
 // command is "Mode=STA" - or AP, Ethernet, or No Wifi.
 //
-// FluidNC calls build_info() on every module in response to $I, but each one
-// early-returns unless it is the selected $network/type — so exactly one Mode=
-// line arrives, never both a WiFi and an Ethernet one.
+// $I calls build_info() on every network module, and they do NOT exclude each
+// other.  WifiConfig reports a station line whenever the radio is in STA mode —
+// and a controller running ESP-NOW keeps its radio in STA mode even when
+// $network/type is Ethernet.  So over ESP-NOW an Ethernet controller sends
+//     Mode=STA:SSID=:Status=Not connected:IP=0.0.0.0:MAC=...
+// (and on newer FluidNC a Mode=Ethernet line as well, in either order).  Over
+// UART the radio is off and only the Ethernet line, or nothing, arrives.
+//
+// A station line that hasn't joined a network says "the radio is on", not "the
+// controller is on WiFi", so it must neither win over an Ethernet report nor
+// stop the Ethernet fallback from running.  Same handling for both transports.
+bool net_reported = false;   // any Mode= line seen this connection (for the $I retry)
+
 void handle_radio_mode(char* command, char* arguments) {
     dbg_printf("Mode %s %s\n", command, arguments);
     char* value;
     split(command, &value, '=');
+
+    // Keep what an earlier line in this $I reply established, in case this one
+    // turns out to be an unjoined station line.
+    const std::string prevMode = wifi_mode, prevIp = wifi_ip, prevConn = wifi_connected;
+
     wifi_mode = value;
     // Clear before re-parsing: nothing else resets these, so a controller moved
     // from WiFi to Ethernet would otherwise keep showing its old SSID until the
@@ -853,6 +868,22 @@ void handle_radio_mode(char* command, char* arguments) {
     wifi_connected.clear();
     if (strcmp(value, "No Wifi") != 0) {
         parse_wifi(arguments);
+    }
+    if (wifi_ip == "0.0.0.0") wifi_ip.clear();   // "no address", not an address
+    net_reported = true;
+
+    if (wifi_mode == "STA" && (wifi_ssid.empty() || wifi_ip.empty())) {
+        if (prevMode == "Ethernet") {
+            // The Ethernet line came first and is the real answer; keep it.
+            wifi_mode = prevMode; wifi_ip = prevIp; wifi_connected = prevConn;
+            wifi_ssid.clear();
+        } else {
+            // Not on a network.  Leave the mode unknown so the $network/type
+            // fallback runs; keep any SSID purely for display on a WiFi
+            // controller that is configured but not currently associated.
+            wifi_mode.clear();
+            wifi_connected.clear();
+        }
     }
     current_scene->reDisplay();   // also runs for "No Wifi", so the UI clears
 }

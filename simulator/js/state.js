@@ -54,7 +54,7 @@ const pendantMachine = {
   rotation: 2,
   spindleMaxRPM: 24000,
   spindleMinRPM: 0,
-  fluidDialVersion: "v2.3.1",
+  fluidDialVersion: "v2.3.2",
   // Empty until a [VER:] report arrives — a plausible-looking default rendered
   // exactly like a real reading.  Screens show "---" while empty, as for IP/SSID.
   fluidNCVersion: "",

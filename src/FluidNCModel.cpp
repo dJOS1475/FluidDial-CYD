@@ -352,6 +352,7 @@ extern "C" void show_state(const char* state_string) {
             send_line_nowait("$G");              // Refresh GCode modes
             send_line_nowait("$G");              // Refresh GCode modes
             send_line_nowait("$RI=200");
+            net_reported = false;                // fresh $I, fresh answer
             send_line_nowait("$I");              // Firmware version → show_versions()
             init_file_list();
             detect_homing_info();

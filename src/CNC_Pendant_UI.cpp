@@ -1541,9 +1541,11 @@ public:
             lastMode = netMode; lastStatus = netStatus; lastIp = curIp; lastSsid = curSsid;
             pendantMachine.netMode   = netMode;
             pendantMachine.netStatus = netStatus;
-            // Guarded: Ethernet with a dead link sends no IP, and we must not
-            // wipe a good one on a transient empty reply.
-            if (wifi_ip.length())   pendantMachine.ipAddress = String(wifi_ip.c_str());
+            // Guarded: don't wipe a good IP on a transient empty reply — except
+            // when the link is known to be down, where an address left over
+            // from before would sit misleadingly beside "Ethernet (no link)".
+            if (wifi_ip.length())                     pendantMachine.ipAddress = String(wifi_ip.c_str());
+            else if (netStatus.startsWith("Link down")) pendantMachine.ipAddress = "---";
             if (wifi_ssid.length()) pendantMachine.wifiSSID  = String(wifi_ssid.c_str());
             xSemaphoreGive(stateMutex);
         }
@@ -1975,8 +1977,11 @@ void pendant_comms_task(void* /*pvParameters*/) {
             //    only a station additionally needs its IP and SSID.
             static unsigned long lastCfgRetryMs = 0;
             static int           cfgRetries     = 0;
+            //    net_reported rather than wifi_mode: an unjoined station line
+            //    (the radio is up for ESP-NOW but on no network) deliberately
+            //    leaves wifi_mode empty, yet it IS a complete answer.
             const bool           isStation      = (wifi_mode == "STA" || wifi_mode == "AP");
-            const bool           cfgIncomplete  = wifi_mode.empty() ||
+            const bool           cfgIncomplete  = !net_reported ||
                                                   (isStation && (wifi_ip.empty() || wifi_ssid.empty()));
             if (cfgIncomplete && cfgRetries < 4 && (nowMs - lastCfgRetryMs) >= 2000) {
                 lastCfgRetryMs = nowMs;
