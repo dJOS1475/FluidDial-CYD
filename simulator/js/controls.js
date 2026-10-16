@@ -142,6 +142,30 @@ function buildControls() {
   root.appendChild(_row("Charging", _check("charging", (e) => { pendantMachine.batteryCharging = e.target.checked; repaint(); })));
   root.appendChild(_row("Signal bars", _range("bars", -1, 4, 1, (e) => { pendantMachine.wifiSignalBars = +e.target.value; repaint(); })));
   root.appendChild(_row("AP mode", _check("apmode", (e) => { pendantMachine.wifiInApMode = e.target.checked; repaint(); })));
+  // The controller's $I "Mode=" line decides this row: $network/type selects one
+  // network type, so exactly one Mode= line ever arrives.
+  root.appendChild(_row("Network", _select("netMode", [
+    { v: "sta",     t: "WiFi station (STA)" },
+    { v: "eth_up",  t: "Ethernet - link up" },
+    { v: "eth_cfg", t: "Ethernet - type only, no status" },
+    { v: "eth_down",t: "Ethernet - link down" },
+    { v: "none",    t: "No Wifi" },
+  ], (e) => {
+    const v = e.target.value;
+    if (v === "eth_up")        { pendantMachine.netMode = "Ethernet"; pendantMachine.netStatus = "Link up"; }
+    // Degraded case: the pendant knows the type from $network/type but got no
+    // link state or IP — i.e. $Ethernet/Status went unanswered too.
+    else if (v === "eth_cfg")  { pendantMachine.netMode = "Ethernet"; pendantMachine.netStatus = "";
+                                 pendantMachine.ipAddress = "---"; }
+    else if (v === "eth_down") { pendantMachine.netMode = "Ethernet"; pendantMachine.netStatus = "Link down";
+                                 pendantMachine.ipAddress = "---"; }   // link down sends no IP
+    else if (v === "none")     { pendantMachine.netMode = "No Wifi";  pendantMachine.netStatus = "";
+                                 pendantMachine.ipAddress = "---"; pendantMachine.wifiSSID = "---"; }
+    else                       { pendantMachine.netMode = "STA";      pendantMachine.netStatus = "Connected"; }
+    syncControlsFromState();
+    repaint();
+  })));
+
   root.appendChild(_row("SSID", (() => {
     const i = _el("input", { id: "ssid", type: "text", oninput: (e) => { pendantMachine.wifiSSID = e.target.value || "---"; repaint(); } });
     _ctl["ssid"] = i; return i;
@@ -243,6 +267,10 @@ function syncControlsFromState() {
   set("bars", pendantMachine.wifiSignalBars);
   chk("apmode", pendantMachine.wifiInApMode);
   set("sdFiles", String(simSdTotal));
+  set("netMode", pendantMachine.netMode === "Ethernet"
+                   ? ((pendantMachine.netStatus || "").startsWith("Link down") ? "eth_down"
+                      : (pendantMachine.netStatus || "") === "" ? "eth_cfg" : "eth_up")
+                 : pendantMachine.netMode === "No Wifi" ? "none" : "sta");
   set("ssid", pendantMachine.wifiSSID === "---" ? "" : pendantMachine.wifiSSID);
   set("ip", pendantMachine.ipAddress === "---" ? "" : pendantMachine.ipAddress);
 }

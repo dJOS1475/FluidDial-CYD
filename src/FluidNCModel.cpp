@@ -375,6 +375,12 @@ extern "C" void show_state(const char* state_string) {
 }
 
 extern "C" void handle_other(char* line) {
+    // "$Ethernet/Status" reply lines (raw "Key: value" text — see the note on
+    // handle_eth_status_line).  Checked first so a concurrent JSON request can't
+    // swallow them; it self-gates on an outstanding request, so it is inert
+    // otherwise.
+    if (handle_eth_status_line(line)) return;
+
     // Multi-line JSON responses from $File/SendJSON: only the first line is wrapped in
     // [JSON:...]; subsequent content lines arrive here as bare text.  Route them back
     // into the streaming JSON parser while accumulation is active.
@@ -414,6 +420,11 @@ extern "C" void show_error(int error) {
     errorExpire = milliseconds() + 1000;
     lastError   = error;
     current_scene->reDisplay();
+
+    // A "$Ethernet/Status" that came back as an error (unsupported command on an
+    // older build, or rejected) would otherwise leave the request latched open,
+    // and a later unsolicited "IP:" line could then be taken for a wired address.
+    eth_status_pending = false;
 
     // If a file/macro request got an "error:" reply instead of JSON (eg.
     // $File/SendJSON returning IdleError when the machine isn't Idle/Alarm),

@@ -177,6 +177,14 @@ struct MachineState {
     String workCoordSystem  = "G54";
     String ipAddress        = "---";
     String wifiSSID         = "---";
+    // Network type the controller reports in its $I "Mode=" line — "Ethernet",
+    // "STA", "AP", or "No Wifi"; empty until one arrives.  FluidNC's $network/type
+    // selects exactly one, so this is unambiguous.  netStatus is that line's
+    // Status field: "Link up"/"Link down" for Ethernet, "Connected"/"Not
+    // connected" for WiFi.  Together they let the FluidNC screen show "Wired
+    // Ethernet" in place of an SSID that would never arrive on a wired machine.
+    String netMode          = "";
+    String netStatus        = "";
     // Set true when display rotation is changed via the FluidNC screen encoder.
     // exitFluidNC() observes this flag and writes the new value to NVS once on
     // exit instead of every encoder detent (avoids hammering flash).
@@ -527,6 +535,10 @@ void   navigateTo(PendantScreen next);
 // Arm the touch bounce guard without navigating — for actions that redraw the
 // screen under the finger (see the note on the definition).
 void   suppressTouchBounce();
+// Ask the controller what network it is on — only does anything when $I didn't
+// say (i.e. a wired controller on FluidNC <= v4.1.1).  Called lazily from the
+// FluidNC screen rather than on connect; see the definition for why.
+void   requestNetworkInfo();
 
 // ===== Alarm Description Helper =====
 // Returns a short human-readable description for FluidNC/GRBL alarm codes.

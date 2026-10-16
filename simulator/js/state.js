@@ -54,7 +54,7 @@ const pendantMachine = {
   rotation: 2,
   spindleMaxRPM: 24000,
   spindleMinRPM: 0,
-  fluidDialVersion: "v2.3.0",
+  fluidDialVersion: "v2.3.1",
   // Empty until a [VER:] report arrives — a plausible-looking default rendered
   // exactly like a real reading.  Screens show "---" while empty, as for IP/SSID.
   fluidNCVersion: "",
@@ -68,6 +68,10 @@ const pendantMachine = {
   workCoordSystem: "G54",
   ipAddress: "---",
   wifiSSID: "---",
+  // From the controller's $I "Mode=" line — "Ethernet", "STA", "AP", "No Wifi".
+  // netStatus is that line's Status field ("Link up"/"Link down" on Ethernet).
+  netMode: "",
+  netStatus: "",
   rotationDirty: false,
   batteryPercent: -1,
   batteryMv: 0,

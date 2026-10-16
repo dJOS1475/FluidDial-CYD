@@ -61,6 +61,8 @@ void uart_backend_reset_flow_control() {
 #    define FNC_BAUD 115200
 #endif
 
+static void enable_sw_flow_control();
+
 void init_fnc_uart(int uart_num, int tx_pin, int rx_pin) {
     fnc_uart_port = (uart_port_t)uart_num;
     int baudrate  = FNC_BAUD;
@@ -108,16 +110,58 @@ void init_fnc_uart(int uart_num, int tx_pin, int rx_pin) {
         _uart_events = nullptr;
     }
 
-    // XON/XOFF thresholds MUST be < SOC_UART_FIFO_LEN (128) — ESP-IDF rejects
-    // anything else and returns ESP_FAIL *before* touching the hardware.  This
-    // used to pass (128, 250), reasoning only about the uint8_t range, so BOTH
-    // checks failed and software flow control was never enabled at all: the link
-    // ran at 1 Mbaud with no backstop, and the ignored return value meant nothing
-    // said so.  120/64 keeps XOFF late (rarely fires) while staying legal.
-    e = uart_set_sw_flow_ctrl(fnc_uart_port, true, 64, 120);
+#ifdef USE_NEW_UI
+    // Software flow control is deliberately NOT enabled here on the new UI — see
+    // uart_backend_settle().  This runs inside init_system(), at the very top of
+    // setup(), seconds before anything reads the port.  With XON/XOFF already on,
+    // a controller booting alongside the pendant fills the 4 KB buffer in ~41 ms,
+    // the pendant's UART hardware then XOFFs it, and the controller's boot stalls
+    // on its own log writes — the WebUI never comes up until the cable is pulled.
+    // The comms task enables it once it is actually reading the port.
+#else
+    // Old-UI / M5Dial builds have no comms task and never call the settle, so
+    // they keep the original behaviour: flow control on from the start.
+    enable_sw_flow_control();
+#endif
+}
+
+// XON/XOFF thresholds MUST be < SOC_UART_FIFO_LEN (128) — ESP-IDF rejects
+// anything else and returns ESP_FAIL *before* touching the hardware.  This used
+// to pass (128, 250), reasoning only about the uint8_t range, so BOTH checks
+// failed and software flow control was never enabled at all: the link ran at
+// 1 Mbaud with no backstop, and the ignored return value meant nothing said so.
+// 120/64 keeps XOFF late (rarely fires) while staying legal.
+static void enable_sw_flow_control() {
+    esp_err_t e = uart_set_sw_flow_ctrl(fnc_uart_port, true, 64, 120);
     if (e != ESP_OK) {
         dbg_printf("UART sw flow control NOT enabled: %s\n", esp_err_to_name(e));
     }
+}
+
+// Called once from the comms task, in UART mode, before the pendant sends
+// anything.  Gives a controller that powered up alongside us time to finish
+// booting, and stays completely out of its way while it does:
+//
+//   * flow control is OFF, so the pendant can never XOFF a booting controller,
+//     and a stray 0x13 in its boot chatter cannot freeze OUR transmitter;
+//   * everything received is discarded, so boot-log noise (some of it at the
+//     ROM's 115200 baud, i.e. garbage at our 1 Mbaud) never reaches the parser;
+//   * nothing is transmitted — the first "?" waits until this returns.
+//
+// The port is flushed every 20 ms (~2 KB at 1 Mbaud, half the buffer), so it
+// never fills and no overflow is ever logged against the boot chatter.
+void uart_backend_settle(uint32_t ms) {
+    const TickType_t start = xTaskGetTickCount();
+    while ((xTaskGetTickCount() - start) < pdMS_TO_TICKS(ms)) {
+        uart_flush_input(fnc_uart_port);
+        vTaskDelay(pdMS_TO_TICKS(20));
+    }
+    uart_flush_input(fnc_uart_port);
+    if (_uart_events) xQueueReset(_uart_events);   // don't count boot chatter as loss
+
+    enable_sw_flow_control();
+    // Start from a clean XON state in case anything was latched before we got here.
+    uart_ll_force_xon(fnc_uart_port);
 }
 
 // Drain the UART event queue, counting anything that means we lost bytes.

@@ -24,6 +24,7 @@
 #include "ConfigItem.h"
 #include "Encoder.h"
 #include "GrblParserC.h"
+#include "CommsUart.h"      // uart_backend_settle()
 
 // Screen files
 #include "screens/pendant_shared.h"
@@ -677,6 +678,11 @@ void navigateTo(PendantScreen next) {
     drawCurrentPendantScreen();
 }
 
+// How long a wired pendant stays silent after boot before talking to the
+// controller.  Measured from when the comms task starts — the 2 s logo has
+// already elapsed by then, so first contact lands ~5 s after a shared power-on.
+#define UART_BOOT_SETTLE_MS 3000
+
 // ===== Touch Dispatch (Core 1) =====
 static uint32_t lastNavMs = 0;  // timestamp of last screen navigation
 
@@ -1155,6 +1161,35 @@ static IntConfigItem jogHomingDirMask("$23");   // homing direction invert mask 
 static IntConfigItem jogHomeMposX("$/axes/x/homing/mpos_mm");
 static IntConfigItem jogHomeMposY("$/axes/y/homing/mpos_mm");
 static IntConfigItem jogHomeMposZ("$/axes/z/homing/mpos_mm");
+// Which network interface the controller actually brought up — "Ethernet" or
+// "WiFi".  Needed as a FALLBACK for the network row on the FluidNC screen:
+// FluidNC only began reporting Ethernet in its $I "Mode=" line on 2026-09-30,
+// after v4.1.1 shipped, so on every released version to date a wired controller
+// sends NO Mode= line at all (WifiConfig stays quiet because WiFi isn't the
+// selected type, and EthConfig had no build_info() yet).  This setting has been
+// there all along and answers the question directly.  Superseded automatically
+// once a controller does send Mode= — see reDisplay().
+static StringConfigItem netTypeItem("$network/type");
+// One-shot: once we know the controller is wired, ask for the wired IP and link
+// state.  Re-armed by requestNetworkInfo().
+static bool ethStatusAsked = false;
+
+// Ask what kind of network the controller is on — but ONLY when $I didn't say.
+//
+// Deliberately NOT part of the connect-edge burst.  That burst is sent the moment
+// the pendant sees the controller's banner, which on a wired-UART link is while
+// the controller is still booting; adding another query there is enough to upset
+// a WiFi board mid-association, and the pendant's software flow control will XOFF
+// it if the reply flood outpaces Core 0.  A WiFi controller answers $I with
+// "Mode=STA:..." and needs none of this, so asking lazily — when the FluidNC
+// screen is actually opened and we still don't know — keeps the connect sequence
+// byte-identical to v2.3.0 for everyone who isn't wired.
+void requestNetworkInfo() {
+    if (!pendantConnected) return;
+    if (wifi_mode.length()) return;    // $I already told us; nothing to ask
+    ethStatusAsked = false;            // re-arm for this query
+    netTypeItem.request();
+}
 
 // Called from loop_pendant() when HwEvent::CONNECTED arrives.
 // FluidNC version, IP address, WiFi SSID arrive automatically via [VER:] / status
@@ -1334,6 +1369,8 @@ public:
             pendantMachine.inInches         = inInches;
             if (wifi_ip.length())   pendantMachine.ipAddress = String(wifi_ip.c_str());
             if (wifi_ssid.length()) pendantMachine.wifiSSID  = String(wifi_ssid.c_str());
+            if (wifi_mode.length()) pendantMachine.netMode   = String(wifi_mode.c_str());
+            if (wifi_connected.length()) pendantMachine.netStatus = String(wifi_connected.c_str());
             xSemaphoreGive(stateMutex);
         }
         if (hwEventQueue) {
@@ -1463,6 +1500,54 @@ public:
         if (jogHomeMposY.known()) pendantJog.homeMpos[1] = jogHomeMposY.get();
         if (jogHomeMposZ.known()) pendantJog.homeMpos[2] = jogHomeMposZ.get();
 
+        // Network identity from the $I "Mode=" line.  handle_radio_mode() calls
+        // reDisplay() immediately after parsing it, so this is the earliest point
+        // the values exist.  Doing it here rather than only in onStateChange()
+        // also fixes a latent gap: a controller already Idle when the pendant
+        // connects may never fire a state change, leaving the panel on "---"
+        // even though the globals were populated.
+        // Fallback for controllers that report no "Mode=" line at all (every
+        // FluidNC release up to v4.1.1 on a wired machine — see netTypeItem).
+        // Only consulted when $I told us nothing: a real Mode= line always wins,
+        // since it carries link state and the IP as well as the type.
+        String netMode   = String(wifi_mode.c_str());
+        String netStatus = String(wifi_connected.c_str());
+        if (netMode.length() == 0 && netTypeItem.known()) {
+            std::string t = netTypeItem.get();
+            if (t == "Ethernet") netMode = "Ethernet";
+        }
+
+        // Wired, but $I told us nothing about the link — ask the one command that
+        // does know.  $network/type gives the type only, so without this the IP
+        // and link state would stay unknown on every FluidNC release to date.
+        // Once per connection; the reply lands back here via reDisplay().
+        if (netMode == "Ethernet" && wifi_mode.empty() && !ethStatusAsked) {
+            ethStatusAsked = true;
+            request_eth_status();
+        }
+
+        // Only touch shared state when something actually changed.  reDisplay()
+        // runs on Core 0 (the parser task) for every settings reply, error and
+        // GCode-mode report; taking stateMutex unconditionally there adds a wait
+        // to the UART drain path, and software flow control (XOFF at 120 of the
+        // 128-byte FIFO) will throttle the controller if that drain falls behind.
+        static String lastMode, lastStatus, lastIp, lastSsid;
+        String curIp   = String(wifi_ip.c_str());
+        String curSsid = String(wifi_ssid.c_str());
+        const bool netChanged = (netMode   != lastMode)   || (netStatus != lastStatus) ||
+                                (curIp     != lastIp)     || (curSsid   != lastSsid);
+
+        if (netChanged && xSemaphoreTake(stateMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+            lastMode = netMode; lastStatus = netStatus; lastIp = curIp; lastSsid = curSsid;
+            pendantMachine.netMode   = netMode;
+            pendantMachine.netStatus = netStatus;
+            // Guarded: Ethernet with a dead link sends no IP, and we must not
+            // wipe a good one on a transient empty reply.
+            if (wifi_ip.length())   pendantMachine.ipAddress = String(wifi_ip.c_str());
+            if (wifi_ssid.length()) pendantMachine.wifiSSID  = String(wifi_ssid.c_str());
+            xSemaphoreGive(stateMutex);
+        }
+
         // Macro list is populated in onFilesList() when $File/SendJSON response arrives
         if (hwEventQueue) {
             HwEvent ev = { HwEvent::STATE_UPDATE, 0 };
@@ -1564,6 +1649,16 @@ void pendant_comms_task(void* /*pvParameters*/) {
     // drawn CONTENT disagreed and the Connection panel painted itself over the
     // menu buttons.  The main menu's STATUS panel now reports the link state
     // directly ("Not paired" / "No link"), so there is nothing to route.
+
+    // Wired link: let a controller that powered up alongside us finish booting
+    // before we say anything to it.  On a cold boot the controller and pendant
+    // share a power-on, and anything the pendant does while the controller is
+    // still starting up can wedge it — see uart_backend_settle().  Plugging the
+    // pendant into an already-running controller was never affected, which is
+    // what pointed here.  ESP-NOW has no wire to the controller, so it skips this.
+    if (comms_active_mode() == COMMS_MODE_UART) {
+        uart_backend_settle(UART_BOOT_SETTLE_MS);
+    }
 
     // Send first $? immediately — fnc_is_connected() uses a 'starting' flag
     // so the very first call fires the ping right away.
@@ -1869,11 +1964,20 @@ void pendant_comms_task(void* /*pvParameters*/) {
             // 4. $I: not a ConfigItem, so it needs its own check.  Its reply
             //    carries the firmware version AND the Mode/IP/SSID line; getting
             //    the version without the network line means the reply arrived
-            //    only in part.  Bounded, because a controller genuinely off the
-            //    WLAN reports "No Wifi" and will never fill those fields.
+            //    only in part.
+            //
+            //    Mode-aware, because only a WiFi station ever reports an SSID:
+            //    a wired controller sends "Mode=Ethernet:Status=Link up:IP=..."
+            //    with no SSID key at all, and "No Wifi" carries neither.  The old
+            //    test (ip.empty() || ssid.empty()) was therefore permanently true
+            //    on an Ethernet machine and burned all four retries on every
+            //    reconnect.  Having ANY Mode= line is what completeness means;
+            //    only a station additionally needs its IP and SSID.
             static unsigned long lastCfgRetryMs = 0;
             static int           cfgRetries     = 0;
-            const bool           cfgIncomplete  = wifi_ip.empty() || wifi_ssid.empty();
+            const bool           isStation      = (wifi_mode == "STA" || wifi_mode == "AP");
+            const bool           cfgIncomplete  = wifi_mode.empty() ||
+                                                  (isStation && (wifi_ip.empty() || wifi_ssid.empty()));
             if (cfgIncomplete && cfgRetries < 4 && (nowMs - lastCfgRetryMs) >= 2000) {
                 lastCfgRetryMs = nowMs;
                 ++cfgRetries;

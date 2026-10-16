@@ -3,6 +3,16 @@
 **ChangeLog:**
 
 
+**2026-10-16**
+
+v2.3.1
+* New: **wired Ethernet support.** The FluidNC screen's network row was hardcoded to `WIFI SSID`, so on a wired controller such as the Greyhound it read `---` forever. It now shows **Wired Ethernet** with the controller's wired IP, or **Ethernet (no link)** in amber when the cable is out. WiFi controllers still show their SSID as before. It works on current FluidNC releases as well as newer ones: FluidNC only began reporting Ethernet in its `$I` reply after v4.1.1 shipped, so on those releases the pendant reads `$network/type` and `$Ethernet/Status` instead, when the FluidNC screen is opened. On newer FluidNC the `Mode=Ethernet` line in `$I` carries everything and is always preferred.
+* Fix: **wired pendants and cold boots.** When the controller and a wired pendant powered up together, the controller could fail to finish booting (WebUI never up, pendant stuck on "Connecting") or the pendant could reset; plugging the pendant in afterwards was always fine. The pendant opened its link with XON/XOFF flow control on but didn't read it for several seconds, so a booting controller filled its buffer and was XOFF'd mid-boot. Flow control now stays off until the pendant is actually reading, a wired pendant discards the controller's boot output for 3 seconds before talking, and the boot logo holds for 7 seconds on every pendant.
+* Fix: the `$I` retry no longer re-sends four times on every connect to a wired controller or one with no network — it was waiting for an SSID that only a WiFi station ever reports.
+* Fix: network details now appear even when the controller is already Idle at connect; previously they were only picked up on a state change.
+* Fix: a controller moved from WiFi to Ethernet no longer keeps showing its old SSID until the pendant reboots.
+* Change: the FluidNC screen's title reads **FluidNC** rather than **FLUIDNC**.
+
 **2026-10-15**
 
 v2.3.0

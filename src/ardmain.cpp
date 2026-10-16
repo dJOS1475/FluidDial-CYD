@@ -140,7 +140,17 @@ void setup() {
     display.setRotation(2);  // Boot screen rotation (overridden by saved preference in setup_pendant)
 #endif
     show_logo();
+#ifdef USE_NEW_UI
+    // Hold the logo 7 s on every pendant.  On a shared power-on the controller is
+    // still booting — and on WiFi, still associating — and the pendant stays well
+    // clear of it until that's done.  Kept the same for every transport so boot
+    // looks and behaves identically however the pendant is connected.  The UART
+    // is already open here but with flow control off (see init_fnc_uart), so
+    // waiting can't hold a wired controller; its boot chatter is simply dropped.
+    delay_ms(7000);
+#else
     delay_ms(2000);  // view the logo and wait for the debug port to connect
+#endif
 
 #ifdef USE_NEW_UI
 

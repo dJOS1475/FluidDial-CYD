@@ -38,6 +38,13 @@ extern void request_file_preview(const char* name, int firstline, int lastline);
 extern std::string current_filename;
 extern std::string wifi_mode, wifi_ip, wifi_connected, wifi_ssid;
 
+// Query the wired link's IP and state.  Only useful (and only answered) on a
+// controller whose $network/type is Ethernet; see the note on the definition.
+extern bool eth_status_pending;
+void        request_eth_status();
+// Called from handle_other() — the reply arrives as raw text, not [MSG:...].
+bool        handle_eth_status_line(const char* line);
+
 void init_listener();
 void init_file_list();
 

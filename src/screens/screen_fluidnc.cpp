@@ -1,6 +1,7 @@
 #include "pendant_shared.h"
 #include "screen_fluidnc.h"
 #include "../Comms.h"          // comms_active_mode()
+#include "../FileParser.h"     // request_eth_status()
 #include <Preferences.h>
 
 extern Preferences preferences;
@@ -8,6 +9,20 @@ extern Preferences preferences;
 void enterFluidNC() {
     // Both panels use transient 16-bit sprites (see updateFluidNCDisplay).
     releasePanelSprites();
+
+    // Network details are fetched lazily, on entry to the only screen that shows
+    // them — never as part of the connect-edge burst, which lands while a wired
+    // controller is still booting.
+    //
+    // requestNetworkInfo() is a no-op unless $I reported no network at all (a
+    // wired controller on FluidNC <= v4.1.1); on anything else the Mode= line
+    // already carried everything.  The wired IP and link state then follow from
+    // "$Ethernet/Status", re-asked on each entry so an unplugged cable is noticed
+    // rather than read as still up.
+    if (pendantConnected) {
+        requestNetworkInfo();
+        if (pendantMachine.netMode == "Ethernet") request_eth_status();
+    }
 }
 
 void exitFluidNC() {
@@ -32,6 +47,7 @@ void exitFluidNC() {
 void updateFluidNCDisplay() {
     // Snapshot dynamic values under mutex
     String fluidDialVer, fluidNCVer, connStatus, dispRotation, baudRate, ip, ssid;
+    String netMode, netStatus;
     bool connected = pendantConnected;
 
     if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
@@ -42,6 +58,8 @@ void updateFluidNCDisplay() {
         baudRate     = pendantMachine.baudRate;
         ip           = pendantMachine.ipAddress;
         ssid         = pendantMachine.wifiSSID;
+        netMode      = pendantMachine.netMode;
+        netStatus    = pendantMachine.netStatus;
         xSemaphoreGive(stateMutex);
     }
 
@@ -69,10 +87,23 @@ void updateFluidNCDisplay() {
         g->setTextColor(ip.length() ? COLOR_CYAN : COLOR_GRAY_TEXT);
         g->setCursor(ox + 115, oy + 17); g->print(ip.length() ? ip : "---");
 
+        // Network row.  A wired controller never reports an SSID, so on Ethernet
+        // this row names the link instead — showing a permanently blank "WIFI
+        // SSID" on a Greyhound would just look broken.  FluidNC's $network/type
+        // selects one or the other, so netMode is unambiguous.
+        const bool  isEth    = (netMode == "Ethernet");
+        const bool  ethDown  = isEth && netStatus.startsWith("Link down");
+        const char* netLabel = isEth ? "NETWORK" : "WIFI SSID";
+        String      netValue = isEth ? (ethDown ? "Ethernet (no link)" : "Wired Ethernet")
+                                     : (ssid.length() ? ssid : "---");
+        uint16_t    netColor = ethDown                  ? COLOR_ORANGE
+                             : (isEth || ssid.length()) ? COLOR_CYAN
+                                                        : COLOR_GRAY_TEXT;
+
         g->setTextColor(COLOR_GRAY_TEXT);
-        g->setCursor(ox + 115, oy + 35);  g->print("WIFI SSID");
-        g->setTextColor(ssid.length() ? COLOR_CYAN : COLOR_GRAY_TEXT);
-        g->setCursor(ox + 115, oy + 47); g->print(ssid.length() ? ssid : "---");
+        g->setCursor(ox + 115, oy + 35);  g->print(netLabel);
+        g->setTextColor(netColor);
+        g->setCursor(ox + 115, oy + 47); g->print(netValue);
 
         endPanelSprite(230, 60, 5, 40);
     }
@@ -112,7 +143,7 @@ void updateFluidNCDisplay() {
 
 void drawFluidNCScreen() {
     display.fillScreen(COLOR_BACKGROUND);
-    drawTitle("FLUIDNC");
+    drawTitle("FluidNC");
 
     // Connection panel — static content, drawn once directly.
     // The entire panel is a touch target → PSCREEN_CONNECTION, where the

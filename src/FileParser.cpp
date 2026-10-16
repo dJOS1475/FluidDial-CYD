@@ -747,7 +747,74 @@ std::string wifi_mode;
 std::string wifi_ssid;
 std::string wifi_connected;
 std::string wifi_ip;
-// e.g. SSID=fooStatus=Connected:IP=192.168.0.67:MAC=40-F5-20-57-CE-64
+
+// True while a "$Ethernet/Status" reply is outstanding.  That command is the only
+// way to read the wired IP on FluidNC releases up to v4.1.1, which report nothing
+// about Ethernet in $I.  Its reply is plain "Key: value" lines rather than a
+// structured report, and "IP:" is generic enough that a WiFi controller emits one
+// too (NetConfig does, for $ESP420) — so the lines are only consumed while a
+// request we sent is actually in flight.
+bool eth_status_pending = false;
+
+void request_eth_status() {
+    eth_status_pending = true;
+    send_line_nowait("$Ethernet/Status");
+}
+
+// Consume one line of a "$Ethernet/Status" reply.  Returns true if the line
+// belonged to that reply.
+//
+// These arrive as RAW text, not "[MSG:...]": FluidNC builds them with
+// log_stream(), which adds no prefix, unlike the log_msg_to() used for the
+// newer "Mode=Ethernet" report.  So they never reach handle_msg() and must be
+// picked up in handle_other() instead.
+//
+// Only consumed while a request we sent is outstanding — "IP:" is generic and a
+// WiFi controller emits one too (NetConfig does, for $ESP420), so an unsolicited
+// line must never be mistaken for a wired address.
+bool handle_eth_status_line(const char* line) {
+    if (!eth_status_pending) return false;
+
+    const char* colon = strchr(line, ':');
+    if (!colon) return false;
+
+    const size_t keyLen = (size_t)(colon - line);
+    const char*  v      = colon + 1;
+    while (isspace((int)(unsigned char)*v)) ++v;
+
+    // Exact key match on the part before the FIRST colon.  That keeps "IP"
+    // distinct from "IP Mode", and leaves "MAC: 42:B1:..." (whose value holds
+    // more colons) harmlessly unmatched.
+    auto key_is = [&](const char* k) {
+        return keyLen == strlen(k) && strncmp(line, k, keyLen) == 0;
+    };
+
+    if (key_is("IP")) {
+        wifi_ip = v;
+        return true;
+    }
+    if (key_is("Link")) {
+        // Normalise to the wording the newer "Mode=Ethernet" line uses, so the
+        // UI only ever has one format to understand.
+        wifi_connected = (strncmp(v, "Up", 2) == 0) ? "Link up" : "Link down";
+        return true;
+    }
+    if (key_is("Notifications") || key_is("Ethernet")) {
+        // Last line of the reply: "Notifications: ..." normally, or
+        // "Ethernet: Off" when the PHY never came up (that path returns early
+        // and sends nothing else).  Either way the request is satisfied.
+        eth_status_pending = false;
+        current_scene->reDisplay();
+        return true;
+    }
+    return false;   // Hostname/MAC/Gateway/... — part of the reply, but unused
+}
+// Key=value pairs separated by ':'.  Shapes seen in the wild:
+//   WiFi station   SSID=foo:Status=Connected:IP=192.168.0.67:MAC=40-F5-20-57-CE-64
+//   Ethernet up    Status=Link up:IP=192.168.0.50:GW=192.168.0.1:MAC=...
+//   Ethernet down  Status=Link down:MAC=...            (no IP at all)
+// Ethernet simply never sends an SSID key, so the same parser covers both; GW and
+// MAC are parsed past and discarded.
 void parse_wifi(char* arguments) {
     char* key = arguments;
     char* value;
@@ -768,16 +835,26 @@ void parse_wifi(char* arguments) {
     }
 }
 
-// command is "Mode=STA" - or AP or No Wifi
+// command is "Mode=STA" - or AP, Ethernet, or No Wifi.
+//
+// FluidNC calls build_info() on every module in response to $I, but each one
+// early-returns unless it is the selected $network/type — so exactly one Mode=
+// line arrives, never both a WiFi and an Ethernet one.
 void handle_radio_mode(char* command, char* arguments) {
     dbg_printf("Mode %s %s\n", command, arguments);
     char* value;
     split(command, &value, '=');
     wifi_mode = value;
+    // Clear before re-parsing: nothing else resets these, so a controller moved
+    // from WiFi to Ethernet would otherwise keep showing its old SSID until the
+    // pendant rebooted (Ethernet sends no SSID key to overwrite it).
+    wifi_ssid.clear();
+    wifi_ip.clear();
+    wifi_connected.clear();
     if (strcmp(value, "No Wifi") != 0) {
         parse_wifi(arguments);
-        current_scene->reDisplay();
     }
+    current_scene->reDisplay();   // also runs for "No Wifi", so the UI clears
 }
 
 extern "C" void handle_msg(char* command, char* arguments) {
@@ -805,4 +882,5 @@ extern "C" void handle_msg(char* command, char* arguments) {
     if (strncmp(command, "Mode=", strlen("Mode=")) == 0) {
         handle_radio_mode(command, arguments);
     }
+
 }

@@ -31,10 +31,22 @@ function updateFluidNCDisplay() {
     g.setCursor(ox + 115, oy + 5); g.print("IP ADDRESS");
     g.setTextColor(pendantMachine.ipAddress.length ? COLOR_CYAN : COLOR_GRAY_TEXT);
     g.setCursor(ox + 115, oy + 17); g.print(pendantMachine.ipAddress.length ? pendantMachine.ipAddress : "---");
+    // Network row — on Ethernet this names the link, because a wired controller
+    // never reports an SSID and a blank "WIFI SSID" row would just look broken.
+    const ssid = pendantMachine.wifiSSID;
+    const isEth = pendantMachine.netMode === "Ethernet";
+    const ethDown = isEth && (pendantMachine.netStatus || "").startsWith("Link down");
+    const netLabel = isEth ? "NETWORK" : "WIFI SSID";
+    const netValue = isEth ? (ethDown ? "Ethernet (no link)" : "Wired Ethernet")
+                           : (ssid.length ? ssid : "---");
+    const netColor = ethDown ? COLOR_ORANGE
+                   : (isEth || ssid.length) ? COLOR_CYAN
+                   : COLOR_GRAY_TEXT;
+
     g.setTextColor(COLOR_GRAY_TEXT);
-    g.setCursor(ox + 115, oy + 35); g.print("WIFI SSID");
-    g.setTextColor(pendantMachine.wifiSSID.length ? COLOR_CYAN : COLOR_GRAY_TEXT);
-    g.setCursor(ox + 115, oy + 47); g.print(pendantMachine.wifiSSID.length ? pendantMachine.wifiSSID : "---");
+    g.setCursor(ox + 115, oy + 35); g.print(netLabel);
+    g.setTextColor(netColor);
+    g.setCursor(ox + 115, oy + 47); g.print(netValue);
   }
   // Panel 2: resources
   {
@@ -63,7 +75,7 @@ function updateFluidNCDisplay() {
 
 function drawFluidNCScreen() {
   display.fillScreen(COLOR_BACKGROUND);
-  drawTitle("FLUIDNC");
+  drawTitle("FluidNC");
 
   display.fillRoundRect(5, 108, 230, 70, 5, COLOR_DARKER_BG);
   display.drawRoundRect(5, 108, 230, 70, 5, COLOR_CYAN);
