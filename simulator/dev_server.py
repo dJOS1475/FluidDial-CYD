@@ -37,6 +37,10 @@ def _firmware_mtimes():
             sig.append(os.stat(p).st_mtime_ns)
         except OSError:
             pass
+    try:
+        sig.append(os.stat(sync.LOGO_SRC).st_mtime_ns)   # boot logo in data/
+    except OSError:
+        pass
     return hash(tuple(sig))
 
 
@@ -67,6 +71,7 @@ def _watch():
             last_fw = cur_fw
             try:
                 sync.regen_colors()  # may rewrite js/colors.js -> picked up below
+                sync.sync_logo()     # may rewrite img/fluid_dial.png
                 _generation += 1  # reload so colour changes show immediately
             except Exception as e:
                 print("sync error:", e)
@@ -130,6 +135,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
 
 def main():
+    sync.sync_logo()   # so a fresh checkout's boot screen has its logo
     threading.Thread(target=_watch, daemon=True).start()
     httpd = http.server.ThreadingHTTPServer(("", PORT), Handler)
     print(f"FluidDial-CYD simulator (live reload) -> http://localhost:{PORT}")

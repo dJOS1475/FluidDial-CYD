@@ -126,6 +126,25 @@ def regen_colors():
     return False
 
 
+# The boot logo lives in the firmware's LittleFS image (data/), which the sim's
+# static server can't reach — it serves simulator/ only.  Mirror it into the sim
+# so the sim's boot screen always shows exactly what the firmware ships.
+LOGO_SRC = os.path.join(REPO, "data", "fluid_dial.png")
+LOGO_DST = os.path.join(SIM_DIR, "img", "fluid_dial.png")
+
+
+def sync_logo():
+    """Copy data/fluid_dial.png into the sim if it differs. Returns True if copied."""
+    if not os.path.isfile(LOGO_SRC):
+        return False
+    src = open(LOGO_SRC, "rb").read()
+    if os.path.isfile(LOGO_DST) and open(LOGO_DST, "rb").read() == src:
+        return False
+    os.makedirs(os.path.dirname(LOGO_DST), exist_ok=True)
+    open(LOGO_DST, "wb").write(src)
+    return True
+
+
 def _hash(path):
     if not os.path.isfile(path):
         return None
@@ -177,6 +196,7 @@ def main():
             print("colours: regenerated js/colors.js from firmware #defines")
         else:
             print("colours: already up to date")
+    print("logo: copied data/fluid_dial.png into the sim" if sync_logo() else "logo: already up to date")
 
     report = compute_report()
     if report["missing"]:

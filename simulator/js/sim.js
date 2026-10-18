@@ -7,6 +7,7 @@
 
 // ===== Screen registry =====
 const SCREENS = {
+  [PSCREEN_BOOT]:          { enter: enterBoot,         exit: exitBoot,         draw: drawBootScreen,          handle: handleBootTouch,         update: [] },
   [PSCREEN_MAIN_MENU]:     { enter: enterMainMenu,     exit: exitMainMenu,     draw: drawMainMenu,            handle: handleMainMenuTouch,     update: [updateMainMenuDisplay] },
   [PSCREEN_STATUS]:        { enter: enterStatus,       exit: exitStatus,       draw: drawStatusScreen,        handle: handleStatusTouch,       update: [updateStatusMachineStatus, updateStatusCurrentFile, updateStatusAxisPositions, updateStatusFeedSpindle] },
   [PSCREEN_JOG_HOMING]:    { enter: enterJogHoming,    exit: exitJogHoming,    draw: drawJogHomingScreen,     handle: handleJogHomingTouch,    update: [updateJogAxisDisplay] },
@@ -30,7 +31,7 @@ const SCREENS = {
 };
 
 const SCREEN_LABELS = {
-  [PSCREEN_MAIN_MENU]: "Main Menu", [PSCREEN_STATUS]: "Status", [PSCREEN_JOG_HOMING]: "Jog & Homing",
+  [PSCREEN_BOOT]: "Boot Logo", [PSCREEN_MAIN_MENU]: "Main Menu", [PSCREEN_STATUS]: "Status", [PSCREEN_JOG_HOMING]: "Jog & Homing",
   [PSCREEN_PROBING_WORK]: "Work Area", [PSCREEN_PROBE]: "Probe Hub", [PSCREEN_PROBE_CFG_3D]: "Probe Config (3D)",
   [PSCREEN_PROBE_CFG_PLATE]: "Probe Config (Plate)", [PSCREEN_PROBE_Z]: "Probe: Z Surface",
   [PSCREEN_PROBE_CORNER]: "Probe: XYZ Corner", [PSCREEN_PROBE_BORE]: "Probe: Bore", [PSCREEN_PROBE_BOSS]: "Probe: Boss",
@@ -89,6 +90,7 @@ function jogStopTimeoutMs() {
 
 // ===== Encoder delta (ported handleEncoderDelta) =====
 function handleEncoderDelta(delta) {
+  if (currentPendantScreen === PSCREEN_BOOT) { leaveBoot(); return; }   // a knob turn skips the logo
   if (currentPendantScreen === PSCREEN_SPINDLE_CONTROL && pendantSpindle.dialMode) {
     const maxRPM = pendantMachine.spindleMaxRPM > 0 ? pendantMachine.spindleMaxRPM : 24000;
     const rpmStep = maxRPM <= 10000 ? 100 : 1000;
@@ -406,6 +408,51 @@ function renderLog() {
   el.scrollTop = el.scrollHeight;
 }
 
+// ===== Boot screen (mirrors setup(): show_logo(), then the logo hold) =====
+// A real screen in the registry, so it routes like any other.  The firmware
+// clears to black, draws data/fluid_dial.png centred in the top 240x240 area,
+// then holds it while a co-booting controller finishes starting up — sync.py
+// copies that same PNG into img/, so this always shows the shipping logo.
+//
+// Two ways in:
+//   * fresh load / the bench "Boot" button — a real boot: auto-advances to the
+//     main menu after BOOT_LOGO_MS (a tap or knob turn skips ahead);
+//   * the Screen dropdown — stays put for inspection until tapped.
+// A live-reload restores the session, so you are not sent back through it.
+const BOOT_LOGO_MS = 10000;   // ardmain.cpp: delay_ms(10000)
+let _bootAuto = false, _bootTimer = null;
+const _bootLogo = new Image();
+_bootLogo.src = "img/fluid_dial.png";
+
+function enterBoot() {
+  clearTimeout(_bootTimer);
+  if (_bootAuto) {
+    _bootTimer = setTimeout(leaveBoot, BOOT_LOGO_MS);
+    logLine(`Boot logo (${BOOT_LOGO_MS / 1000} s) — tap the screen or turn the knob to skip`);
+  }
+}
+function exitBoot() { clearTimeout(_bootTimer); _bootAuto = false; }
+
+function drawBootScreen() {
+  display.fillScreen(COLOR_BACKGROUND);
+  const paint = () => {
+    if (currentPendantScreen !== PSCREEN_BOOT || !_bootLogo.naturalWidth) return;
+    octx.drawImage(_bootLogo, ((240 - _bootLogo.naturalWidth) / 2) | 0,
+                              ((240 - _bootLogo.naturalHeight) / 2) | 0);
+  };
+  if (_bootLogo.complete) paint(); else _bootLogo.onload = paint;
+}
+
+function leaveBoot() { if (currentPendantScreen === PSCREEN_BOOT) navigateTo(PSCREEN_MAIN_MENU); }
+function handleBootTouch() { leaveBoot(); }     // like the end of setup(): on to the menu
+
+// Replay a real boot: logo, then the main menu on its own.
+function simBoot() {
+  _bootAuto = true;
+  if (currentPendantScreen === PSCREEN_BOOT) { enterBoot(); drawBootScreen(); }   // navigateTo() would no-op
+  else navigateTo(PSCREEN_BOOT);
+}
+
 // ===== Boot =====
 window.addEventListener("DOMContentLoaded", () => {
   canvas = document.getElementById("screen");
@@ -420,6 +467,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (jp.selectedIncrement !== undefined) pendantJog.selectedIncrement = jp.selectedIncrement;
   } catch (e) {}
 
+  const freshLoad = !sessionStorage.getItem("sim.session");   // before restoreSession()
   restoreSession();
 
   setupCanvasInput();
@@ -427,6 +475,7 @@ window.addEventListener("DOMContentLoaded", () => {
   setupEncoder();
   buildControls();
 
+  if (freshLoad) { currentPendantScreen = PSCREEN_BOOT; _bootAuto = true; syncControlsFromState(); }   // boot like the device
   SCREENS[currentPendantScreen].enter();
   drawCurrentPendantScreen();
   setInterval(tick, 100);

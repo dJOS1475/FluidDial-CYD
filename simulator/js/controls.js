@@ -232,6 +232,7 @@ function buildControls() {
   // -- Actions --
   root.appendChild(_el("h3", {}, "Actions"));
   const actions = _el("div", { class: "ctl-actions" }, [
+    _el("button", { type: "button", onclick: () => simBoot() }, "Boot"),
     _el("button", { type: "button", onclick: () => { drawCurrentPendantScreen(); } }, "Redraw"),
     _el("button", { type: "button", onclick: () => { simLog.length = 0; renderLog(); } }, "Clear log"),
     _el("button", { type: "button", onclick: resetSimState }, "Reset state"),

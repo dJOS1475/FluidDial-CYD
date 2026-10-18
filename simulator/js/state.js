@@ -12,6 +12,7 @@ const PENDANT_MAX_AXES = 6;
 const AXIS_NAMES = ["X", "Y", "Z", "A", "B", "C"];
 
 // ===== Screen enum (order matches PendantScreen in pendant_shared.h) =====
+const PSCREEN_BOOT          = "BOOT";        // sim-only: the boot logo, as setup() shows it
 const PSCREEN_MAIN_MENU     = "MAIN_MENU";
 const PSCREEN_STATUS        = "STATUS";
 const PSCREEN_JOG_HOMING    = "JOG_HOMING";
@@ -54,7 +55,7 @@ const pendantMachine = {
   rotation: 2,
   spindleMaxRPM: 24000,
   spindleMinRPM: 0,
-  fluidDialVersion: "v2.3.2",
+  fluidDialVersion: "v2.3.3",
   // Empty until a [VER:] report arrives — a plausible-looking default rendered
   // exactly like a real reading.  Screens show "---" while empty, as for IP/SSID.
   fluidNCVersion: "",

@@ -3,6 +3,11 @@
 **ChangeLog:**
 
 
+**2026-10-18**
+
+v2.3.3
+* Change: **new boot logo** — the Fluid Dial wordmark is now the chrome-and-flame design with a **CYD** badge, drawn on a pure black background so it sits seamlessly on the black boot screen.
+
 **2026-10-17**
 
 v2.3.2

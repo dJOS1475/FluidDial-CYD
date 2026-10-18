@@ -1,12 +1,12 @@
 {
   "name": "FluidDial-CYD (Factory Reset — wipes everything)",
-  "version": "2.3.2",
+  "version": "2.3.3",
   "new_install_prompt_erase": true,
   "builds": [
     {
       "chipFamily": "ESP32",
       "parts": [
-        { "path": "https://cdn.jsdelivr.net/gh/dJOS1475/FluidDial-CYD@876090dbcd836885dacdfb7598571303e8f3052c/docs/merged-flash.bin", "offset": 0 }
+        { "path": "https://cdn.jsdelivr.net/gh/dJOS1475/FluidDial-CYD@v2.3.3/docs/merged-flash.bin", "offset": 0 }
       ]
     }
   ]

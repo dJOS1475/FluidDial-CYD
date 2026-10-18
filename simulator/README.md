@@ -50,6 +50,12 @@ server.
   axis count, units, work/machine positions, feed & spindle, current job +
   progress, and (in WiFi mode) battery % and WiFi signal/AP state. Change any
   control and the active screen repaints.
+- **Boot logo** — a fresh tab opens on the boot screen, as the pendant does:
+  the logo held for 10 s (`delay_ms(10000)` in `ardmain.cpp`), then the main
+  menu; a tap or knob turn skips ahead. Pick **Boot Logo** in the Screen
+  dropdown to keep it on screen for inspection, or press **Boot** to replay a
+  real boot. The image is `data/fluid_dial.png`, which `sync.py` copies into
+  `img/`, so it is always the logo the firmware ships. A live-reload skips it.
 - **Controller Log (bottom)** — every G-code line, realtime override and
   request the UI emits (`send_line`, `fnc_realtime`, file/macro requests).
 
