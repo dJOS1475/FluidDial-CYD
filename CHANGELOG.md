@@ -2,6 +2,24 @@
 
 **ChangeLog:**
 
+**2026-10-22 — PiBot fork (unreleased)**
+
+* Add experimental `pibot_v42` target with FT6336U touch, PiBot backlight,
+  encoder and button mapping, plus the existing ESP-NOW/UART UI.
+* Keep the standard CYD target and its battery/touch detection unchanged.
+  PiBot battery telemetry is deferred.
+* PiBot: default screen rotation is now 0 (the generic default showed the screen
+  upside down on the pendant). Saved rotation preferences are unchanged.
+* PiBot: the 3-position selector (GPIO34/35/39) selects the jog axis and the
+  potentiometer (GPIO26) sets the jog speed cap on the Jog screen. Logic lives in the
+  host-tested `src/PiBotControls.h`. Untested on hardware; pot reads share ADC2 with
+  the ESP-NOW radio (see docs/PIBOT.md).
+* Isolate PiBot installer artifacts in `docs/pibot_v42/`; add host regression
+  checks and CI builds for both new-UI hardware targets.
+* Expand the existing GrblParser dependency pin to its full commit SHA so
+  PlatformIO's shallow Git fetch can resolve it (same library revision).
+* Hardware validation is pending; see [PiBot commissioning notes](docs/PIBOT.md).
+
 
 **2026-10-18**
 
@@ -459,4 +477,3 @@ v0.1
 * Probe Screen created and button added to Main Menu
 * Screen can be rotated 180 degress via the Jog Dial from the FluidNC
 * Screen Rotation is saved and will be recalled on restart
-

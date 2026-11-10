@@ -4,6 +4,7 @@
  */
 
 #pragma once
+#include "../PiBotPins.h"
 
 #include "../cnc_pendant_config.h"
 #include "../System.h"
@@ -104,7 +105,9 @@ struct HwEvent {
         ENCODER_DELTA,
         STATE_UPDATE,
         CONNECTED,      // edge: pendant transitioned to connected — fetch static config
-        POWER_OFF       // red button held 5 s — Core 1 draws shutdown screen then sleeps
+        POWER_OFF,      // red button held 5 s — Core 1 draws shutdown screen then sleeps
+        PIBOT_AXIS,     // PiBot selector switch settled on axis `value` (0=X 1=Y 2=Z)
+        PIBOT_SPEED     // PiBot potentiometer moved; `value` is 0..1000 permille
     } type;
     int32_t value;
 };
@@ -155,7 +158,7 @@ struct MachineState {
     String spindleDir     = "Fwd";
     bool   spindleRunning = false;
     String displayRotation  = "Normal";
-    int    rotation         = 2;
+    int    rotation         = PENDANT_NORMAL_ROTATION;
 
     int    spindleMaxRPM   = 24000;
     int    spindleMinRPM   = 0;
@@ -255,6 +258,9 @@ struct JogState {
 
 // Save jog preferences (coarseIdx + selectedIncrement) to NVS — defined in CNC_Pendant_UI.cpp
 extern void saveJogPrefs();
+// PiBot hardware controls (selector switch / potentiometer) applied to the Jog screen.
+extern void jogSelectAxisFromHardware(int axis);
+extern void jogSetSpeedFromHardware(int permille);
 
 // Request a feed/spindle override % — reached by a paced coarse+fine stepper in
 // the periodic loop (see CNC_Pendant_UI.cpp), not an immediate burst of bytes.

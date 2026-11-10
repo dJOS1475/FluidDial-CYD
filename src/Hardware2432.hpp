@@ -1,4 +1,16 @@
-#ifdef DEBUG_TO_USB
+#pragma once
+
+#include "PiBotPins.h"
+
+#ifdef PIBOT_PENDANT
+
+// PiBot RJ12 uses UART0. Do not use the generic CYD debug UART pins:
+// GPIO21 is the PiBot backlight, and GPIO35 belongs to its selector.
+constexpr static const int PND_RX_FNC_TX_PIN = pibot::uart_rx;
+constexpr static const int PND_TX_FNC_RX_PIN = pibot::uart_tx;
+constexpr static const int FNC_UART_NUM      = 0;
+
+#elif defined(DEBUG_TO_USB)
 
 // This variant lets you have debugging output on the
 // USB serial port, at the expense of not being able

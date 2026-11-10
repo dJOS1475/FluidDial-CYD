@@ -23,6 +23,10 @@
 #include "FileParser.h"
 #include "ConfigItem.h"
 #include "Encoder.h"
+#ifdef PIBOT_PENDANT
+#    include "PiBotControls.h"
+#    include <driver/adc.h>
+#endif
 #include "GrblParserC.h"
 #include "CommsUart.h"      // uart_backend_settle()
 
@@ -1060,10 +1064,10 @@ static void handleEncoderDelta(int32_t delta) {
         // what's stored on flash and a putInt() is required.
         static unsigned long lastRotationMs = 0;
         if (millis() - lastRotationMs > 300) {
-            int newRot = (pendantMachine.rotation == 2) ? 0 : 2;
+            int newRot = (pendantMachine.rotation == 2) ? 0 : 2;  // toggles between the two flips
             if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
                 pendantMachine.rotation        = newRot;
-                pendantMachine.displayRotation = (newRot == 2) ? "Normal" : "Upside Down";
+                pendantMachine.displayRotation = (newRot == PENDANT_NORMAL_ROTATION) ? "Normal" : "Upside Down";
                 xSemaphoreGive(stateMutex);
             }
             display.setRotation(newRot);
@@ -2208,6 +2212,19 @@ void pendant_hw_task(void* /*pvParameters*/) {
     unsigned long lastBatteryMs  = millis();
     unsigned long lastChargingMs = millis();
 
+#ifdef PIBOT_PENDANT
+    // Selector switch (GPIO34/35/39: input-only, external pull-ups) and potentiometer
+    // wiper (GPIO26 = ADC2 channel 9).
+    pinMode(pibot::selector_0, INPUT);
+    pinMode(pibot::selector_1, INPUT);
+    pinMode(pibot::selector_2, INPUT);
+    adc2_config_channel_atten(ADC2_CHANNEL_9, ADC_ATTEN_DB_11);
+    pibot::SelectorFilter selectorFilter(3);   // 3 x 20 ms
+    pibot::PotFilter      potFilter;
+    unsigned long         lastSelectorMs = 0;
+    unsigned long         lastPotMs      = 0;
+#endif
+
     for (;;) {
         // Encoder delta via PCNT.  Wired in 4x quadrature, so one physical
         // detent = 4 raw counts.  Accumulate until a full detent so slow
@@ -2232,6 +2249,41 @@ void pendant_hw_task(void* /*pvParameters*/) {
         }
 
         // (Physical buttons are handled on Core 0 in pendant_comms_task.)
+
+#ifdef PIBOT_PENDANT
+        // Selector switch -> jog axis.  Reports only a debounced CHANGE, so touch
+        // axis selection keeps working until the knob is turned again.
+        if (millis() - lastSelectorMs >= 20) {
+            lastSelectorMs = millis();
+            int decoded = pibot::decode_selector(digitalRead(pibot::selector_0),
+                                                 digitalRead(pibot::selector_1),
+                                                 digitalRead(pibot::selector_2));
+            int axis = selectorFilter.feed(decoded);
+            if (axis >= 0 && hwEventQueue) {
+                HwEvent ev = { HwEvent::PIBOT_AXIS, axis };
+                xQueueSend(hwEventQueue, &ev, 0);
+            }
+        }
+        // Potentiometer -> jog speed cap.  ADC2 is shared with the Wi-Fi driver that
+        // ESP-NOW needs, so a read can fail while the radio is busy: failed reads are
+        // dropped (never treated as 0), and the speed simply keeps its last value.
+        if (millis() - lastPotMs >= 40) {
+            lastPotMs = millis();
+            int sum = 0, ok = 0;
+            for (int i = 0; i < 4; i++) {
+                int raw = 0;
+                if (adc2_get_raw(ADC2_CHANNEL_9, ADC_WIDTH_BIT_12, &raw) == ESP_OK) {
+                    sum += raw;
+                    ok++;
+                }
+            }
+            int permille;
+            if (ok >= 2 && potFilter.feed(pibot::pot_permille(sum / ok), &permille) && hwEventQueue) {
+                HwEvent ev = { HwEvent::PIBOT_SPEED, permille };
+                xQueueSend(hwEventQueue, &ev, 0);
+            }
+        }
+#endif
 
         // Battery voltage every 5 s (ADC read, no bus contention).
         if (millis() - lastBatteryMs >= 5000) {
@@ -2277,7 +2329,8 @@ void setup_pendant() {
 
     // Load saved display rotation and jog preferences
     preferences.begin("pendant", false);
-    int  savedRotation = preferences.getInt("rotation",    2);
+    // PiBot: 0 is right way up (generic CYD: 2); the Rotate toggle still works.
+    int  savedRotation = preferences.getInt("rotation",    PENDANT_NORMAL_ROTATION);
     int  savedCoarse   = preferences.getInt("jogCoarseIdx", 0);
     // Default slot 2 = 1 mm (slots are 0.01 / 0.1 / 1 / dial).  This fallback is
     // the real fresh-build default — it overwrites the struct initialiser on
@@ -2293,7 +2346,7 @@ void setup_pendant() {
     pendantJog.selectedIncrement = constrain(savedSelInc, 0, 3);
 
     pendantMachine.rotation        = savedRotation;
-    pendantMachine.displayRotation = (savedRotation == 2) ? "Normal" : "Upside Down";
+    pendantMachine.displayRotation = (savedRotation == PENDANT_NORMAL_ROTATION) ? "Normal" : "Upside Down";
     display.setRotation(savedRotation);
 
     dbg_printf("Pendant rotation: %s (%d)\n",
@@ -2363,6 +2416,21 @@ void loop_pendant() {
                     lastActivityMs = millis();
                 }
                 break;
+#ifdef PIBOT_PENDANT
+            case HwEvent::PIBOT_AXIS:
+                // Never wake from sleep or interrupt an in-flight jog by knob alone.
+                if (currentPendantScreen != PSCREEN_SLEEP && state != Jog) {
+                    jogSelectAxisFromHardware(ev.value);
+                    lastActivityMs = millis();
+                }
+                break;
+            case HwEvent::PIBOT_SPEED:
+                if (currentPendantScreen != PSCREEN_SLEEP) {
+                    jogSetSpeedFromHardware(ev.value);
+                    lastActivityMs = millis();
+                }
+                break;
+#endif
             case HwEvent::BUTTON_RED:
                 lastActivityMs = millis();
                 break;

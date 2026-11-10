@@ -13,13 +13,21 @@
 #ifndef CNC_PENDANT_CONFIG_H
 #define CNC_PENDANT_CONFIG_H
 
+#ifdef PIBOT_PENDANT
+#include "PiBotPins.h"
+#endif
+
 // ===== Firmware Version =====
 // Single source of truth for the release version shown on the FluidNC screen
 // (and anywhere else the pendant displays its own version).  Bump this in lock
 // step with the top entry in CHANGELOG.md on every release — it is independent
 // of the git-tag-derived `git_info` string (which only changes when a tag is
 // actually cut, and is kept for the full build identifier in the About screen).
+#ifdef PIBOT_PENDANT
+#define FIRMWARE_VERSION "v2.3.3-pibot-dev"
+#else
 #define FIRMWARE_VERSION "v2.3.3"
+#endif
 
 // ===== Display Configuration =====
 #define DISPLAY_WIDTH 240
@@ -33,7 +41,11 @@
 #define TFT_CS 15
 #define TFT_DC 2
 #define TFT_RST -1  // Not used on CYD
+#ifdef PIBOT_PENDANT
+#define TFT_BL pibot::backlight
+#else
 #define TFT_BL 27   // Backlight
+#endif
 
 // ===== Touch Screen Pins =====
 #define TOUCH_CS 33
@@ -46,15 +58,27 @@
 #define TS_MAXY 3700
 
 // ===== Physical Button Pins (Optional - P6 Connector) =====
-#define BTN_RED_PIN 4       // E-Stop
+#ifdef PIBOT_PENDANT
+#define BTN_RED_PIN pibot::button_cancel
+#define BTN_YELLOW_PIN pibot::button_pause
+#define BTN_GREEN_PIN pibot::button_start
+#else
+#define BTN_RED_PIN 4       // Cancel (software reset, not a safety E-stop)
 #define BTN_YELLOW_PIN 17   // Pause
 #define BTN_GREEN_PIN 16    // Cycle Start
+#endif
 #define USE_PHYSICAL_BUTTONS true  // Set to false if not using physical buttons
 
 // ===== Rotary Encoder Pins (Optional - CN1 Connector) =====
+#ifdef PIBOT_PENDANT
+#define ENCODER_CLK pibot::encoder_a
+#define ENCODER_DT pibot::encoder_b
+#define ENCODER_SW -1  // No encoder push switch; GPIO35 is the selector
+#else
 #define ENCODER_CLK 22
 #define ENCODER_DT 21
 #define ENCODER_SW 35
+#endif
 #define USE_ENCODER true  // Set to false if not using encoder
 
 // ===== Color Scheme - Dark Mode =====

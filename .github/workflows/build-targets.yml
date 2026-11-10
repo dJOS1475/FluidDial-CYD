@@ -1,0 +1,38 @@
+name: Build CYD and PiBot targets
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [cyd_new_ui_combined, pibot_v42]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: ${{ runner.os }}-pio-${{ matrix.target }}-${{ hashFiles('platformio.ini') }}
+      - name: Install PlatformIO
+        run: pip install platformio
+      - name: Host regression checks
+        run: python3 -m unittest discover -s test -p 'test_*.py' -v
+      - name: Build firmware and merged image
+        run: pio run -e ${{ matrix.target }} -t build_merged
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: |
+            .pio/build/${{ matrix.target }}/*.bin
+            .pio/build/${{ matrix.target }}/firmware.elf
