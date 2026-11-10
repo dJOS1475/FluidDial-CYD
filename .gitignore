@@ -8,3 +8,4 @@ release
 .claude/
 __pycache__/
 .DS_Store
+/docs/pibot_v42/

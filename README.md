@@ -1,4 +1,9 @@
 # FluidDial-CYD: 
+**Experimental target:** PiBot Pendant V4.2 support is available with
+`pio run -e pibot_v42`. The standard `cyd_new_ui_combined` target is retained.
+Read [PiBot hardware, build and commissioning notes](docs/PIBOT.md) before flashing;
+the generic CYD web-installer binary is not a PiBot build.
+
 FluidDial-CYD is a custom firmware for CYD-equipped FluidDial CNC pendants. The UI has been rebuilt from the ground up for devices with 3 physical buttons and a jog dial. Supports both **resistive (XPT2046)** and **capacitive (CST816S)** CYD screen variants. 
 
 Runs **wired over UART** or **wireless over ESP-NOW** (requires FluidNC v4.0.4+), with **Li-Ion battery** support for a fully untethered pendant.
@@ -172,7 +177,7 @@ Wiki pages for more information: CYD Dial Pendant (http://wiki.fluidnc.com/en/ha
 
 ### Building from source
 
-The only supported build target is **`cyd_new_ui_combined`** — a single binary that runs on every supported CYD variant (resistive XPT2046, capacitive CST816S, with or without the IP5306 battery PMIC). It is the binary published via the web installer and on the [Releases page](https://github.com/dJOS1475/FluidDial-CYD/releases).
+The standard CYD build target is **`cyd_new_ui_combined`** — a single binary that runs on every supported CYD variant (resistive XPT2046, capacitive CST816S, with or without the IP5306 battery PMIC). It is the binary published via the web installer and [Releases page](https://github.com/dJOS1475/FluidDial-CYD/releases). An experimental hardware-specific target, **`pibot_v42`**, is also available in this repository; see [PiBot notes](docs/PIBOT.md). PiBot binaries are not included in the web installer or releases while hardware validation is pending.
 
 ```
 pio run -e cyd_new_ui_combined
@@ -204,4 +209,3 @@ FluidDial-CYD v1.0.0:
 
 FluidDial-CYD v2.1.7: 
 [![Watch the video](https://img.youtube.com/vi/rT5MI35Bp68/maxresdefault.jpg)](https://youtu.be/rT5MI35Bp68)
-
