@@ -1,6 +1,7 @@
 #include "pendant_shared.h"
 #include "screen_jog_homing.h"
 #include "screen_probe.h"   // probeDrawKVTouch — shared adjustable-field style
+#include "../PiBotControls.h"   // pot_to_speed (pure logic, host-tested)
 
 // ===== Increment sets =====
 struct IncrementSet {
@@ -495,4 +496,44 @@ void handleJogHomingTouch(int x, int y) {
 
     if (isTouchInBounds(x, y, 5,   SPD_Y, 73, SPD_H)) { currentPendantScreen = PSCREEN_MAIN_MENU;    return; }
     if (isTouchInBounds(x, y, 162, SPD_Y, 73, SPD_H)) { currentPendantScreen = PSCREEN_PROBING_WORK; return; }
+}
+
+// ===== PiBot hardware controls (selector switch / potentiometer) =====
+// Called from the Core 1 UI loop only (never from the hardware task), so they may
+// redraw. Both are no-ops for the jog state unless the machine is connected.
+
+void jogSelectAxisFromHardware(int axis) {
+    if (!pendantConnected || axis < 0 || axis >= pendantMachine.numAxes) {
+        return;  // axis not present on this machine: ignore the knob position
+    }
+    bool leavingIncDial      = pendantJog.incDialMode;
+    pendantJog.speedDialMode = false;   // same as picking an axis by touch
+    pendantJog.incDialMode   = false;
+    pendantJog.selectedAxis  = axis;
+    pendantJog.homingAxis    = -1;
+    if (currentPendantScreen != PSCREEN_JOG_HOMING) {
+        return;   // state is set; the Jog screen picks it up when entered
+    }
+    redrawJogAxisButtons();
+    redrawJogSpeedButton();
+    if (leavingIncDial) redrawJogIncrementButtons();
+    redrawJogIncrementLabel();
+}
+
+void jogSetSpeedFromHardware(int permille) {
+    // Only on the Jog screen, and not while the encoder is busy adjusting speed or
+    // the coarse increment (the pot must not fight the dial).
+    if (!pendantConnected || currentPendantScreen != PSCREEN_JOG_HOMING || pendantJog.speedDialMode ||
+        pendantJog.incDialMode) {
+        return;
+    }
+    // Same bounds and step sizes the encoder uses in handleEncoderDelta().
+    if (pendantMachine.inInches) {
+        int maxIn = constrain((int)(pendantJog.maxFeedRate / 25.4f), 40, 400);
+        pendantJog.jogSpeedIn = pibot::pot_to_speed(permille, 40, maxIn, 20);
+    } else {
+        pendantJog.jogSpeedMm = pibot::pot_to_speed(permille, 1000, pendantJog.maxFeedRate, 500);
+    }
+    redrawJogSpeedButton();
+    updateJogAxisDisplay();
 }

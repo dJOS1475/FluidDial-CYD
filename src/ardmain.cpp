@@ -2,6 +2,7 @@
 // Use of this source code is governed by a GPLv3 license that can be found in the LICENSE file.
 
 #include "System.h"
+#include "PiBotPins.h"
 #include "FileParser.h"
 #include "FluidNCModel.h"   // fnc_init_tx_lock()
 #include "Scene.h"
@@ -137,7 +138,7 @@ void setup() {
     display.setBrightness(aboutScene.getBrightness());
 
 #ifdef USE_NEW_UI
-    display.setRotation(2);  // Boot screen rotation (overridden by saved preference in setup_pendant)
+    display.setRotation(PENDANT_NORMAL_ROTATION);  // Boot screen rotation (overridden by saved preference in setup_pendant)
 #endif
     show_logo();
 #ifdef USE_NEW_UI
