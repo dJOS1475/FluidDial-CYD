@@ -156,51 +156,16 @@ let nvsPrevIter0 = 0,
   nvsPrevMinHeap = 0,
   nvsPrevNowHeap = 0;
 
-// ---- comms transport mode (USE_WIFI build is what the sim models) ----
-const COMMS_MODE_UART = 0,
-  COMMS_MODE_WIFI = 1;
-let _commsMode = COMMS_MODE_UART;
-function comms_active_mode() {
-  return _commsMode;
-}
-const TFORCE_UART = 0,
-  TFORCE_WIFI = 1;
-function get_transport_force() {
-  return _commsMode === COMMS_MODE_WIFI ? TFORCE_WIFI : TFORCE_UART;
-}
-function set_transport_force(v) {
-  _commsMode = v === TFORCE_WIFI ? COMMS_MODE_WIFI : COMMS_MODE_UART;
-  logLine("Transport override -> " + (v === TFORCE_WIFI ? "WiFi" : "UART"));
-}
-
-// ---- WiFi helpers (WiFi-mode WiFi-setup screen) ----
-function wifi_in_ap_mode() {
-  return pendantMachine.wifiInApMode;
-}
-function wifi_status_str() {
-  if (pendantMachine.wifiInApMode) return "AP / captive portal";
-  return pendantConnected ? "Connected" : "Connecting...";
-}
-function wifi_last_error() {
-  return "";
-}
-function wifi_ap_ssid() {
-  return "FluidDial-Setup";
-}
-function websocket_is_connected() {
-  return pendantConnected;
-}
-function wifi_active_config() {
-  return {
-    valid: pendantMachine.wifiSSID !== "---",
-    ssid: pendantMachine.wifiSSID,
-    fluidnc_ip: pendantMachine.ipAddress,
-  };
-}
-function wifi_stop_ap() {
-  pendantMachine.wifiInApMode = false;
-  logLine("wifi_stop_ap()");
-}
+// ---- comms transport ----
+// The firmware has two transports, UART and ESP-NOW (Comms.h — value 1 was the
+// WiFi backend, removed in v2.2.0).  The sim names them with strings; these
+// constants let ported code keep the firmware's spelling, e.g.
+//     if (comms_active_mode() == COMMS_MODE_UART) return;
+// comms_active_mode(), get_transport_force() and set_transport_force() live in
+// screens/connection.js, which models the stored choice separately from the
+// transport actually running (they differ until the reboot that applies a change).
+const COMMS_MODE_UART = "UART", COMMS_MODE_ESPNOW = "ESPNOW";
+const TFORCE_UART = "UART", TFORCE_ESPNOW = "ESPNOW";
 
 // ---- seed data for the list screens ----
 // A handful of realistic names, then generated filler so long lists can be

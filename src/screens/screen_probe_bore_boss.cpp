@@ -164,10 +164,10 @@ void drawProbeBoreScreen() {
     probeDrawPosPanel(38);
 
     // ── Combined panel: sequence (left) + settings & result (right) ───────────
-    display.fillRoundRect(5, 70, 230, 146, 4, PROBE_BG_PANEL);
+    uiPanel(&display, 5, 70, 230, 146);
 
     // Left column: sequence steps
-    display.setTextSize(1);
+    uiText(&display, 1);
     display.setTextColor(PROBE_C_LBLUE);
     display.setCursor(10, 73);
     display.print("SEQUENCE");
@@ -177,7 +177,7 @@ void drawProbeBoreScreen() {
     drawBoreDiagram();
 
     // Right column: 2 KV-touch settings (h=27 so the value isn't clipped)
-    display.setTextSize(1);
+    uiText(&display, 1);
     display.setTextColor(PROBE_C_LBLUE);
     display.setCursor(122, 73);
     display.print("SETTINGS");
@@ -185,7 +185,7 @@ void drawProbeBoreScreen() {
     updateProbeBoreFields();
 
     // Right column, centred: result line, then the Z-Surface note.
-    display.setTextSize(1);
+    uiText(&display, 1);
     {
         const char* s = "Sets X0 Y0";
         display.setTextColor(PROBE_C_GREEN);
@@ -414,7 +414,7 @@ static void drawBossDiagramRect() {
     display.drawLine(60, 192, 63, 196, PROBE_C_GREEN);
     // Z0 tick at the centre (the top touch still sets Z0 first).
     display.fillCircle(60, 175, 2, PROBE_C_YELLOW);
-    display.setTextSize(1);
+    uiText(&display, 1);
     display.setTextColor(PROBE_C_YELLOW);
     display.setCursor(64, 172);
     display.print("Z0");
@@ -446,10 +446,10 @@ void drawProbeBossScreen() {
     probeDrawPosPanel(38);
 
     // Combined panel: sequence + diagram (left) / settings + result (right).
-    display.fillRoundRect(5, 70, 230, 146, 4, PROBE_BG_PANEL);
+    uiPanel(&display, 5, 70, 230, 146);
 
     // Left: sequence + diagram
-    display.setTextSize(1);
+    uiText(&display, 1);
     display.setTextColor(PROBE_C_LBLUE);
     display.setCursor(10, 73);
     display.print("SEQUENCE");
@@ -463,14 +463,14 @@ void drawProbeBossScreen() {
     display.drawRoundRect(6, 136, 112, 79, 3, PROBE_C_TAPBDR);
     if (pendantProbeV2.bossRect) drawBossDiagramRect();
     else                         drawBossDiagram();
-    display.setTextSize(1);
+    uiText(&display, 1);
     display.setTextColor(PROBE_C_LBLUE);
     display.setCursor(10, 206);
     display.print("Tap: shape");
 
     // Right: KV settings (h=27 so the value isn't clipped).  Rectangular mode
     // splits the nominal size into X-size / Y-size, so it shows one extra field.
-    display.setTextSize(1);
+    uiText(&display, 1);
     display.setTextColor(PROBE_C_LBLUE);
     display.setCursor(122, 73);
     display.print("SETTINGS");
@@ -480,7 +480,7 @@ void drawProbeBossScreen() {
     // Result line — what axes the probe will set (below the last field)
     {
         const char* s = "Sets X0 Y0 Z0";
-        display.setTextSize(1);
+        uiText(&display, 1);
         display.setTextColor(PROBE_C_GREEN);
         display.setCursor(177 - display.textWidth(s) / 2, pendantProbeV2.bossRect ? 205 : 182);
         display.print(s);

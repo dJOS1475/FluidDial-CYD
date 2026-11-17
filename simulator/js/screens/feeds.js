@@ -41,12 +41,12 @@ function updateFeedsSpeedsTopDisplay() {
   const P = panel(230, 35, 5, 40);
   const g = P.g, ox = P.ox, oy = P.oy;
   g.fillRect(ox, oy, 230, 35, COLOR_BACKGROUND);
-  g.fillRoundRect(ox, oy, 112, 35, 5, COLOR_DARKER_BG);
+  uiPanel(g, ox, oy, 112, 35);
   g.setTextColor(COLOR_GRAY_TEXT); g.setTextSize(1);
   g.setCursor(ox + 5, oy + 3); g.print("FEED");
   g.setTextColor(COLOR_ORANGE); g.setTextSize(2);
   g.setCursor(ox + 5, oy + 13); g.print(pendantMachine.feedRate);
-  g.fillRoundRect(ox + 118, oy, 112, 35, 5, COLOR_DARKER_BG);
+  uiPanel(g, ox + 118, oy, 112, 35);
   g.setTextColor(COLOR_GRAY_TEXT); g.setTextSize(1);
   g.setCursor(ox + 123, oy + 3); g.print("SPINDLE");
   g.setTextColor(COLOR_GREEN); g.setTextSize(2);
@@ -57,7 +57,7 @@ function updateFeedsSpeedsTopDisplay() {
 // sprite `g`: label on top, large value + unit below; border and value
 // highlight (yellow) while the dial is active.
 function drawDialField(g, ox, oy, w, h, value, valColor, active) {
-  const bg = active ? PROBE_SEL_BG : PROBE_BG_SCREEN;
+  const bg = active ? PROBE_SEL_BG : fieldBg();
   const bdr = active ? PROBE_C_YELLOW : PROBE_C_TAPBDR;
   g.fillRect(ox, oy, w, h, COLOR_BACKGROUND);
   g.fillRoundRect(ox, oy, w, h, 2, bg);
@@ -66,13 +66,8 @@ function drawDialField(g, ox, oy, w, h, value, valColor, active) {
   g.setTextColor(active ? COLOR_WHITE : PROBE_C_LBLUE);
   g.setCursor(ox + 3, oy + 2); g.print("DIAL");
   const vbuf = String(value);
-  g.setTextSize(2);
-  g.setTextColor(active ? PROBE_C_YELLOW : valColor);
-  g.setCursor(ox + 3, oy + 11); g.print(vbuf);
-  g.setTextSize(1);
-  g.setTextColor(PROBE_C_DIMBLUE);
-  const vw = g.textWidth(vbuf) * 2;
-  g.setCursor(ox + 3 + vw + 1, oy + 14); g.print("%");
+  // Font2 "100 %" on one line under the caption, as the probe fields.
+  uiFieldValue(ox + 3, w - 6, oy + 10 + (h - 10) / 2, vbuf, "%", active ? PROBE_C_YELLOW : valColor, false);
 }
 
 function updateFeedOverrideDisplay() {

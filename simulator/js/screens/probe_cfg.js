@@ -6,7 +6,7 @@ const kGfxCX = 120;
 // 3D touch probe (compact — fits below the deflection-cal panel, y188+).
 function drawProbe3DGraphic() {
   const cx = kGfxCX;
-  display.fillRoundRect(5, 188, 230, 82, 4, PROBE_BG_PANEL);
+  uiPanel(display, 5, 188, 230, 82);
   display.fillRect(cx - 7, 194, 14, 8, PROBE_C_DIMBLUE);
   display.fillRoundRect(cx - 17, 202, 34, 18, 4, COLOR_GRAY_TEXT);
   display.drawFastVLine(cx - 1, 220, 24, PROBE_C_LBLUE);
@@ -20,7 +20,7 @@ function drawProbe3DGraphic() {
 
 function drawPlateZGraphic() {
   const cx = kGfxCX;
-  display.fillRoundRect(5, 128, 230, 142, 4, PROBE_BG_PANEL);
+  uiPanel(display, 5, 128, 230, 142);
   display.fillRect(cx - 45, 206, 90, 32, COLOR_BUTTON_GRAY);
   display.fillRect(cx - 55, 194, 110, 12, PROBE_C_BLUE);
   display.fillRect(cx - 7, 164, 14, 30, COLOR_GRAY_TEXT);
@@ -28,7 +28,7 @@ function drawPlateZGraphic() {
 
 function drawPlateXYZGraphic() {
   const cx = kGfxCX;
-  display.fillRoundRect(5, 170, 230, 100, 4, PROBE_BG_PANEL);
+  uiPanel(display, 5, 170, 230, 100);
   display.fillRect(cx - 28, 213, 90, 43, COLOR_BUTTON_GRAY);
   display.fillRect(cx - 40, 203, 78, 10, PROBE_C_BLUE);
   display.fillRect(cx - 40, 203, 10, 53, PROBE_C_BLUE);
@@ -52,15 +52,11 @@ function drawCalOverlay(l1, l2, l2col, buttons, okLabel = "APPLY") {
   display.setCursor(120 - (display.textWidth(l1) / 2 | 0), 118); display.print(l1);
   display.setTextSize(2); display.setTextColor(l2col);
   display.setCursor(120 - (display.textWidth(l2) / 2 | 0), 140); display.print(l2);
-  display.setTextSize(2); display.setTextColor(COLOR_WHITE);
   if (buttons === 2) {
-    display.fillRoundRect(28, 175, 78, 32, 5, COLOR_BUTTON_GRAY);
-    display.fillRoundRect(114, 175, 98, 32, 5, PROBE_BTN_GREEN);
-    display.setCursor(36, 183); display.print("CANCEL");
-    display.setCursor(114 + ((98 - display.textWidth(okLabel)) / 2 | 0), 183); display.print(okLabel);
+    drawButton(28, 175, 78, 32, "CANCEL", COLOR_BUTTON_GRAY, COLOR_WHITE, 2);
+    drawButton(114, 175, 98, 32, okLabel, PROBE_BTN_GREEN, COLOR_WHITE, 2);   // affirmative
   } else if (buttons === 1) {
-    display.fillRoundRect(71, 175, 98, 32, 5, PROBE_BTN_BLUE);
-    display.setCursor(71 + ((98 - display.textWidth("OK")) / 2 | 0), 183); display.print("OK");
+    drawButton(71, 175, 98, 32, "OK", PROBE_BTN_BLUE, COLOR_WHITE, 2);        // dismiss
   }
 }
 
@@ -121,18 +117,18 @@ function updateProbeCfg3DFields() {
 function drawProbeCfg3DScreen() {
   display.fillScreen(PROBE_BG_SCREEN);
   drawTitle("PROBE CONFIG");
-  display.fillRoundRect(5, 38, 230, 26, 4, PROBE_BG_PANEL);
+  uiPanel(display, 5, 38, 230, 26);
   display.setTextSize(1); display.setTextColor(PROBE_C_LBLUE);
   display.setCursor(10, 41); display.print("PROBE HARDWARE");
   display.setTextColor(PROBE_C_GREEN);
   display.setCursor(10, 53); display.print("3D Touch Probe");
 
-  display.fillRoundRect(5, 67, 230, 55, 4, PROBE_BG_PANEL);
+  uiPanel(display, 5, 67, 230, 55);
   display.setTextSize(1); display.setTextColor(PROBE_C_LBLUE);
   display.setCursor(10, 70); display.print("STYLUS");
 
   // Deflection-calibration panel (field spaced like the Stylus panel)
-  display.fillRoundRect(5, 128, 230, 55, 4, PROBE_BG_PANEL);
+  uiPanel(display, 5, 128, 230, 55);
   display.setTextSize(1); display.setTextColor(PROBE_C_LBLUE);
   display.setCursor(10, 131); display.print("DEFLECTION CAL");
   drawButton(122, 140, 111, 40, "Calibrate", PROBE_BTN_BLUE, COLOR_WHITE, 2);
@@ -208,14 +204,14 @@ function drawProbeCfgPlateScreen() {
   drawTitle("PROBE CONFIG");
   const xyz = pendantProbeV2.probeTypeIdx === PROBE_TYPE_XYZPLATE;
 
-  display.fillRoundRect(5, 38, 230, 26, 4, PROBE_BG_PANEL);
+  uiPanel(display, 5, 38, 230, 26);
   display.setTextSize(1); display.setTextColor(PROBE_C_LBLUE);
   display.setCursor(10, 41); display.print("PROBE TYPE");
   display.setTextColor(PROBE_C_GREEN);
   display.setCursor(10, 53); display.print(xyz ? "XYZ Touch Plate" : "Z-Height Touch Plate");
 
   const panelH = xyz ? 98 : 55;
-  display.fillRoundRect(5, 67, 230, panelH, 4, PROBE_BG_PANEL);
+  uiPanel(display, 5, 67, 230, panelH);
   display.setTextSize(1); display.setTextColor(PROBE_C_LBLUE);
   display.setCursor(10, 70); display.print(xyz ? "PLATE DIMENSIONS" : "PLATE THICKNESS");
   updateProbeCfgPlateFields();

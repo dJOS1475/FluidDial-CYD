@@ -27,32 +27,16 @@ function drawRoundRect(x, y, w, h, r, color) {
   display.fillRoundRect(x, y, w, h, r, color);
 }
 
-function drawButton(x, y, w, h, text, bgColor, textColor, textSize = 2) {
-  drawRoundRect(x, y, w, h, 8, bgColor);
-  display.setTextColor(textColor);
-  display.setTextSize(textSize);
-  const tw = display.textWidth(String(text));
-  const th = display.fontHeight();
-  display.setCursor(x + ((w - tw) / 2) | 0, y + ((h - th) / 2) | 0);
-  display.print(String(text));
+// Buttons draw in the v2.4.0 style (uistyle.js): bevelled 3D frame,
+// FreeSansBold label (GLCD at textSize 1), optional icon left of the label.
+function drawButton(x, y, w, h, text, bgColor, textColor, textSize = 2, icon = null) {
+  uiDrawButton(x, y, w, h, String(text), bgColor, textColor, textSize, icon);
 }
 
-function drawMultiLineButton(x, y, w, h, line1, line2, bgColor, textColor, textSize = 1) {
-  drawRoundRect(x, y, w, h, 8, bgColor);
-  display.setTextColor(textColor);
-  display.setTextSize(textSize);
-  const fh = display.fontHeight();
-  const totalH = fh * 2 + 4;
-  const startY = y + ((h - totalH) / 2) | 0;
-  const tw1 = display.textWidth(line1);
-  display.setCursor(x + ((w - tw1) / 2) | 0, startY);
-  display.print(line1);
-  const tw2 = display.textWidth(line2);
-  display.setCursor(x + ((w - tw2) / 2) | 0, startY + fh + 4);
-  display.print(line2);
+function drawMultiLineButton(x, y, w, h, line1, line2, bgColor, textColor, textSize = 1, icon = null) {
+  uiDrawButton(x, y, w, h, [line1, line2], bgColor, textColor, textSize, icon);
 }
 
-// ---- Battery icon (top-right, WiFi mode only) ----
 // Lightning-bolt charging glyph (~6w x 9h, full battery height), yellow with a
 // 1px black outline.
 function drawChargeBolt(x, y) {
@@ -65,61 +49,15 @@ function drawChargeBolt(x, y) {
     display.drawFastHLine(x + r[1], y + r[0], r[2], COLOR_YELLOW);
 }
 
-function drawBatteryIcon() {
-  if (comms_active_mode() !== COMMS_MODE_WIFI) return;
-  const pct = pendantMachine.batteryPercent;
-  const charging = pendantMachine.batteryCharging;
-  if (pct < 0) return;
-
-  const outline = COLOR_GRAY_TEXT;   // outline no longer signals charging
-  const fg = pct > 50 ? COLOR_GREEN : pct > 20 ? COLOR_ORANGE : COLOR_RED;
-
-  // sprite was 25x13 at (212,11); draw directly at that origin
-  const ox = 212,
-    oy = 11;
-  display.fillRect(ox, oy, 25, 13, COLOR_DARKER_BG);
-  display.drawRoundRect(ox + 1, oy + 1, 20, 11, 2, outline);
-  display.fillRect(ox + 21, oy + 4, 3, 5, outline);
-  const fillW = (16 * pct) / 100 | 0;
-  if (fillW > 0) display.fillRect(ox + 3, oy + 3, fillW, 7, fg);
-  if (charging) drawChargeBolt(ox + 8, oy + 2);   // full-height yellow lightning bolt overlay
-}
-
-// ---- WiFi signal icon (top-left, WiFi mode only) ----
-function drawWiFiIcon() {
-  if (comms_active_mode() !== COMMS_MODE_WIFI) return;
-  const ox = 5,
-    oy = 11;
-  display.fillRect(ox, oy, 22, 13, COLOR_DARKER_BG);
-  if (pendantMachine.wifiInApMode) {
-    display.setTextSize(1);
-    display.setTextColor(COLOR_ORANGE);
-    display.setCursor(ox + 2, oy + 3);
-    display.print("AP");
-    return;
-  }
-  let bars = pendantMachine.wifiSignalBars;
-  if (bars < 0) bars = 0;
-  const live = bars >= 3 ? COLOR_GREEN : bars >= 2 ? COLOR_ORANGE : bars >= 1 ? COLOR_RED : COLOR_GRAY_TEXT;
-  const bar_h = [3, 6, 9, 12];
-  for (let i = 0; i < 4; i++) {
-    const x = 1 + i * 5;
-    const h = bar_h[i];
-    const y = 12 - h;
-    const col = i < bars ? live : COLOR_BUTTON_GRAY;
-    display.fillRect(ox + x, oy + y, 3, h, col);
-  }
-}
-
+// Title bar: framed bar, per-screen icon on the left, status box on the right
+// (signal + battery on a wireless pendant, a plug on a wired one) — uiDrawTitle().
 function drawTitle(title) {
-  display.fillRect(0, 0, 240, 35, COLOR_DARKER_BG);
-  display.setTextColor(COLOR_TITLE);
-  display.setTextSize(2);
-  const tw = display.textWidth(title);
-  display.setCursor(((240 - tw) / 2) | 0, 10);
-  display.print(title);
-  drawWiFiIcon();
-  drawBatteryIcon();
+  uiDrawTitle(title);
+}
+
+// Periodic title-bar refresh (sim.js tick) — just the status box.
+function refreshTitleIcons() {
+  uiDrawTitleStatus();
 }
 
 function drawInfoBox(x, y, w, h, label, value, valueColor = COLOR_ORANGE) {
@@ -188,7 +126,7 @@ function probeDrawPosPanel(y, h = 28) {
   const g = P.g,
     ox = P.ox,
     oy = P.oy;
-  g.fillRoundRect(ox, oy, 230, h, 4, PROBE_BG_PANEL);
+  uiPanel(g, ox, oy, 230, h);
 
   if (h >= 38) {
     const cols = [5, 80, 155];
@@ -202,7 +140,7 @@ function probeDrawPosPanel(y, h = 28) {
       g.print(axLabels[i]);
     }
     g.setTextSize(1);
-    g.setTextColor(PROBE_C_DIMBLUE);
+    g.setTextColor(unitColor());
     g.setCursor(ox + 212, oy + 3);
     g.print(uu);
     g.setTextSize(2);
@@ -235,7 +173,7 @@ function probeDrawPosPanel(y, h = 28) {
     g.setTextColor(PROBE_C_YELLOW);
     g.setCursor(ox + 169, oy + 14);
     g.print(fmtF(pz, dec));
-    g.setTextColor(PROBE_C_DIMBLUE);
+    g.setTextColor(unitColor());
     g.setCursor(ox + 215, oy + 18);
     g.print(uu);
   }
@@ -259,7 +197,7 @@ function probeDrawSelBar(y, fieldName, value, unit, decimals = 3) {
   display.setCursor(215 - vw - display.textWidth(unit), y + 3);
   display.print(vbuf);
   display.setTextSize(1);
-  display.setTextColor(PROBE_C_DIMBLUE);
+  display.setTextColor(unitColor());
   display.setCursor(218 - display.textWidth(unit), y + 8);
   display.print(unit);
 }
@@ -279,8 +217,30 @@ function probeDrawSelBarInt(y, fieldName, value) {
   display.print(vbuf);
 }
 
+// Tap-to-edit field fill: an inset navy (UI_FIELD_BG in the firmware).
+function fieldBg() { return UI_FIELD_BG; }
+
+// Unit suffixes (mm, mm/m, %, in): near-white so they read on the navy fields.
+function unitColor() { return UI_UNIT; }
+
+// A field's value and unit on one line in Font2, e.g.
+// "150 mm/m" — value in its colour, unit near-white — centred (caps) on cy.
+// Regular weight: the doubled "bold" Font2 read worse at this size.
+// x0/w: the span to place it in; centre=false left-aligns at x0.
+function uiFieldValue(x0, w, cy, value, unit, valColor, centre) {
+  const g = display;
+  g.setFont(GFX_FONTS.Font2); g.setTextSize(1);
+  const sp = unit ? g.textWidth(" ") : 0;
+  const vw = g.textWidth(value), uw = unit ? g.textWidth(unit) : 0;
+  const x = centre ? x0 + ((w - (vw + sp + uw)) / 2 | 0) : x0;
+  const y = uiCenterCursorY(g, cy);
+  g.setTextColor(valColor); g.setCursor(x, y); g.print(value);
+  if (unit) { g.setTextColor(UI_UNIT); g.setCursor(x + vw + sp, y); g.print(unit); }
+  g.setFont(null);
+}
+
 function probeDrawKVTouch(x, y, w, h, label, value, unit, valColor, focused, decimals = 3) {
-  const bg = focused ? PROBE_SEL_BG : PROBE_BG_SCREEN;
+  const bg = focused ? PROBE_SEL_BG : fieldBg();
   const bdr = focused ? PROBE_C_YELLOW : PROBE_C_TAPBDR;
   display.fillRoundRect(x, y, w, h, 2, bg);
   display.drawRoundRect(x, y, w, h, 2, bdr);
@@ -289,19 +249,12 @@ function probeDrawKVTouch(x, y, w, h, label, value, unit, valColor, focused, dec
   display.setCursor(x + 3, y + 2);
   display.print(label);
   const vbuf = fmtF(value, decimals);
-  display.setTextSize(2);
-  display.setTextColor(focused ? PROBE_C_YELLOW : valColor);
-  display.setCursor(x + 3, y + 11);
-  display.print(vbuf);
-  display.setTextSize(1);
-  display.setTextColor(PROBE_C_DIMBLUE);
-  const vw = display.textWidth(vbuf) * 2;
-  display.setCursor(x + 3 + vw + 1, y + 14);
-  display.print(unit);
+  // value + unit on one line, centred in the space under the caption
+  uiFieldValue(x + 3, w - 6, y + 10 + (h - 10) / 2, vbuf, unit, focused ? PROBE_C_YELLOW : valColor, false);
 }
 
 function probeDrawKVTouchInt(x, y, w, h, label, value, valColor, focused) {
-  const bg = focused ? PROBE_SEL_BG : PROBE_BG_SCREEN;
+  const bg = focused ? PROBE_SEL_BG : fieldBg();
   const bdr = focused ? PROBE_C_YELLOW : PROBE_C_TAPBDR;
   display.fillRoundRect(x, y, w, h, 2, bg);
   display.drawRoundRect(x, y, w, h, 2, bdr);
@@ -339,15 +292,8 @@ function probeDrawConfirmOverlay(routineName) {
   const tw = display.textWidth(routineName);
   display.setCursor(120 - (tw / 2) | 0, 126);
   display.print(routineName);
-  display.fillRoundRect(28, 175, 78, 32, 5, COLOR_BUTTON_GRAY);
-  display.fillRoundRect(114, 175, 98, 32, 5, PROBE_BTN_GREEN);
-  display.setTextSize(2);
-  display.setTextColor(COLOR_WHITE);
-  display.setCursor(36, 183);
-  display.print("CANCEL");
-  const cw = display.textWidth("CONFIRM");
-  display.setCursor(114 + ((98 - cw) / 2) | 0, 183);
-  display.print("CONFIRM");
+  drawButton(28, 175, 78, 32, "CANCEL", COLOR_BUTTON_GRAY, COLOR_WHITE, 2);
+  drawButton(114, 175, 98, 32, "CONFIRM", PROBE_BTN_GREEN, COLOR_WHITE, 2);
 }
 
 function probeDialStep(delta, baseStep) {
@@ -494,7 +440,7 @@ function probeReturnToTrigger(axis) {
 
 // Work-area selector button — styled like the Z-Surface "Sets" box.
 function probeDrawWorkAreaButton(x, y, w, h) {
-  display.fillRoundRect(x, y, w, h, 8, PROBE_BG_SCREEN);
+  display.fillRoundRect(x, y, w, h, 8, fieldBg());
   display.drawRoundRect(x, y, w, h, 8, PROBE_C_TAPBDR);
   display.setTextSize(1); display.setTextColor(PROBE_C_LBLUE);
   const lbl = "WORK AREA";

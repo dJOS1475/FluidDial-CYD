@@ -8,11 +8,11 @@
 // only — no value — because the target RPM is shown in the readout panel above.
 static void drawSpindleDialButton() {
     bool     active = pendantSpindle.dialMode;
-    uint16_t bg     = active ? PROBE_SEL_BG   : PROBE_BG_SCREEN;
+    uint16_t bg     = active ? PROBE_SEL_BG   : UI_FIELD_BG;
     uint16_t bdr    = active ? PROBE_C_YELLOW : PROBE_C_TAPBDR;
     display.fillRoundRect(179, 163, 56, 37, 2, bg);
     display.drawRoundRect(179, 163, 56, 37, 2, bdr);
-    display.setTextSize(2);
+    uiText(&display, 2);
     display.setTextColor(active ? PROBE_C_YELLOW : COLOR_TEAL_BRIGHT);
     int16_t tw = display.textWidth("Dial");
     display.setCursor(179 + (56 - tw) / 2, 163 + (37 - 16) / 2);
@@ -62,7 +62,7 @@ void drawSpindleControlScreen() {
     display.fillScreen(COLOR_BACKGROUND);
     drawTitle("SPINDLE CONTROL");
 
-    display.fillRoundRect(5, 40, 230, 60, 5, COLOR_DARKER_BG);
+    uiPanel(&display, 5, 40, 230, 60);
     updateSpindleRPMDisplay();
 
     drawButton(5,   110, 112, 38, "Fwd", pendantSpindle.directionFwd ? COLOR_DARK_GREEN : COLOR_BUTTON_GRAY, COLOR_WHITE, 2);
@@ -70,7 +70,7 @@ void drawSpindleControlScreen() {
 
     // Min/Max from controller
     display.setTextColor(COLOR_GRAY_TEXT);
-    display.setTextSize(1);
+    uiText(&display, 1);
     display.setCursor(5, 152);
     display.printf("Min: %d  Max: %d RPM", pendantMachine.spindleMinRPM, pendantMachine.spindleMaxRPM);
 
@@ -102,25 +102,25 @@ void updateSpindleRPMDisplay() {
 
     int ox, oy;
     LovyanGFX* g = beginPanelSprite(230, 60, ox, oy, 5, 40);
-    g->fillRect(ox, oy, 230, 60, COLOR_DARKER_BG);
+    uiPanel(g, ox, oy, 230, 60);
 
     // Left column — current actual spindle RPM
     g->setTextColor(COLOR_GRAY_TEXT);
-    g->setTextSize(1);
+    uiText(g, 1);
     g->setCursor(ox + 5, oy + 5);
     g->print("RPM");
     g->setTextColor(COLOR_ORANGE);
-    g->setTextSize(3);
+    uiText(g, 3);
     g->setCursor(ox + 5, oy + 22);
     g->print(spindleRPM);
 
     // Right column — user-selected target RPM
     g->setTextColor(COLOR_GRAY_TEXT);
-    g->setTextSize(1);
+    uiText(g, 1);
     g->setCursor(ox + 120, oy + 5);
     g->print("Target RPM");
     g->setTextColor(COLOR_DARK_GREEN);
-    g->setTextSize(3);
+    uiText(g, 3);
     g->setCursor(ox + 120, oy + 22);
     g->print(pendantSpindle.targetRPM);
 

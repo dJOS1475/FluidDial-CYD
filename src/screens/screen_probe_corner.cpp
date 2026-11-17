@@ -183,10 +183,10 @@ void drawProbeCornerScreen() {
     drawTitle("XYZ CORNER");
     probeDrawPosPanel(38);
 
-    display.fillRoundRect(5, 70, 230, 146, 4, PROBE_BG_PANEL);
+    uiPanel(&display, 5, 70, 230, 146);
 
     // Left column: sequence + diagram
-    display.setTextSize(1);
+    uiText(&display, 1);
     display.setTextColor(PROBE_C_LBLUE);
     display.setCursor(10, 73);
     display.print("SEQUENCE");
@@ -196,7 +196,7 @@ void drawProbeCornerScreen() {
     drawCornerDiagram();
 
     // Right column: settings
-    display.setTextSize(1);
+    uiText(&display, 1);
     display.setTextColor(PROBE_C_LBLUE);
     display.setCursor(122, 73);
     display.print("SETTINGS");
@@ -205,7 +205,7 @@ void drawProbeCornerScreen() {
     // shared tappable-field style (TAPBDR border; yellow is reserved for focus).
     // The result line was removed: sequence step 3 already reads "Set X0 Y0 Z0",
     // freeing the space so all four controls get taller, evenly spaced targets.
-    display.fillRoundRect(122, 84, 111, 31, 2, PROBE_BG_SCREEN);
+    display.fillRoundRect(122, 84, 111, 31, 2, UI_FIELD_BG);
     display.drawRoundRect(122, 84, 111, 31, 2, PROBE_C_TAPBDR);
     display.setTextColor(PROBE_C_LBLUE);
     display.setCursor(125, 87);

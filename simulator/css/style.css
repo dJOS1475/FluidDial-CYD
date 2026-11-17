@@ -164,3 +164,6 @@ html, body {
   border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
   font: 11.5px/1.45 "SFMono-Regular", Menlo, Consolas, monospace; white-space: pre-wrap;
 }
+
+/* Small read-only readout under a bench control (e.g. "-58 dBm = 3/4"). */
+.ctl-note { font-size: 11px; opacity: 0.7; }

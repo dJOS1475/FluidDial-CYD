@@ -19,7 +19,7 @@
 // step with the top entry in CHANGELOG.md on every release — it is independent
 // of the git-tag-derived `git_info` string (which only changes when a tag is
 // actually cut, and is kept for the full build identifier in the About screen).
-#define FIRMWARE_VERSION "v2.3.3"
+#define FIRMWARE_VERSION "v2.4.0"
 
 // ===== Display Configuration =====
 #define DISPLAY_WIDTH 240
@@ -57,21 +57,27 @@
 #define ENCODER_SW 35
 #define USE_ENCODER true  // Set to false if not using encoder
 
-// ===== Color Scheme - Dark Mode =====
+// ===== Color Scheme =====
+// v2.4.0 theme: navy panels, light-blue labels, bright-blue buttons, yellow =
+// selected.  Several entries were re-pointed rather than renamed so every screen
+// picks the theme up unchanged; screens/ui_style.h holds the extra colours the
+// new title bar, buttons and fields use.  Note several values now coincide
+// (COLOR_BLUE == COLOR_BUTTON_ACTIVE, COLOR_TITLE == COLOR_ORANGE), so never
+// switch() on these.
 #define COLOR_BACKGROUND 0x0000      // Pure black
-#define COLOR_DARKER_BG 0x2104       // Very dark gray
-#define COLOR_TITLE 0xFD20           // Orange
-#define COLOR_GRAY_TEXT 0x7BEF       // Medium gray
-#define COLOR_ORANGE 0xFD20          // Orange
+#define COLOR_DARKER_BG 0x08A8       // Navy panel fill            rgb(10,20,70)
+#define COLOR_TITLE 0xEEC0           // Yellow (title text on the old title bar)
+#define COLOR_GRAY_TEXT 0x9EDF       // Light blue — labels, captions, hints  rgb(155,220,255)
+#define COLOR_ORANGE 0xEEC0          // Yellow — selected / highlight         rgb(235,220,0)
 #define COLOR_GREEN 0x07E0           // Green
 #define COLOR_DARK_GREEN 0x0360      // Darker green
 #define COLOR_CYAN 0x07FF            // Cyan
-#define COLOR_BLUE 0x1C9F            // Blue
+#define COLOR_BLUE 0x1A9B            // Button blue                         rgb(24,80,220)
 #define COLOR_RED 0xF800             // Red
 #define COLOR_YELLOW 0xFFE0          // Yellow (e.g. charging bolt)
 #define COLOR_WHITE 0xFFFF           // White
-#define COLOR_BUTTON_GRAY 0x31A6     // Dark button gray
-#define COLOR_BUTTON_ACTIVE 0x5AEB   // Active button gray
+#define COLOR_BUTTON_GRAY 0x198D     // Unselected / unlit (dim navy); unselected buttons draw blue  rgb(30,50,110)
+#define COLOR_BUTTON_ACTIVE 0x1A9B   // Selected list row (button blue)
 #define COLOR_TEAL 0x032C            // 565 of (0,100,100) — Spindle Dial idle; main-menu params group
 #define COLOR_TEAL_BRIGHT 0x05B6     // 565 of (0,180,180) — Spindle Dial active
 #define COLOR_INDIGO 0x52B9          // 565 of (82,85,206) — XYZ Corner routine; main-menu jobs group

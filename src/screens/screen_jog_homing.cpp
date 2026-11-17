@@ -1,6 +1,6 @@
 #include "pendant_shared.h"
 #include "screen_jog_homing.h"
-#include "screen_probe.h"   // probeDrawKVTouch — shared adjustable-field style
+#include "screen_probe.h"   // PROBE_* colours
 
 // ===== Increment sets =====
 struct IncrementSet {
@@ -43,69 +43,119 @@ void jogApplyCoarseIncrement() {
 }
 
 // ===== Layout constants =====
-// Bottom row: Main Menu | Speed | Work Area  (3 equal-ish buttons, 2px gaps)
-// x=5, w=73 | x=80, w=80 | x=162, w=73
-static const int SPD_X = 80;
-static const int SPD_W = 80;
-static const int SPD_Y = 277;
-static const int SPD_H = 40;
+// Top to bottom: MPos/WPos panel, HOME, JOG AXIS, JOG INCREMENT (each under a
+// small section label), then Main Menu | SPEED | Work Area.
+static const int PANEL_Y = 38;
+static const int PANEL_H = 52;
+
+// Bottom row: Main Menu | Speed | Work Area  (x=5,w=70 | x=78,w=84 | x=165,w=70)
+static const int MM_X  = 5;
+static const int MM_W  = 70;
+static const int SPD_X = 78;
+static const int SPD_W = 84;
+static const int WA_X  = 165;
+static const int WA_W  = 70;
+static const int SPD_Y = 266;
+static const int SPD_H = 50;
 
 // Button rows use the shared rowBtnX()/rowBtnWAt() grid from pendant_shared.h, so
 // HOME, JOG AXIS and the increment row all span 5..235 and align with each other.
-static const int ROW_H  = 38;
-static const int HOME_Y = 115;
-static const int AXIS_Y = 173;
+static const int ROW_H   = 36;
+static const int HOME_Y  = 110;
+static const int AXIS_Y  = 166;
+static const int AXIS_TS = 4;    // axis letters: FreeSansBold 18pt
+static const int ALL_TS  = 3;    // "ALL": 12pt (18pt won't fit the 56 px slot)
 
 // Increment row: 4 slots on the shared grid — rowBtnW(4) == 56, pitch 58.
-static const int INC_Y = 231;
-static const int INC_H = ROW_H;
+static const int INC_Y = 222;
+static const int INC_H = 38;
 static const int INC_W = 56;
 static inline int incX(int i) { return rowBtnX(4, i); }
 
 // Axis to restore when the coarse dial box hands the encoder back to jogging.
 static int incDialPrevAxis = 0;
 
-// Slot 3 is the coarse dial box.  Drawn as an adjustable field rather than a plain
-// button — small "DIAL" cap, value below, tappable border — so it reads as
-// something the encoder drives.  Yellow border/value while incDialMode is live,
-// matching every other dial-driven field in the UI.
+// One run of a value line: a font, text and colour sharing one baseline.
+struct ValPart { const lgfx::IFont* font; const char* text; uint16_t color; };
+
+// A small Font2 caption over a value, the pair centred (caps to caps) on cy and
+// each line centred across [x, x+w).  The value is a run of parts 3 px apart on
+// one baseline — e.g. "5000" in bold with "mm/m" in Font2.
+static void captionValue(LovyanGFX* g, int x, int w, float cy, const char* caption, uint16_t capColor,
+                         const ValPart* parts, int n) {
+    const int GAP = 5;
+    int ca, cb, va, vb;
+    uiFont2(g);
+    uiCapBox(g, ca, cb);
+    g->setFont(parts[0].font);
+    uiCapBox(g, va, vb);
+    int blockH    = (cb - ca) + GAP + (vb - va);
+    int capTop    = (int)lroundf(cy - blockH / 2.0f);
+    int valCapTop = capTop + (cb - ca) + GAP;
+
+    uiFont2(g);
+    g->setTextColor(capColor);
+    g->setCursor(x + (w - g->textWidth(caption)) / 2, capTop - ca);
+    g->print(caption);
+
+    int baseline = valCapTop + (vb - va);
+    int total    = 3 * (n - 1);
+    for (int i = 0; i < n; ++i) { g->setFont(parts[i].font); total += g->textWidth(parts[i].text); }
+    int px = x + (w - total) / 2;
+    for (int i = 0; i < n; ++i) {
+        int a, b;
+        g->setFont(parts[i].font);
+        g->setTextColor(parts[i].color);
+        uiCapBox(g, a, b);
+        g->setCursor(px, baseline - b);
+        g->print(parts[i].text);
+        px += g->textWidth(parts[i].text) + 3;
+    }
+    uiText(g, 1);
+}
+
+// Slot 3 is the coarse dial box: a button with a small "DIAL" caption over the
+// coarse value — blue, or yellow when selected — and an inset field with a
+// yellow edge while the encoder is stepping it (incDialMode), matching every
+// other dial-driven field in the UI.
 static void drawIncDialButton() {
     bool selected = (pendantJog.selectedIncrement == 3);
     bool active   = pendantJog.incDialMode;
     IncrementSet incs = currentIncrements();
-
-    uint16_t bg  = active ? PROBE_SEL_BG : (selected ? COLOR_ORANGE : COLOR_BUTTON_GRAY);
-    uint16_t bdr = active ? PROBE_C_YELLOW : PROBE_C_TAPBDR;
     int x = incX(3);
-    display.fillRoundRect(x, INC_Y, INC_W, INC_H, 5, bg);
-    display.drawRoundRect(x, INC_Y, INC_W, INC_H, 5, bdr);
-
-    display.setTextSize(1);
-    display.setTextColor(active ? PROBE_C_YELLOW : COLOR_WHITE);
-    int16_t lw = display.textWidth("DIAL");
-    display.setCursor(x + (INC_W - lw) / 2, INC_Y + 5);
-    display.print("DIAL");
-
-    const char* v = incs.labels[3];
-    display.setTextSize(2);
-    display.setTextColor(active ? PROBE_C_YELLOW : COLOR_WHITE);
-    int16_t vw = display.textWidth(v);
-    display.setCursor(x + (INC_W - vw) / 2, INC_Y + 17);
-    display.print(v);
+    uint16_t fg;
+    if (active) {
+        display.fillRoundRect(x, INC_Y, INC_W, INC_H, 7, UI_FIELD_BG);
+        display.drawRoundRect(x, INC_Y, INC_W, INC_H, 7, UI_BTN_YELLOW);
+        display.drawRoundRect(x + 1, INC_Y + 1, INC_W - 2, INC_H - 2, 6, UI_BTN_YELLOW);
+        fg = UI_BTN_YELLOW;
+    } else {
+        UiBtnColors c = uiButtonColors(selected ? COLOR_ORANGE : COLOR_BUTTON_GRAY, COLOR_WHITE);
+        uiButtonFrame(&display, x, INC_Y, INC_W, INC_H, c);
+        fg = c.text;
+    }
+    ValPart v[1] = { { &fonts::FreeSansBold9pt7b, incs.labels[3], fg } };
+    captionValue(&display, x, INC_W, INC_Y + INC_H / 2.0f, "DIAL", fg, v, 1);
 }
 
 // ===== Helpers =====
 
+// SPEED box: an inset field with a "SPEED" caption over the value in bold
+// green with its unit in Font2; yellow edge while the encoder is setting it.
 void redrawJogSpeedButton() {
-    // Adjustable-field style, matching the tap-to-edit buttons on the Probe
-    // screens: a bordered box with a small label on top and the value below;
-    // the border + value highlight (yellow) while speed-dial mode is active.
-    bool        active = pendantJog.speedDialMode;
-    float       spd    = pendantMachine.inInches ? (float)pendantJog.jogSpeedIn
-                                                 : (float)pendantJog.jogSpeedMm;
-    const char* unit   = pendantMachine.inInches ? "ipm" : "mm/m";
-    probeDrawKVTouch(SPD_X, SPD_Y, SPD_W, SPD_H, "SPEED", spd, unit,
-                     COLOR_GREEN, active, 0);
+    bool  active = pendantJog.speedDialMode;
+    char  spd[12];
+    snprintf(spd, sizeof(spd), "%d", pendantMachine.inInches ? (int)pendantJog.jogSpeedIn
+                                                             : (int)pendantJog.jogSpeedMm);
+    const char* unit = pendantMachine.inInches ? "ipm" : "mm/m";
+    display.fillRect(SPD_X, SPD_Y, SPD_W, SPD_H, COLOR_BACKGROUND);
+    display.fillRoundRect(SPD_X, SPD_Y, SPD_W, SPD_H, 7, UI_FIELD_BG);
+    display.drawRoundRect(SPD_X, SPD_Y, SPD_W, SPD_H, 7, active ? UI_BTN_YELLOW : UI_EDGE_LT);
+    display.drawRoundRect(SPD_X + 1, SPD_Y + 1, SPD_W - 2, SPD_H - 2, 6, active ? UI_BTN_YELLOW : UI_EDGE);
+    uint16_t vc = active ? UI_BTN_YELLOW : COLOR_GREEN;
+    ValPart v[2] = { { &fonts::FreeSansBold9pt7b, spd, vc }, { &fonts::Font2, unit, vc } };
+    captionValue(&display, SPD_X, SPD_W, SPD_Y + SPD_H / 2.0f, "SPEED",
+                 active ? UI_BTN_YELLOW : COLOR_WHITE, v, 2);
 }
 
 // ===== Lifecycle =====
@@ -128,7 +178,7 @@ void enterJogHoming() {
 
     // $110/$130-$133 are cached on connect — no UART query here.
 
-    // The big DRO uses a transient 16-bit panel (see updateJogAxisDisplay); the
+    // The DRO panel uses the shared 16-bit scratch (see updateJogAxisDisplay); the
     // direct-draw fallback keeps it from ever being blank under heap pressure.
     releasePanelSprites();
 }
@@ -139,67 +189,71 @@ void exitJogHoming() {
 
 // ===== Draw =====
 
-// Redraws just the "JOG INCREMENT (unit) — mode" label row.  Pulled out so it
-// can refresh when the selected axis changes (A → "deg", X/Y/Z → "mm"/"in")
-// without a full-screen redraw.
+// Section label: GLCD size 1 in the label colour, 4 px above its row — the same
+// treatment every other screen uses.  Returns the x just past the text.
+static int sectionLabel(int rowY, const char* text, uint16_t color = COLOR_GRAY_TEXT) {
+    int y = rowY - 12;
+    display.fillRect(5, y - 1, 230, 10, COLOR_BACKGROUND);
+    uiText(&display, 1);
+    display.setTextColor(color);
+    display.setCursor(5, y);
+    display.print(text);
+    return 5 + display.textWidth(text);
+}
+
+// Redraws just the "JOG INCREMENT (unit)" label row.  Pulled out so it can
+// refresh when the selected axis changes (A → "deg", X/Y/Z → "mm"/"in")
+// without a full-screen redraw.  In Alarm it turns red and names the alarm.
 static void redrawJogIncrementLabel() {
-    display.fillRect(5, 219, 230, 9, COLOR_BACKGROUND);   // clear the old text row
-    display.setTextSize(1);
-    display.setCursor(5, 219);
     if (pendantMachine.status.startsWith("Alarm")) {
-        display.setTextColor(TFT_RED);
-        display.print("JOG INCREMENT  *** " + pendantMachine.status + " ***");
+        int end = sectionLabel(INC_Y, "JOG INCREMENT", TFT_RED);
+        display.setCursor(end + 6, INC_Y - 12);
+        display.print("*** " + pendantMachine.status + " ***");
     } else {
-        display.setTextColor(COLOR_GRAY_TEXT);
         // A axis (rotary) → label the increments in degrees, not mm/in.
-        String unitStr = (pendantJog.selectedAxis == 3) ? "deg"
-                                                        : (pendantMachine.inInches ? "in" : "mm");
-        display.print("JOG INCREMENT (" + unitStr + ")");
+        const char* unitStr = (pendantJog.selectedAxis == 3) ? "deg"
+                                                             : (pendantMachine.inInches ? "in" : "mm");
+        char buf[32];
+        snprintf(buf, sizeof(buf), "JOG INCREMENT (%s)", unitStr);
+        sectionLabel(INC_Y, buf);
     }
+}
+
+static void drawHomeButton(int i, bool pressed) {
+    const int   numAx   = pendantMachine.numAxes;
+    const int   numHome = (numAx < 4) ? numAx + 1 : numAx;
+    const bool  isAll   = (numAx < 4) && (i == numAx);
+    drawButton(rowBtnX(numHome, i), HOME_Y, rowBtnWAt(numHome, i), ROW_H,
+               isAll ? "ALL" : AXIS_NAMES[i],
+               pressed ? COLOR_WHITE : COLOR_DARK_GREEN, pressed ? COLOR_DARK_GREEN : COLOR_WHITE,
+               isAll ? ALL_TS : AXIS_TS);
 }
 
 void drawJogHomingScreen() {
     display.fillScreen(COLOR_BACKGROUND);
     drawTitle("JOG & HOMING");
 
-    display.fillRoundRect(5, 40, 230, 55, 5, COLOR_DARKER_BG);
-    updateJogAxisDisplay();
+    updateJogAxisDisplay();   // draws the framed MPos/WPos panel
 
     int numAx = pendantMachine.numAxes;
 
-    display.setTextColor(COLOR_GRAY_TEXT);
-    display.setTextSize(1);
-    display.setCursor(5, 103);
-    display.print("HOME");
-
+    // One HOME button per reported axis, plus "ALL" when there is room for it.
+    sectionLabel(HOME_Y, "HOME");
     {
-        // One button per reported axis, plus "ALL" when there is room for it.
-        // Sized from numAx (already clamped) rather than a fixed 4-entry table.
         const int numHome = (numAx < 4) ? numAx + 1 : numAx;
-        for (int i = 0; i < numHome; i++) {
-            const bool  isAll = (numAx < 4) && (i == numAx);
-            const char* label = isAll ? "ALL" : AXIS_NAMES[i];
-            const int   sz    = isAll ? 2 : 3;
-            drawButton(rowBtnX(numHome, i), HOME_Y, rowBtnWAt(numHome, i), ROW_H,
-                       label, COLOR_DARK_GREEN, COLOR_WHITE, sz);
-        }
+        for (int i = 0; i < numHome; i++) drawHomeButton(i, false);
     }
 
-    display.setTextColor(COLOR_GRAY_TEXT);
-    display.setTextSize(1);
-    display.setCursor(5, 161);
-    display.print("JOG AXIS");
-
+    sectionLabel(AXIS_Y, "JOG AXIS");
     for (int i = 0; i < numAx; i++) {
         // Deselect all axis buttons when in speed dial mode
         uint16_t bg = (!pendantJog.speedDialMode && i == pendantJog.selectedAxis)
                       ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
         drawButton(rowBtnX(numAx, i), AXIS_Y, rowBtnWAt(numAx, i), ROW_H,
-                   AXIS_NAMES[i], bg, COLOR_WHITE, 3);
+                   AXIS_NAMES[i], bg, COLOR_WHITE, AXIS_TS);
     }
 
     redrawJogIncrementLabel();
-
     {
         IncrementSet incs = currentIncrements();
         for (int i = 0; i < 3; i++) {
@@ -209,150 +263,106 @@ void drawJogHomingScreen() {
         drawIncDialButton();   // slot 3 — coarse dial box
     }
 
-    // Bottom row: Main Menu | Speed | Work Area
-    drawButton(5,   SPD_Y, 73, SPD_H, "Main Menu", COLOR_BLUE, COLOR_WHITE, 1);
+    // Bottom row: Main Menu | Speed | Work Area.  Two-line bold labels — one line
+    // won't fit 70 px in FreeSansBold.
+    drawMultiLineButton(MM_X, SPD_Y, MM_W, SPD_H, "Main", "Menu", COLOR_BLUE, COLOR_WHITE, 2);
     redrawJogSpeedButton();
-    drawButton(162, SPD_Y, 73, SPD_H, "Work Area", COLOR_BLUE, COLOR_WHITE, 1);
+    drawMultiLineButton(WA_X, SPD_Y, WA_W, SPD_H, "Work", "Area", COLOR_BLUE, COLOR_WHITE, 2);
 }
 
 // ===== Sprite update =====
-
-// Tiny degree "°" glyph drawn from two concentric rings — font-independent, so
-// it works regardless of whether the active font carries a degree character.
-static void drawDegreeIcon(LovyanGFX* g, int x, int y, uint16_t color) {
-    g->drawCircle(x, y, 3, color);
-    g->drawCircle(x, y, 2, color);
-}
 
 void updateJogAxisDisplay() {
     if (currentPendantScreen != PSCREEN_JOG_HOMING) return;
 
     // Snapshot under the lock; skip the frame if briefly held.  Panel is
-    // 230 x 55, pushed at (5, 40); shared 16-bit scratch, direct-draw fallback.
-    // Jog & Homing shows MACHINE coordinates (mpos[]) — homing and travel-limit
-    // reasoning are all in machine space.
-    float positions[PENDANT_MAX_AXES];
+    // 230 x 52, pushed at (5, 38); shared 16-bit scratch, direct-draw fallback.
+    float mpos[PENDANT_MAX_AXES], wpos[PENDANT_MAX_AXES];
     if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(5)) != pdTRUE) return;
-    for (int i = 0; i < PENDANT_MAX_AXES; i++) positions[i] = pendantMachine.mpos[i];
+    for (int i = 0; i < PENDANT_MAX_AXES; i++) {
+        mpos[i] = pendantMachine.mpos[i];
+        wpos[i] = pendantMachine.wpos[i];
+    }
     xSemaphoreGive(stateMutex);
 
     int ox, oy;
-    LovyanGFX* g = beginPanelSprite(230, 55, ox, oy, 5, 40);
-    g->fillRect(ox, oy, 230, 55, COLOR_DARKER_BG);
+    LovyanGFX* g = beginPanelSprite(230, PANEL_H, ox, oy, 5, PANEL_Y);
+    uiPanel(g, ox, oy, 230, PANEL_H, 6);
+    const int cx = ox + 115;
 
-    if (pendantJog.speedDialMode) {
-        // Speed dial mode — show jog speed prominently
-        g->setTextColor(COLOR_GREEN);
-        g->setTextSize(1);
-        int16_t lw = g->textWidth("JOG SPEED");
-        g->setCursor(ox + 115 - lw / 2, oy + 5);
-        g->print("JOG SPEED");
-
-        String speedStr = pendantMachine.inInches
-            ? "F:" + String(pendantJog.jogSpeedIn) + " ipm"
-            : "F:" + String(pendantJog.jogSpeedMm) + " mm/m";
-        g->setTextSize(2);
-        int16_t sw = g->textWidth(speedStr.c_str());
-        g->setCursor(ox + 115 - sw / 2, oy + 20);
-        g->print(speedStr);
-
-        g->setTextColor(COLOR_GRAY_TEXT);
-        g->setTextSize(1);
-        int16_t hw = g->textWidth("Select an axis to jog");
-        g->setCursor(ox + 115 - hw / 2, oy + 42);
-        g->print("Select an axis to jog");
-    } else if (pendantJog.incDialMode) {
-        // Coarse dial mode — mirrors the speed panel so the encoder's job is never
-        // ambiguous: it's stepping the increment, not moving the machine.
-        IncrementSet incs = currentIncrements();
-        const char*  unit = (pendantJog.selectedAxis == 3) ? "deg"
-                                                           : (pendantMachine.inInches ? "in" : "mm");
-        g->setTextColor(PROBE_C_YELLOW);
-        g->setTextSize(1);
-        int16_t lw = g->textWidth("JOG INCREMENT");
-        g->setCursor(ox + 115 - lw / 2, oy + 5);
-        g->print("JOG INCREMENT");
-
-        String incStr = String(incs.labels[3]) + " " + unit;
-        g->setTextSize(2);
-        int16_t sw = g->textWidth(incStr.c_str());
-        g->setCursor(ox + 115 - sw / 2, oy + 20);
-        g->print(incStr);
-
-        // Name the toggle explicitly — the second tap is the quick way back to
-        // jogging, and nothing else on screen would tell you it exists.
-        g->setTextColor(COLOR_GRAY_TEXT);
-        g->setTextSize(1);
-        const char* hint = "Tap DIAL again to jog";
-        int16_t hw2 = g->textWidth(hint);
-        g->setCursor(ox + 115 - hw2 / 2, oy + 42);
-        g->print(hint);
-    } else {
-        bool inAlarm = pendantMachine.status.startsWith("Alarm");
-
-        // While homing, the big DRO shows the axis being homed (pendantJog.homingAxis);
-        // otherwise it shows the user's jog-button selection (selectedAxis).  When
-        // homing ends, homingAxis goes back to -1 and the DRO returns to selectedAxis.
-        int dispAxis = (pendantJog.homingAxis >= 0) ? pendantJog.homingAxis
-                                                     : pendantJog.selectedAxis;
-        // Both are set from user input / homing state, so they can outlive a
-        // change in axis count.  Clamp before indexing — this is the one place
-        // an axis index is not derived from a bounded loop.
-        if (dispAxis < 0)                  dispAxis = 0;
-        if (dispAxis >= PENDANT_MAX_AXES)  dispAxis = PENDANT_MAX_AXES - 1;
-
-        // Large display: axis + position on one line.  Unit handling:
-        //   • in alarm        → unit slot shows the alarm state (red)
-        //   • A axis (rotary)  → no "mm"/"in"; a degree symbol is drawn instead
-        //   • X / Y / Z        → "mm" or "in" as usual
-        bool isAAxis = (dispAxis == 3);
-        char posBuf[12];
-        int  decPlaces = pendantMachine.inInches ? 4 : 2;
-        dtostrf(positions[dispAxis], 1, decPlaces, posBuf);
-
-        char mainLine[32];
-        if (inAlarm) {
-            snprintf(mainLine, sizeof(mainLine), "%s %s %s",
-                     AXIS_NAMES[dispAxis], posBuf, pendantMachine.status.c_str());
-        } else if (isAAxis) {
-            // No text unit — a degree icon is overlaid after the value below.
-            snprintf(mainLine, sizeof(mainLine), "%s %s",
-                     AXIS_NAMES[dispAxis], posBuf);
+    if (pendantJog.speedDialMode || pendantJog.incDialMode) {
+        // Dial modes take the panel over so it is never ambiguous what the knob
+        // is driving: caption + hint on one line, the value large beneath.
+        char cap[48], val[24];
+        uint16_t col;
+        if (pendantJog.speedDialMode) {
+            col = COLOR_GREEN;
+            snprintf(cap, sizeof(cap), "JOG SPEED  -  tap an axis to jog");
+            if (pendantMachine.inInches) snprintf(val, sizeof(val), "%d ipm", (int)pendantJog.jogSpeedIn);
+            else                         snprintf(val, sizeof(val), "%d mm/min", (int)pendantJog.jogSpeedMm);
         } else {
-            snprintf(mainLine, sizeof(mainLine), "%s %s %s",
-                     AXIS_NAMES[dispAxis], posBuf,
-                     pendantMachine.inInches ? "in" : "mm");
+            const char* unit = (pendantJog.selectedAxis == 3) ? "deg" : (pendantMachine.inInches ? "in" : "mm");
+            col = UI_BTN_YELLOW;
+            snprintf(cap, sizeof(cap), "JOG INCREMENT  -  tap DIAL to jog");
+            snprintf(val, sizeof(val), "%s %s", currentIncrements().labels[3], unit);
         }
-        g->setTextColor(inAlarm ? TFT_RED : COLOR_GREEN);
-        g->setTextSize(3);
-        g->setCursor(ox + 5, oy + 5);
-        g->print(mainLine);
-
-        // Rotary A axis: draw a degree "°" after the value (font-independent).
-        if (isAAxis && !inAlarm) {
-            int iconX = ox + 5 + g->textWidth(mainLine) + 6;
-            drawDegreeIcon(g, iconX, oy + 8, COLOR_GREEN);
-        }
-
-        // Non-selected axes in a small row underneath
-        g->setTextColor(COLOR_GRAY_TEXT);
-        g->setTextSize(1);
-        int numAx      = pendantMachine.numAxes;
-        int colSpacing = (numAx > 1) ? 230 / (numAx - 1) : 230;
-        int col        = 5;
-        for (int i = 0; i < numAx; i++) {
-            if (i == dispAxis) continue;  // already shown large above
-            char valBuf[10];
-            dtostrf(positions[i], 1, 2, valBuf);
-            char buf[16];
-            snprintf(buf, sizeof(buf), "%s:%s", AXIS_NAMES[i], valBuf);
-            g->setCursor(ox + col, oy + 38);
-            g->print(buf);
-            col += colSpacing;
-        }
+        g->setTextColor(col);
+        uiFont2(g);
+        g->setCursor(cx - g->textWidth(cap) / 2, oy + 4);
+        g->print(cap);
+        uiText(g, 3);
+        g->setCursor(cx - g->textWidth(val) / 2, oy + 23);
+        g->print(val);
+        uiText(g, 1);
+        endPanelSprite(230, PANEL_H, 5, PANEL_Y);
+        return;
     }
 
-    endPanelSprite(230, 55, 5, 40);
+    // MPos (yellow caption) over WPos (light blue), every axis in columns; the
+    // axis the knob moves — or the one being homed — is green.
+    const int numAx = pendantMachine.numAxes;
+    const int dec   = pendantMachine.inInches ? 3 : 2;
+    const int hot   = (pendantJog.homingAxis >= 0) ? pendantJog.homingAxis : pendantJog.selectedAxis;
+    const int COL0  = ox + 42, PITCH = 61;
+    const char*     caps[2]    = { "MPos", "WPos" };
+    const uint16_t  capCols[2] = { COLOR_ORANGE, COLOR_GRAY_TEXT };
+    const float*    rows[2]    = { mpos, wpos };
+    char buf[20], v[12];
+
+    for (int r = 0; r < 2; r++) {
+        if (numAx <= 3) {
+            // One Font2 row per coordinate system; bold Font2 caption.
+            int y = oy + 5 + r * 25;
+            uiFont2(g);
+            g->setTextColor(capCols[r]);
+            uiPrintBold2(g, ox + 5, y, caps[r]);
+            for (int i = 0; i < numAx; i++) {
+                dtostrf(rows[r][i], 1, dec, v);
+                snprintf(buf, sizeof(buf), "%s:%s", AXIS_NAMES[i], v);
+                g->setTextColor(i == hot ? COLOR_GREEN : COLOR_WHITE);
+                g->setCursor(COL0 + i * PITCH, y);
+                g->print(buf);
+            }
+        } else {
+            // 4-6 axes don't fit one Font2 row: two GLCD lines of three per system.
+            int y = oy + 4 + r * 24;
+            uiText(g, 1);
+            g->setTextColor(capCols[r]);
+            g->setCursor(ox + 5, y + 5);
+            g->print(caps[r]);
+            for (int i = 0; i < numAx; i++) {
+                dtostrf(rows[r][i], 1, dec, v);
+                snprintf(buf, sizeof(buf), "%s:%s", AXIS_NAMES[i], v);
+                g->setTextColor(i == hot ? COLOR_GREEN : COLOR_WHITE);
+                g->setCursor(COL0 + (i % 3) * PITCH, y + (i < 3 ? 0 : 10));
+                g->print(buf);
+            }
+        }
+    }
+    g->drawFastHLine(ox + 5, oy + 25, 220, UI_EDGE);
+    uiText(g, 1);
+
+    endPanelSprite(230, PANEL_H, 5, PANEL_Y);
 }
 
 // ===== Partial redraws =====
@@ -364,7 +374,7 @@ void redrawJogAxisButtons() {
         uint16_t bg = (!pendantJog.speedDialMode && i == pendantJog.selectedAxis)
                       ? COLOR_ORANGE : COLOR_BUTTON_GRAY;
         drawButton(rowBtnX(numAx, i), AXIS_Y, rowBtnWAt(numAx, i), ROW_H,
-                   AXIS_NAMES[i], bg, COLOR_WHITE, 3);
+                   AXIS_NAMES[i], bg, COLOR_WHITE, AXIS_TS);
     }
     updateJogAxisDisplay();
 }
@@ -390,11 +400,9 @@ void handleJogHomingTouch(int x, int y) {
         for (int i = 0; i < numHome; i++) {
             int hx = rowBtnX(numHome, i), hw = rowBtnWAt(numHome, i);
             if (isTouchInBounds(x, y, hx, HOME_Y, hw, ROW_H)) {
-                int sz = (i == numAx && numAx < 4) ? 2 : 3;
-                const char* label = ((numAx < 4) && (i == numAx)) ? "ALL" : AXIS_NAMES[i];
-                drawButton(hx, HOME_Y, hw, ROW_H, label, COLOR_WHITE, COLOR_DARK_GREEN, sz);
+                drawHomeButton(i, true);    // brief press flash
                 delay_ms(150);
-                drawButton(hx, HOME_Y, hw, ROW_H, label, COLOR_DARK_GREEN, COLOR_WHITE, sz);
+                drawHomeButton(i, false);
                 if (!pendantConnected) return;
                 char cmd[16];
                 if (i == numAx) {
@@ -493,6 +501,6 @@ void handleJogHomingTouch(int x, int y) {
         return;
     }
 
-    if (isTouchInBounds(x, y, 5,   SPD_Y, 73, SPD_H)) { currentPendantScreen = PSCREEN_MAIN_MENU;    return; }
-    if (isTouchInBounds(x, y, 162, SPD_Y, 73, SPD_H)) { currentPendantScreen = PSCREEN_PROBING_WORK; return; }
+    if (isTouchInBounds(x, y, MM_X, SPD_Y, MM_W, SPD_H)) { currentPendantScreen = PSCREEN_MAIN_MENU;    return; }
+    if (isTouchInBounds(x, y, WA_X, SPD_Y, WA_W, SPD_H)) { currentPendantScreen = PSCREEN_PROBING_WORK; return; }
 }

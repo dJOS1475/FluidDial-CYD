@@ -19,31 +19,24 @@ void drawMainMenu() {
     display.fillScreen(COLOR_BACKGROUND);
     drawTitle("MAIN MENU");
 
-    // Draw static background for status display area
-    display.fillRoundRect(5, 40, 230, 65, 5, COLOR_DARKER_BG);
+    // Framed status panel; updateMainMenuDisplay() fills it.
+    uiPanel(&display, 5, 40, 230, 65, 6);
     updateMainMenuDisplay();
 
     int btnY   = 115;
     int btnH   = 47;
     int btnGap = 52;
 
-    // Colour groups the menu by what each destination is for, so you can land on
-    // the right button without reading it.  The existing row pairs are already
-    // coherent categories, so nothing moves — only the tint changes.  These are
-    // all navigation colours: orange (selected), green (execute), red (alarm) and
-    // yellow (focus) stay reserved, so no menu button can be misread as a state.
-    const uint16_t MENU_MACHINE = COLOR_BLUE;    // move it, datum it, probe it, watch it
-    const uint16_t MENU_PARAMS  = COLOR_TEAL;    // cutting parameters
-    const uint16_t MENU_JOBS    = COLOR_INDIGO;  // jobs & files
-
-    drawButton(5, btnY, 112, btnH, "Jog", MENU_MACHINE, COLOR_WHITE, 2);
-    drawButton(123, btnY, 112, btnH, "Work Area", MENU_MACHINE, COLOR_WHITE, 2);
-    drawMultiLineButton(5, btnY + btnGap, 112, btnH, "Feeds &", "Speeds", MENU_PARAMS, COLOR_WHITE, 2);
-    drawMultiLineButton(123, btnY + btnGap, 112, btnH, "Spindle", "Control", MENU_PARAMS, COLOR_WHITE, 2);
-    drawButton(5, btnY + btnGap * 2, 112, btnH, "Macros", MENU_JOBS, COLOR_WHITE, 2);
-    drawButton(123, btnY + btnGap * 2, 112, btnH, "SD Card", MENU_JOBS, COLOR_WHITE, 2);
-    drawButton(5, btnY + btnGap * 3, 112, btnH, "Probe", MENU_MACHINE, COLOR_WHITE, 2);
-    drawButton(123, btnY + btnGap * 3, 112, btnH, "Status", MENU_MACHINE, COLOR_WHITE, 2);
+    // One button blue throughout; each destination carries its icon.
+    const uint16_t B = COLOR_BLUE, W = COLOR_WHITE;
+    drawButton(5, btnY, 112, btnH, "Jog", B, W, 2, UI_ICON_JOG);
+    drawMultiLineButton(123, btnY, 112, btnH, "Work", "Area", B, W, 2, UI_ICON_WORK);
+    drawMultiLineButton(5, btnY + btnGap, 112, btnH, "Feeds &", "Speeds", B, W, 2, UI_ICON_GAUGE);
+    drawMultiLineButton(123, btnY + btnGap, 112, btnH, "Spindle", "Control", B, W, 2, UI_ICON_SPINDLE);
+    drawButton(5, btnY + btnGap * 2, 112, btnH, "Macros", B, W, 2, UI_ICON_MACRO);
+    drawButton(123, btnY + btnGap * 2, 112, btnH, "SD Card", B, W, 2, UI_ICON_SD);
+    drawButton(5, btnY + btnGap * 3, 112, btnH, "Probe", B, W, 2, UI_ICON_PROBE);
+    drawButton(123, btnY + btnGap * 3, 112, btnH, "Status", B, W, 2, UI_ICON_STATUS);
 }
 
 // Wireless link problems are reported in the STATUS panel rather than as an
@@ -93,71 +86,61 @@ void updateMainMenuDisplay() {
 
     int ox, oy;
     LovyanGFX* g = beginPanelSprite(230, 65, ox, oy, 5, 40);
-    g->fillRect(ox, oy, 230, 65, COLOR_DARKER_BG);
 
-    LinkFault lf;
+    // Caption / big value / optional sub-line, chosen by state:
+    //   ESP-NOW link fault -> "ESP-NOW" caption, so a dead radio link never looks
+    //                         like a machine sitting in Alarm
+    //   not yet synced     -> "Connecting" (link down) / "Syncing" (fetching config)
+    //   Alarm              -> the alarm's description over a red ALARM
+    //   otherwise          -> STATUS over the machine state
+    const char* caption;
+    const char* big;
+    uint16_t    bigCol;
+    const char* sub = nullptr;
+    String      desc;
+    LinkFault   lf;
     if (espNowLinkFault(lf)) {
-        // Caption switches STATUS -> ESP-NOW so it is obvious WHICH layer is
-        // broken: a dead radio link and a machine sitting in Alarm are very
-        // different problems and must not look alike.
-        g->setTextColor(COLOR_GRAY_TEXT);
-        g->setTextSize(1);
-        int16_t lw = g->textWidth("ESP-NOW");
-        g->setCursor(ox + 115 - lw / 2, oy + 5);
-        g->print("ESP-NOW");
-
-        g->setTextColor(lf.col);
-        g->setTextSize(3);
-        int16_t bw = g->textWidth(lf.big);
-        g->setCursor(ox + 115 - bw / 2, oy + 20);
-        g->print(lf.big);
-
-        g->setTextColor(COLOR_GRAY_TEXT);
-        g->setTextSize(1);
-        int16_t sw = g->textWidth(lf.sub);
-        g->setCursor(ox + 115 - sw / 2, oy + 50);
-        g->print(lf.sub);
+        caption = "ESP-NOW"; big = lf.big; bigCol = lf.col; sub = lf.sub;
     } else if (!pendantSynced || statusStr == "N/C" || statusStr.length() == 0) {
-        // Power-up / reconnect, two phases so the user knows what's happening:
-        //   "Connecting" — link not yet established (WiFi assoc / WS handshake
-        //                  or UART not yet responding)
-        //   "Syncing"    — link is up; fetching config + waiting for live state
-        // Size 3 so the 10-char "Connecting" fits the 230 px bar.  Same for
-        // WiFi and wired.
-        const char* phase = pendantConnected ? "Syncing" : "Connecting";
-        g->setTextColor(COLOR_GRAY_TEXT);
-        g->setTextSize(1);
-        int16_t lw = g->textWidth("STATUS");
-        g->setCursor(ox + 115 - lw / 2, oy + 8);
-        g->print("STATUS");
-        g->setTextColor(COLOR_ORANGE);
-        g->setTextSize(3);
-        int16_t cw = g->textWidth(phase);
-        g->setCursor(ox + 115 - cw / 2, oy + 30);
-        g->print(phase);
+        caption = "STATUS"; big = pendantConnected ? "Syncing" : "Connecting"; bigCol = COLOR_ORANGE;
     } else if (statusStr.startsWith("Alarm")) {
-        // Alarm: description on label line, "ALARM" in red on status line
-        String desc = alarmDescription(statusStr);
-        g->setTextColor(TFT_RED);
-        g->setTextSize(1);
-        int16_t dw = g->textWidth(desc.c_str());
-        g->setCursor(ox + 115 - dw / 2, oy + 8);
-        g->print(desc);
-        g->setTextSize(4);
-        int16_t sw = g->textWidth("ALARM");
-        g->setCursor(ox + 115 - sw / 2, oy + 26);
-        g->print("ALARM");
+        desc = alarmDescription(statusStr);
+        caption = desc.c_str(); big = "ALARM"; bigCol = TFT_RED;
     } else {
+        caption = "STATUS"; big = statusStr.c_str(); bigCol = COLOR_CYAN;
+    }
+
+    uiPanel(g, ox, oy, 230, 65, 6);
+    // Caption (GLCD, section-label style) + big FreeSansBold value (+ sub line)
+    // centred as one block, caps to caps.
+    const int GAP = 7, cx = ox + 115;
+    int ca, cb, ba, bb;
+    uiText(g, 1);
+    uiCapBox(g, ca, cb);
+    uiText(g, 4);
+    if (g->textWidth(big) > 220) uiText(g, 3);   // "Connecting" etc. at 12pt if 18pt won't fit
+    const lgfx::IFont* bigFont = g->getFont();
+    uiCapBox(g, ba, bb);
+    int blockH = (cb - ca) + GAP + (bb - ba) + (sub ? 7 + 5 : 0);
+    int top    = (int)lroundf(oy + 65 / 2.0f - blockH / 2.0f);
+
+    uiText(g, 1);
+    g->setTextColor(COLOR_GRAY_TEXT);
+    g->setCursor(cx - g->textWidth(caption) / 2, top - ca);
+    g->print(caption);
+    top += (cb - ca) + GAP;
+
+    g->setFont(bigFont);
+    g->setTextColor(bigCol);
+    g->setCursor(cx - g->textWidth(big) / 2, top - ba);
+    g->print(big);
+    top += (bb - ba) + 5;
+
+    uiText(g, 1);
+    if (sub) {
         g->setTextColor(COLOR_GRAY_TEXT);
-        g->setTextSize(1);
-        int16_t labelWidth = g->textWidth("STATUS");
-        g->setCursor(ox + 115 - labelWidth / 2, oy + 8);
-        g->print("STATUS");
-        g->setTextColor(COLOR_CYAN);
-        g->setTextSize(4);
-        int16_t statusWidth = g->textWidth(statusStr.c_str());
-        g->setCursor(ox + 115 - statusWidth / 2, oy + 26);
-        g->print(statusStr);
+        g->setCursor(cx - g->textWidth(sub) / 2, top);
+        g->print(sub);
     }
 
     endPanelSprite(230, 65, 5, 40);

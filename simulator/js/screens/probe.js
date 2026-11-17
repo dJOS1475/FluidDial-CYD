@@ -14,8 +14,9 @@ function exitProbe() {}
 function drawProbeTypeRow() {
   for (let i = 0; i < PROBE_TYPE_COUNT; i++) {
     const sel = pendantProbeV2.probeTypeIdx === i;
-    drawButton(kProbeTypeX[i], 38, kProbeTypeW[i], 40, kProbeTypeLabels[i],
-      sel ? PROBE_C_YELLOW : COLOR_BUTTON_GRAY, COLOR_WHITE, 1);
+    const bg = sel ? PROBE_C_YELLOW : COLOR_BUTTON_GRAY;
+    // Too narrow for FreeSansBold: bold Font2 label.
+    uiDrawNarrowButton(kProbeTypeX[i], 38, kProbeTypeW[i], 40, kProbeTypeLabels[i], bg, COLOR_WHITE);
   }
 }
 
@@ -30,7 +31,7 @@ function updateProbeSharedFields() {
 }
 
 function drawSharedKVPanel() {
-  display.fillRoundRect(5, 82, 230, 84, 4, PROBE_BG_PANEL);
+  uiPanel(display, 5, 82, 230, 84);
   display.setTextSize(1);
   display.setTextColor(PROBE_C_LBLUE);
   display.setCursor(10, 84);
@@ -39,23 +40,23 @@ function drawSharedKVPanel() {
 }
 
 function drawRoutineButtons() {
-  display.fillRoundRect(5, 170, 230, 104, 4, PROBE_BG_PANEL);
+  uiPanel(display, 5, 170, 230, 104);
   display.setTextSize(1);
   display.setTextColor(PROBE_C_LBLUE);
   display.setCursor(10, 172);
   display.print("PROBE ROUTINES");
   const n = probeRoutineCount();
   if (n === 1) {
-    drawButton(7, 186, 226, 40, "Z Surface", PROBE_BTN_GREEN, COLOR_WHITE, 2);
+    drawButton(7, 186, 226, 40, "Z Surface", PROBE_BTN_GREEN, COLOR_WHITE, 2, "zsurf");
   } else if (n === 2) {
     // XYZ Plate — two full-width buttons, one per row.
-    drawButton(7, 186, 226, 40, "Z Surface", PROBE_BTN_GREEN, COLOR_WHITE, 2);
-    drawButton(7, 230, 226, 40, "XYZ Corner", PROBE_BTN_INDIGO, COLOR_WHITE, 2);
+    drawButton(7, 186, 226, 40, "Z Surface", PROBE_BTN_GREEN, COLOR_WHITE, 2, "zsurf");
+    drawButton(7, 230, 226, 40, "XYZ Corner", UI_RT_CORNER, COLOR_WHITE, 2, "corner");
   } else {  // n === 4 (3D probe) — 2x2 grid
-    drawButton(7, 186, 112, 40, "Z Surf", PROBE_BTN_GREEN, COLOR_WHITE, 2);
-    drawButton(121, 186, 112, 40, "XYZ Cnr", PROBE_BTN_INDIGO, COLOR_WHITE, 2);
-    drawButton(7, 230, 112, 40, "Bore", PROBE_BTN_BLUE, COLOR_WHITE, 2);
-    drawButton(121, 230, 112, 40, "Boss", PROBE_BTN_PURPLE, COLOR_WHITE, 2);
+    drawButton(7, 186, 112, 40, "Z Surf", PROBE_BTN_GREEN, COLOR_WHITE, 2, "zsurf");
+    drawButton(121, 186, 112, 40, "XYZ Cnr", UI_RT_CORNER, COLOR_WHITE, 2, "corner");
+    drawButton(7, 230, 112, 40, "Bore", UI_RT_BORE, COLOR_WHITE, 2, "bore");
+    drawButton(121, 230, 112, 40, "Boss", UI_RT_BOSS, COLOR_WHITE, 2, "boss");
   }
 }
 

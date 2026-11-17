@@ -19,7 +19,7 @@ function fmtRPM(rpm) {
 // target RPM is shown in the readout panel above.
 function drawSpindleDialButton() {
   const active = pendantSpindle.dialMode;
-  display.fillRoundRect(179, 163, 56, 37, 2, active ? PROBE_SEL_BG : PROBE_BG_SCREEN);
+  display.fillRoundRect(179, 163, 56, 37, 2, active ? PROBE_SEL_BG : fieldBg());
   display.drawRoundRect(179, 163, 56, 37, 2, active ? PROBE_C_YELLOW : PROBE_C_TAPBDR);
   display.setTextSize(2);
   display.setTextColor(active ? PROBE_C_YELLOW : COLOR_TEAL_BRIGHT);
@@ -41,7 +41,7 @@ function exitSpindleControl() { releasePanelSprites(); }
 function drawSpindleControlScreen() {
   display.fillScreen(COLOR_BACKGROUND);
   drawTitle("SPINDLE CONTROL");
-  display.fillRoundRect(5, 40, 230, 60, 5, COLOR_DARKER_BG);
+  uiPanel(display, 5, 40, 230, 60);
   updateSpindleRPMDisplay();
 
   drawButton(5, 110, 112, 38, "Fwd", pendantSpindle.directionFwd ? COLOR_DARK_GREEN : COLOR_BUTTON_GRAY, COLOR_WHITE, 2);
@@ -67,7 +67,7 @@ function updateSpindleRPMDisplay() {
   if (currentPendantScreen !== PSCREEN_SPINDLE_CONTROL) return;
   const P = panel(230, 60, 5, 40);
   const g = P.g, ox = P.ox, oy = P.oy;
-  g.fillRect(ox, oy, 230, 60, COLOR_DARKER_BG);
+  uiPanel(g, ox, oy, 230, 60);
   g.setTextColor(COLOR_GRAY_TEXT); g.setTextSize(1);
   g.setCursor(ox + 5, oy + 5); g.print("RPM");
   g.setTextColor(COLOR_ORANGE); g.setTextSize(3);

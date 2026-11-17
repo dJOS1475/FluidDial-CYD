@@ -74,30 +74,24 @@ static void runProbeZ() {
 static void drawZParamButton(int x, int y, int w, int h,
                               const char* label, float valueMm, bool focused) {
     bool inInch = pendantMachine.inInches;
-    uint16_t bg  = focused ? PROBE_SEL_BG   : PROBE_BG_SCREEN;
+    uint16_t bg  = focused ? PROBE_SEL_BG   : UI_FIELD_BG;
     uint16_t bdr = focused ? PROBE_C_YELLOW : PROBE_C_TAPBDR;
     uint16_t vc  = focused ? PROBE_C_YELLOW : PROBE_C_BLUE;
     display.fillRoundRect(x, y, w, h, 8, bg);
     display.drawRoundRect(x, y, w, h, 8, bdr);
 
     // Label (small, vertically centred in top half)
-    display.setTextSize(1);
+    uiText(&display, 1);
     display.setTextColor(focused ? COLOR_WHITE : PROBE_C_LBLUE);
     int16_t lw = display.textWidth(label);
     display.setCursor(x + (w - lw) / 2, y + 5);
     display.print(label);
 
-    // Value (large, bottom)
+    // Value + unit on one line in Font2 ("40 mm"), centred under the label.
     char valBuf[16];
-    if (inInch)
-        snprintf(valBuf, sizeof(valBuf), "%.3f in", valueMm / 25.4f);
-    else
-        snprintf(valBuf, sizeof(valBuf), "%.0f mm", valueMm);
-    display.setTextSize(2);
-    display.setTextColor(vc);
-    int16_t vw = display.textWidth(valBuf);
-    display.setCursor(x + (w - vw) / 2, y + 17);
-    display.print(valBuf);
+    if (inInch) snprintf(valBuf, sizeof(valBuf), "%.3f", valueMm / 25.4f);
+    else        snprintf(valBuf, sizeof(valBuf), "%.0f", valueMm);
+    uiFieldValue(&display, x, w, y + 14 + (h - 14) / 2.0f, valBuf, inInch ? "in" : "mm", vc, true);
 }
 
 // Side-view diagram of a Z-surface probe: stylus descending onto the work
@@ -128,10 +122,10 @@ void drawProbeZScreen() {
     probeDrawPosPanel(38);
 
     // Combined panel: sequence + diagram (left) / settings (right) — boss style.
-    display.fillRoundRect(5, 70, 230, 146, 4, PROBE_BG_PANEL);
+    uiPanel(&display, 5, 70, 230, 146);
 
     // Left column: sequence + diagram
-    display.setTextSize(1);
+    uiText(&display, 1);
     display.setTextColor(PROBE_C_LBLUE);
     display.setCursor(10, 73);
     display.print("SEQUENCE");
@@ -141,7 +135,7 @@ void drawProbeZScreen() {
     drawZDiagram();
 
     // Right column: settings
-    display.setTextSize(1);
+    uiText(&display, 1);
     display.setTextColor(PROBE_C_LBLUE);
     display.setCursor(122, 73);
     display.print("SETTINGS");
@@ -150,7 +144,7 @@ void drawProbeZScreen() {
     // Result line — what the probe will set
     {
         const char* s = "Sets Z0";
-        display.setTextSize(1);
+        uiText(&display, 1);
         display.setTextColor(PROBE_C_GREEN);
         display.setCursor(177 - display.textWidth(s) / 2, 166);
         display.print(s);

@@ -22,7 +22,7 @@ function updateStatusMachineStatus() {
   const jobRunning = fileStr.length > 0;
   const P = panel(230, 50, 5, 40);
   const g = P.g, ox = P.ox, oy = P.oy;
-  g.fillRect(ox, oy, 230, 50, COLOR_DARKER_BG);
+  uiPanel(g, ox, oy, 230, 50);
 
   if (!pendantSynced || statusStr === "N/C" || statusStr.length === 0) {
     const phase = pendantConnected ? "Syncing" : "Connecting";
@@ -70,7 +70,7 @@ function updateStatusCurrentFile() {
   const fileStr = pendantMachine.currentFile;
   const P = panel(230, 40, 5, 95);
   const g = P.g, ox = P.ox, oy = P.oy;
-  g.fillRoundRect(ox, oy, 230, 40, 5, COLOR_DARKER_BG);
+  uiPanel(g, ox, oy, 230, 40);
   if (pendantSdCard.loadedFile.length > 0 && fileStr.length === 0) {
     g.setTextColor(COLOR_GREEN); g.setTextSize(1);
     g.setCursor(ox + 5, oy + 5); g.print("READY - press green to run");
@@ -99,7 +99,7 @@ function updateStatusAxisPositions() {
   const numAxes = pendantMachine.numAxes;
   const P = panel(230, 65, 5, 140);
   const g = P.g, ox = P.ox, oy = P.oy;
-  g.fillRoundRect(ox, oy, 230, 65, 5, COLOR_DARKER_BG);
+  uiPanel(g, ox, oy, 230, 65);
   g.setTextColor(COLOR_GRAY_TEXT); g.setTextSize(1);
   g.setCursor(ox + 5, oy + 5); g.print("MACHINE POSITION");
   // Unit hint, dim, top-right — drawn once so it costs no column width.  Without
@@ -140,7 +140,7 @@ function updateStatusFeedSpindle() {
   const g = P.g, ox = P.ox, oy = P.oy;
   g.fillRect(ox, oy, 230, 65, COLOR_BACKGROUND);
 
-  g.fillRoundRect(ox + 0, oy, 112, 65, 5, COLOR_DARKER_BG);
+  uiPanel(g, ox + 0, oy, 112, 65);
   g.setTextColor(COLOR_GRAY_TEXT); g.setTextSize(1);
   g.setCursor(ox + 5, oy + 3); g.print("FEED");
   g.setTextColor(COLOR_ORANGE); g.setTextSize(2);
@@ -149,7 +149,7 @@ function updateStatusFeedSpindle() {
   let mmW = g.textWidth("mm/min");
   g.setCursor(ox + 112 - 5 - mmW, oy + 50); g.print("mm/min");
 
-  g.fillRoundRect(ox + 118, oy, 112, 65, 5, COLOR_DARKER_BG);
+  uiPanel(g, ox + 118, oy, 112, 65);
   g.setTextColor(COLOR_GRAY_TEXT); g.setTextSize(1);
   g.setCursor(ox + 123, oy + 3); g.print("SPINDLE");
   let dirW = g.textWidth(spindleDir);

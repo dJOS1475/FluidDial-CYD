@@ -39,12 +39,15 @@ The 3 physical buttons always perform the same function regardless of the active
 
 ## 🖥️ Screens & Features
 
-**Main Menu** — touch navigation to all screens. Shows live machine status; alarm states display a human-readable description in red (e.g. "Hard limit triggered").
+**Look (v2.4.0)** — every screen has a framed title bar with that screen's icon on the left and a status box on the right: signal bars and a battery gauge on a wireless pendant, or a power-plug icon on a wired one. Buttons are bright blue with a subtle 3D bevel and bold text, and the main destinations carry icons. Panels are navy with a blue outline. Yellow means selected, green means go or home, and red means stop.
+
+**Main Menu** — touch navigation to all screens, each button with its icon. Shows live machine status; alarm states show a human-readable description (e.g. "Hard limit triggered") over a red **ALARM**.
 
 **Status** — live DRO showing machine position, feed rate, spindle RPM, active file, and machine state. Axis count is detected automatically from the connected controller. Alarm states show a human-readable description in red. When an SD job is running, the status row splits into two columns — left shows machine state (Run / Hold / etc.), right shows live job progress as a percentage in green. When a file has been queued via the SD Card Load button, the screen shows "READY — press green to run" with the filename highlighted in green until the job starts.
 
 **Jog & Homing**
-* Jog dial moves the selected axis by the chosen increment; the DRO shows **machine coordinates** (MPos)
+* Jog dial moves the selected axis by the chosen increment
+* The position panel shows **every axis in both machine (MPos) and work (WPos) coordinates**; the axis being jogged, or homed, is highlighted green
 * **Handwheel stop** — a single deliberate detent completes its full move, but during a **continuous spin** the axis stops the moment you stop turning (the pendant sends a real-time jog-cancel), so it doesn't coast through queued moves — like a full-size MPG
 * Four increment slots — the first three are fixed, the fourth is a **DIAL box** holding the coarse values
   * Metric: 0.01 / 0.1 / 1 mm, then **10 / 50 / 100 mm** in the DIAL box
@@ -52,12 +55,12 @@ The 3 physical buttons always perform the same function regardless of the active
   * **First tap selects** the coarse increment — you carry on jogging with it, just like the other three slots. A **second tap** hands the encoder over to stepping 10/50/100 (the box highlights yellow and the DRO reads "JOG INCREMENT"). A further tap hands the encoder back to jogging and restores the axis you were on; tapping an axis does the same
   * The selected increment and the DIAL box's value are saved to flash and restored on reboot
 * Units detected automatically from the controller (G20/G21) — no manual switching needed
-* The **A axis** (4th axis) is treated as rotary — its DRO shows a **degree symbol (°)** instead of mm/in; X/Y/Z use mm/in as normal
+* The **A axis** (4th axis) is treated as rotary — its increments are labelled in degrees instead of mm/in
 * Axis selection and increment buttons on screen
 * Home buttons for each detected axis, plus an "ALL" home button on 3-axis machines
 * Only axes present on the connected machine are shown
-* Alarm state (e.g. from a limit switch) is displayed in red where the unit label normally appears
-* **Speed field** (bottom row, between Main Menu and Work Area) — a tap-to-edit field (same style as the Probe screens) showing the current jog speed; tap to adjust it with the dial in 100 mm/min steps (metric) or 10 ipm steps (imperial); the field highlights while active; tap any axis to return to jogging
+* Alarm state (e.g. from a limit switch) is shown in red on the JOG INCREMENT label
+* **Speed field** (bottom row, between Main Menu and Work Area) — a tap-to-edit field showing the current jog speed; tap to adjust it with the dial in 100 mm/min steps (metric) or 10 ipm steps (imperial); the field highlights while active; tap any axis to return to jogging
 * Velocity scaling — turning the dial faster proportionally increases the jog feed rate up to 8× the base speed, giving a natural acceleration feel
 * Jog feed rate is capped at the controller's X-axis maximum (`$110`), read automatically on entry to the screen
 * **Soft-limit clamp** — once the machine is homed, the pendant clamps every jog so an axis's **absolute machine position can't leave its travel envelope**, preventing a fast or repeated jog from driving into a hard stop. The per-axis envelope is read from the controller's per-axis travel (`$130–$132`) and homing-direction mask (`$23`), so machines that home in different directions per axis work correctly. This engages only for homed X/Y/Z axes; it does not replace controller soft limits.
@@ -65,7 +68,7 @@ The 3 physical buttons always perform the same function regardless of the active
 
 **Work Area (Probing Work)**
 * Coordinate system selection (G54–G57)
-* Displays Machine Position (absolute machine coordinates) and Work Position (DRO / work coordinate values); Work Position updates live as the machine moves
+* Displays Machine Position (absolute machine coordinates) and Work Position (DRO / work coordinate values) together in one framed panel; both update live as the machine moves
 * Zero individual axes or all at once for the selected coordinate system
 
 **Probing**
@@ -104,9 +107,9 @@ The 3 physical buttons always perform the same function regardless of the active
 
 ## 🔋 Battery Status (capacitive CYD only)
 
-On capacitive-screen CYDs a small battery icon appears in the top-right corner of every screen title bar when a LiPo battery is connected to the CYD's 3.3 V rail (via GPIO 39 voltage divider):
+On capacitive-screen CYDs a small battery icon appears in the status box at the right of every screen title bar when a LiPo battery is connected to the CYD's 3.3 V rail (via GPIO 39 voltage divider):
 
-* **Icon colour** — green above 50 %, orange 20–50 %, red below 20 %
+* **Icon colour** — green above 50 %, yellow 20–50 %, red below 20 %
 * **Charging indicator** — a yellow lightning-bolt overlay appears on the battery icon while charging. Charging is inferred from the battery-voltage trend (rising/held-high ⇒ on charger), so it reacts within ~30 s of plugging in. A short post-boot settling window suppresses it for the first couple of minutes after power-up, so the normal boot-load voltage recovery isn't mistaken for charging
 * **Update rate** — battery level refreshes every 5 seconds; charging status every 3 seconds (cheap ADC read)
 * **Screen sleep** — to save power on battery, the display backlight switches off after **15 minutes** with the CNC Idle (or stuck "Connecting", eg your CNC is powered down and pendant is charging); **a touch anywhere wakes it** back to the screen you left, without sending any command to the controller. This is backlight-off only — the pendant stays connected and running. Wired (UART) pendants don't sleep
@@ -157,7 +160,7 @@ Macros use the `$File/SendJSON` chain on both transports and must live in **`mac
 
 ### Signal strength and status
 
-A four-bar signal icon sits in the top-left of every title bar when a wireless transport is active, coloured by link quality. The **Connection** screen shows live link state, machine name, peer MAC + channel, and RSSI in dBm.
+A four-bar signal icon sits in the status box at the right of every title bar when a wireless transport is active, coloured by link quality; a wired (UART) pendant shows a power-plug icon there instead. The **Connection** screen shows live link state, machine name, peer MAC + channel, and RSSI in dBm.
 
 ### Upgrading from v2.1.x
 

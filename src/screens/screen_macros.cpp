@@ -149,12 +149,12 @@ void updateMacrosFileList() {
 
     if (pendantMacros.loading) {
         g->setTextColor(COLOR_GRAY_TEXT);
-        g->setTextSize(2);
+        uiText(g, 2);
         g->setCursor(ox + 45, oy + 100);
         g->print(pendantConnected ? "Loading..." : "Not connected.");
     } else if (pendantMacros.loadFailed) {
         g->setTextColor(COLOR_ORANGE);
-        g->setTextSize(1);
+        uiText(g, 1);
         g->setCursor(ox + 15, oy + 90);
         g->print("Couldn't load macros.");
         g->setTextColor(COLOR_GRAY_TEXT);
@@ -162,7 +162,7 @@ void updateMacrosFileList() {
         g->print("Tap Refresh to try again.");
     } else if (pendantMacros.count == 0) {
         g->setTextColor(COLOR_GRAY_TEXT);
-        g->setTextSize(1);
+        uiText(g, 1);
         g->setCursor(ox + 15, oy + 90);
         g->print("No macros found.");
         g->setCursor(ox + 15, oy + 108);
@@ -183,7 +183,7 @@ void updateMacrosFileList() {
             int ry = oy + LIST_ROW_Y0 + i * LIST_ROW_PITCH;
             g->fillRoundRect(ox, ry, 230, LIST_ROW_H, 8, bg);
             g->setTextColor(COLOR_WHITE);
-            g->setTextSize(1);
+            uiText(g, 1);
             g->setCursor(ox + 5, ry + 11);
             g->print(macroLabel(displayIndex));
         }

@@ -7,6 +7,7 @@
 
 // ===== Screen registry =====
 const SCREENS = {
+  [PSCREEN_POWER_OFF]:     { enter: enterPowerOff,     exit: exitPowerOff,     draw: drawPowerOffScreen,      handle: () => {},                update: [] },
   [PSCREEN_BOOT]:          { enter: enterBoot,         exit: exitBoot,         draw: drawBootScreen,          handle: handleBootTouch,         update: [] },
   [PSCREEN_MAIN_MENU]:     { enter: enterMainMenu,     exit: exitMainMenu,     draw: drawMainMenu,            handle: handleMainMenuTouch,     update: [updateMainMenuDisplay] },
   [PSCREEN_STATUS]:        { enter: enterStatus,       exit: exitStatus,       draw: drawStatusScreen,        handle: handleStatusTouch,       update: [updateStatusMachineStatus, updateStatusCurrentFile, updateStatusAxisPositions, updateStatusFeedSpindle] },
@@ -31,7 +32,7 @@ const SCREENS = {
 };
 
 const SCREEN_LABELS = {
-  [PSCREEN_BOOT]: "Boot Logo", [PSCREEN_MAIN_MENU]: "Main Menu", [PSCREEN_STATUS]: "Status", [PSCREEN_JOG_HOMING]: "Jog & Homing",
+  [PSCREEN_BOOT]: "Boot Logo", [PSCREEN_POWER_OFF]: "Powering Off", [PSCREEN_MAIN_MENU]: "Main Menu", [PSCREEN_STATUS]: "Status", [PSCREEN_JOG_HOMING]: "Jog & Homing",
   [PSCREEN_PROBING_WORK]: "Work Area", [PSCREEN_PROBE]: "Probe Hub", [PSCREEN_PROBE_CFG_3D]: "Probe Config (3D)",
   [PSCREEN_PROBE_CFG_PLATE]: "Probe Config (Plate)", [PSCREEN_PROBE_Z]: "Probe: Z Surface",
   [PSCREEN_PROBE_CORNER]: "Probe: XYZ Corner", [PSCREEN_PROBE_BORE]: "Probe: Bore", [PSCREEN_PROBE_BOSS]: "Probe: Boss",
@@ -325,6 +326,10 @@ function handleEncoderDelta(delta) {
 // These are sim approximations (the firmware's button handler lives in
 // ardmain.cpp) — they emit the standard GRBL realtime bytes and log them.
 function pressButton(which) {
+  if (currentPendantScreen === PSCREEN_POWER_OFF) {
+    if (which === "red") { logLine("BTN red  -> wake from deep sleep (full reboot)"); simBoot(); }
+    return;   // asleep: nothing else is listening
+  }
   if (which === "red") {
     logLine("BTN red  -> soft reset (0x18)");
     pendantMachine.spindleRunning = false;
@@ -376,10 +381,11 @@ function forceSleepNow() {
   navigateTo(PSCREEN_SLEEP);
 }
 function manageScreenSleep() {
-  // WiFi (battery) pendants only — wired pendants power down with the controller.
-  // Eligible to blank when Idle OR while "Connecting" (not connected); any
-  // connected-but-busy state keeps it awake and resets the idle clock.
-  if (comms_active_mode() !== COMMS_MODE_WIFI) return;
+  // Wireless (battery) pendants only — wired pendants power down with the
+  // controller.  Eligible to blank when Idle OR while "Connecting" (not
+  // connected); any connected-but-busy state keeps it awake and resets the idle
+  // clock.  Mirrors the firmware gate: comms_active_mode() != COMMS_MODE_UART.
+  if (comms_active_mode() === COMMS_MODE_UART) return;
   const sleepEligible = !pendantConnected || pendantMachine.status.startsWith("Idle");
   if (!sleepEligible) lastActivityMs = millis();
   if (currentPendantScreen === PSCREEN_SLEEP) {
@@ -393,11 +399,25 @@ function manageScreenSleep() {
 }
 
 // ===== Refresh tick (firmware updates panels ~every 100 ms) =====
+let _lastLinkSampleMs = 0;
 function tick() {
+  // Wireless link-quality cache — the firmware samples espnow_signal_bars() on
+  // Core 0 every 500 ms and publishes it to pendantMachine.linkSignalBars.
+  if (comms_active_mode() === COMMS_MODE_ESPNOW && millis() - _lastLinkSampleMs >= 500) {
+    pendantMachine.linkSignalBars = espnow_signal_bars();
+    _lastLinkSampleMs = millis();
+  }
   manageScreenSleep();
   if (currentPendantScreen === PSCREEN_SLEEP) return;   // nothing to update while blank
   const u = SCREENS[currentPendantScreen].update;
   for (const fn of u) fn();
+  // Refresh title-bar icons on every periodic tick (updateCurrentScreenSprites),
+  // so a change in signal or battery shows without a full redraw.  Not on the
+  // boot logo (no title bar) or once powered off (the device is asleep and its
+  // backlight is off — nothing is refreshing).
+  if (currentPendantScreen !== PSCREEN_BOOT && currentPendantScreen !== PSCREEN_POWER_OFF) {
+    refreshTitleIcons();
+  }
 }
 
 // ===== Log panel =====
@@ -453,6 +473,31 @@ function simBoot() {
   else navigateTo(PSCREEN_BOOT);
 }
 
+// ===== Power-off screen (mirrors the HwEvent::POWER_OFF handler) =====
+// A 5 s hold of the red button posts POWER_OFF: the shutdown message is shown
+// for 1.5 s, then the backlight goes off and the ESP32 deep-sleeps.  Only the red
+// button (GPIO4, the one RTC-capable button pin) wakes it, and waking is a full
+// reboot, not a resume — so here a red press replays the boot.  Touch does
+// nothing while it is off.  Pick "Powering Off" in the Screen dropdown to view it.
+let _powerOffTimer = null;
+function enterPowerOff() {
+  clearTimeout(_powerOffTimer);
+  logLine("POWER_OFF — shutdown screen, then deep sleep (red button wakes)");
+  _powerOffTimer = setTimeout(() => {
+    if (currentPendantScreen === PSCREEN_POWER_OFF) display.fillScreen(COLOR_BACKGROUND);  // setBrightness(0)
+  }, 1500);
+}
+function exitPowerOff() { clearTimeout(_powerOffTimer); }
+function drawPowerOffScreen() {
+  display.fillScreen(COLOR_BACKGROUND);
+  drawTitle("POWERING OFF");
+  display.setTextSize(2);
+  display.setTextColor(COLOR_GRAY_TEXT);
+  const l1 = "Press red button", l2 = "to power on";
+  display.setCursor(((240 - display.textWidth(l1)) / 2) | 0, 130); display.print(l1);
+  display.setCursor(((240 - display.textWidth(l2)) / 2) | 0, 158); display.print(l2);
+}
+
 // ===== Boot =====
 window.addEventListener("DOMContentLoaded", () => {
   canvas = document.getElementById("screen");
@@ -489,7 +534,9 @@ function saveSession() {
   try {
     sessionStorage.setItem("sim.session", JSON.stringify({
       screen: currentPendantScreen,
-      commsMode: _commsMode,
+      transport: simTransport,
+      activeTransport: simActiveTransport,
+      espnow: simEspNow,
       connected: pendantConnected,
       synced: pendantSynced,
       machine: pendantMachine,
@@ -514,7 +561,9 @@ function restoreSession() {
   const CODE_OWNED = ["fluidDialVersion", "fluidNCVersion"];
   const codeVals = {};
   for (const k of CODE_OWNED) codeVals[k] = pendantMachine[k];
-  _commsMode = s.commsMode;
+  if (s.transport === COMMS_MODE_UART || s.transport === COMMS_MODE_ESPNOW) simTransport = s.transport;
+  if (s.activeTransport === COMMS_MODE_UART || s.activeTransport === COMMS_MODE_ESPNOW) simActiveTransport = s.activeTransport;
+  if (s.espnow) Object.assign(simEspNow, s.espnow);
   pendantConnected = s.connected;
   pendantSynced = s.synced;
   Object.assign(pendantMachine, s.machine);
@@ -538,8 +587,18 @@ function setupCanvasInput() {
   });
 }
 
+const RED_POWER_OFF_HOLD_MS = 5000;   // CNC_Pendant_UI.cpp: red long-press -> power off
 function setupButtons() {
-  document.getElementById("btn-red").addEventListener("click", () => pressButton("red"));
+  const red = document.getElementById("btn-red");
+  let holdTimer = null, heldToOff = false;
+  red.addEventListener("pointerdown", () => {
+    heldToOff = false;
+    if (currentPendantScreen === PSCREEN_POWER_OFF) return;
+    holdTimer = setTimeout(() => { heldToOff = true; navigateTo(PSCREEN_POWER_OFF); }, RED_POWER_OFF_HOLD_MS);
+  });
+  for (const ev of ["pointerup", "pointerleave", "pointercancel"])
+    red.addEventListener(ev, () => clearTimeout(holdTimer));
+  red.addEventListener("click", () => { if (!heldToOff) pressButton("red"); heldToOff = false; });
   document.getElementById("btn-yellow").addEventListener("click", () => pressButton("yellow"));
   document.getElementById("btn-green").addEventListener("click", () => pressButton("green"));
 }

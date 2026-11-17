@@ -63,20 +63,20 @@ void exitConnection() {
 // top edge lands in the current target.  Anything outside the target is clipped,
 // so the same code renders either the full panel or a horizontal band of it.
 static void drawLinkBody(LovyanGFX* g, int ox, int base) {
-    g->fillRoundRect(ox, base, 230, LK_H, 4, PROBE_BG_PANEL);
-    g->setTextSize(1);
+    uiPanel(g, ox, base, 230, LK_H);
+    uiText(g, 1);
     g->setTextColor(PROBE_C_LBLUE);
     g->setCursor(ox + 5, base + 3);
     g->print("LINK");
 
     if (comms_active_mode() == COMMS_MODE_UART) {
         // Wired: no radio, so show the serial parameters instead.
-        g->setTextSize(2);
+        uiText(g, 2);
         g->setTextColor(PROBE_C_GREEN);
         g->setCursor(ox + 7, base + 18);
         g->print("Wired");
 
-        g->setTextSize(1);
+        uiText(g, 1);
         g->setTextColor(COLOR_GRAY_TEXT);
         g->setCursor(ox + 7, base + 44);
         g->print("Baud");
@@ -99,11 +99,11 @@ static void drawLinkBody(LovyanGFX* g, int ox, int base) {
     if (!espnow_radio_ready()) {
         // The radio itself never started — no amount of waiting will fix it, so
         // do not show "Reconnecting" and imply otherwise.
-        g->setTextSize(2);
+        uiText(g, 2);
         g->setTextColor(PROBE_C_RED);
         g->setCursor(ox + 7, base + 18);
         g->print("Radio down");
-        g->setTextSize(1);
+        uiText(g, 1);
         g->setTextColor(COLOR_GRAY_TEXT);
         g->setCursor(ox + 7, base + 46);
         g->print("ESP-NOW failed to start.");
@@ -117,14 +117,14 @@ static void drawLinkBody(LovyanGFX* g, int ox, int base) {
     const bool paired = espnow_has_saved_pairing();
     const bool up     = espnow_is_connected();
 
-    g->setTextSize(2);
+    uiText(g, 2);
     g->setTextColor(up      ? PROBE_C_GREEN
                   : paired  ? PROBE_C_YELLOW
                             : PROBE_C_RED);
     g->setCursor(ox + 7, base + 18);
     g->print(up ? "Connected" : (paired ? "Reconnecting" : "Not paired"));
 
-    g->setTextSize(1);
+    uiText(g, 1);
     if (!paired) {
         g->setTextColor(COLOR_GRAY_TEXT);
         g->setCursor(ox + 7, base + 46);
@@ -225,8 +225,8 @@ static void drawLinkPanel() {
 }
 
 static void drawTransportPanel() {
-    display.fillRoundRect(5, TP_Y, 230, TP_H, 4, PROBE_BG_PANEL);
-    display.setTextSize(1);
+    uiPanel(&display, 5, TP_Y, 230, TP_H);
+    uiText(&display, 1);
     display.setTextColor(PROBE_C_LBLUE);
     display.setCursor(10, TP_Y + 3);
     display.print("TRANSPORT");
@@ -246,11 +246,11 @@ static void drawActionRow() {
     if (restartAtMs) {
         display.fillRoundRect(5, ACT_Y, 230, ACT_H, 4, PROBE_WARN_BG);
         display.drawRoundRect(5, ACT_Y, 230, ACT_H, 4, PROBE_WARN_BDR);
-        display.setTextSize(1);
+        uiText(&display, 1);
         display.setTextColor(COLOR_ORANGE);
         display.setCursor(14, ACT_Y + 8);
         display.print("Transport changed,");
-        display.setTextSize(2);
+        uiText(&display, 2);
         display.setCursor(14, ACT_Y + 21);
         display.printf("rebooting in %d", restartSecsLeft());
         return;

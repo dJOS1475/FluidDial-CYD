@@ -25,7 +25,7 @@ function runProbeZ() {
 
 function drawZParamButton(x, y, w, h, label, valueMm, focused) {
   const inInch = pendantMachine.inInches;
-  const bg = focused ? PROBE_SEL_BG : PROBE_BG_SCREEN;
+  const bg = focused ? PROBE_SEL_BG : fieldBg();
   const bdr = focused ? PROBE_C_YELLOW : PROBE_C_TAPBDR;
   const vc = focused ? PROBE_C_YELLOW : PROBE_C_BLUE;
   display.fillRoundRect(x, y, w, h, 8, bg);
@@ -35,12 +35,9 @@ function drawZParamButton(x, y, w, h, label, valueMm, focused) {
   let lw = display.textWidth(label);
   display.setCursor(x + ((w - lw) / 2 | 0), y + 5);
   display.print(label);
-  const valBuf = inInch ? fmtF(valueMm / 25.4, 3) + " in" : fmtF(valueMm, 0) + " mm";
-  display.setTextSize(2);
-  display.setTextColor(vc);
-  let vw = display.textWidth(valBuf);
-  display.setCursor(x + ((w - vw) / 2 | 0), y + 17);
-  display.print(valBuf);
+  // Value + unit on one line in Font2 ("40 mm"), centred under the label.
+  uiFieldValue(x, w, y + 14 + (h - 14) / 2, inInch ? fmtF(valueMm / 25.4, 3) : fmtF(valueMm, 0),
+               inInch ? "in" : "mm", vc, true);
 }
 
 // Side-view diagram of a Z-surface probe: stylus descending onto the surface.
@@ -66,7 +63,7 @@ function drawProbeZScreen() {
   display.fillScreen(PROBE_BG_SCREEN);
   drawTitle("Z SURFACE");
   probeDrawPosPanel(38);
-  display.fillRoundRect(5, 70, 230, 146, 4, PROBE_BG_PANEL);
+  uiPanel(display, 5, 70, 230, 146);
   display.setTextSize(1); display.setTextColor(PROBE_C_LBLUE);
   display.setCursor(10, 73); display.print("SEQUENCE");
   drawSeqStep(8, 87, 1, "Fast seek -Z", true);

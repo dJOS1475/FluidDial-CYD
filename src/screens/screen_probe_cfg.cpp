@@ -30,7 +30,7 @@ static const int kGfxCX = 120;   // horizontal centre of all illustrations
 // Compact form so it fits the space left below the deflection-cal panel (y188+).
 static void drawProbe3DGraphic() {
     const int cx = kGfxCX;
-    display.fillRoundRect(5, 188, 230, 82, 4, PROBE_BG_PANEL);
+    uiPanel(&display, 5, 188, 230, 82);
     display.fillRect(cx - 7, 194, 14, 8, PROBE_C_DIMBLUE);            // collet/shank
     display.fillRoundRect(cx - 17, 202, 34, 18, 4, COLOR_GRAY_TEXT); // probe body
     display.drawFastVLine(cx - 1, 220, 24, PROBE_C_LBLUE);           // stylus (3px)
@@ -45,7 +45,7 @@ static void drawProbe3DGraphic() {
 // Z-height touch plate: tool descending onto a flat plate sitting on the stock.
 static void drawPlateZGraphic() {
     const int cx = kGfxCX;
-    display.fillRoundRect(5, 128, 230, 142, 4, PROBE_BG_PANEL);
+    uiPanel(&display, 5, 128, 230, 142);
     display.fillRect(cx - 45, 206, 90, 32, COLOR_BUTTON_GRAY);  // workpiece
     display.fillRect(cx - 55, 194, 110, 12, PROBE_C_BLUE);      // touch plate (top)
     display.fillRect(cx - 7, 164, 14, 30, COLOR_GRAY_TEXT);     // tool
@@ -54,7 +54,7 @@ static void drawPlateZGraphic() {
 // XYZ touch plate: L-shaped corner block wrapping the top-left corner of stock.
 static void drawPlateXYZGraphic() {
     const int cx = kGfxCX;
-    display.fillRoundRect(5, 170, 230, 100, 4, PROBE_BG_PANEL);
+    uiPanel(&display, 5, 170, 230, 100);
     display.fillRect(cx - 28, 213, 90, 43, COLOR_BUTTON_GRAY);  // workpiece block
     display.fillRect(cx - 40, 203, 78, 10, PROBE_C_BLUE);       // plate — top arm
     display.fillRect(cx - 40, 203, 10, 53, PROBE_C_BLUE);       // plate — left arm
@@ -88,28 +88,21 @@ static void drawCalOverlay(const char* l1, const char* l2, uint16_t l2col, int b
                            const char* okLabel = "APPLY") {
     display.fillRoundRect(20, 100, 200, 120, 8, PROBE_BG_PANEL);
     display.drawRoundRect(20, 100, 200, 120, 8, PROBE_C_YELLOW);
-    display.setTextSize(1);
+    uiText(&display, 1);
     display.setTextColor(PROBE_C_YELLOW);
     int16_t w1 = display.textWidth(l1);
     display.setCursor(120 - w1 / 2, 118);
     display.print(l1);
-    display.setTextSize(2);
+    uiText(&display, 2);
     display.setTextColor(l2col);
     int16_t w2 = display.textWidth(l2);
     display.setCursor(120 - w2 / 2, 140);   // centre the size-2 line
     display.print(l2);
-    display.setTextSize(2);
-    display.setTextColor(COLOR_WHITE);
     if (buttons == 2) {
-        display.fillRoundRect(28,  175, 78, 32, 5, COLOR_BUTTON_GRAY);   // CANCEL
-        display.fillRoundRect(114, 175, 98, 32, 5, PROBE_BTN_GREEN);     // affirmative
-        display.setCursor(36, 183);  display.print("CANCEL");
-        int16_t aw = display.textWidth(okLabel);
-        display.setCursor(114 + (98 - aw) / 2, 183);  display.print(okLabel);
+        drawButton(28,  175, 78, 32, "CANCEL", COLOR_BUTTON_GRAY, COLOR_WHITE, 2);
+        drawButton(114, 175, 98, 32, okLabel,  PROBE_BTN_GREEN,   COLOR_WHITE, 2);   // affirmative
     } else if (buttons == 1) {
-        display.fillRoundRect(71, 175, 98, 32, 5, PROBE_BTN_BLUE);       // OK / dismiss
-        int16_t ow = display.textWidth("OK");
-        display.setCursor(71 + (98 - ow) / 2, 183);  display.print("OK");
+        drawButton(71, 175, 98, 32, "OK", PROBE_BTN_BLUE, COLOR_WHITE, 2);           // dismiss
     }
 }
 
@@ -138,8 +131,8 @@ void drawProbeCfg3DScreen() {
     drawTitle("PROBE CONFIG");
 
     // ── Hardware panel (static info) ──────────────────────────────────────
-    display.fillRoundRect(5, 38, 230, 26, 4, PROBE_BG_PANEL);
-    display.setTextSize(1);
+    uiPanel(&display, 5, 38, 230, 26);
+    uiText(&display, 1);
     display.setTextColor(PROBE_C_LBLUE);
     display.setCursor(10, 41);
     display.print("PROBE HARDWARE");
@@ -148,15 +141,15 @@ void drawProbeCfg3DScreen() {
     display.print("3D Touch Probe");
 
     // ── Stylus panel (Ball dia · Deflection) ─────────────────────────────
-    display.fillRoundRect(5, 67, 230, 55, 4, PROBE_BG_PANEL);
-    display.setTextSize(1);
+    uiPanel(&display, 5, 67, 230, 55);
+    uiText(&display, 1);
     display.setTextColor(PROBE_C_LBLUE);
     display.setCursor(10, 70);
     display.print("STYLUS");
 
     // ── Deflection-calibration panel (field spaced like the Stylus panel) ─
-    display.fillRoundRect(5, 128, 230, 55, 4, PROBE_BG_PANEL);
-    display.setTextSize(1);
+    uiPanel(&display, 5, 128, 230, 55);
+    uiText(&display, 1);
     display.setTextColor(PROBE_C_LBLUE);
     display.setCursor(10, 131);
     display.print("DEFLECTION CAL");
@@ -387,8 +380,8 @@ void drawProbeCfgPlateScreen() {
 
     // ── Type panel (static info — the probe type is shown here, so the title
     //    can stay generic "Probe Config") ──────────────────────────────────
-    display.fillRoundRect(5, 38, 230, 26, 4, PROBE_BG_PANEL);
-    display.setTextSize(1);
+    uiPanel(&display, 5, 38, 230, 26);
+    uiText(&display, 1);
     display.setTextColor(PROBE_C_LBLUE);
     display.setCursor(10, 41);
     display.print("PROBE TYPE");
@@ -398,8 +391,8 @@ void drawProbeCfgPlateScreen() {
 
     // ── Dimensions panel ──────────────────────────────────────────────────
     int panelH = xyz ? 98 : 55;
-    display.fillRoundRect(5, 67, 230, panelH, 4, PROBE_BG_PANEL);
-    display.setTextSize(1);
+    uiPanel(&display, 5, 67, 230, panelH);
+    uiText(&display, 1);
     display.setTextColor(PROBE_C_LBLUE);
     display.setCursor(10, 70);
     display.print(xyz ? "PLATE DIMENSIONS" : "PLATE THICKNESS");

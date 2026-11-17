@@ -8,29 +8,22 @@
 // highlight (yellow) while the dial is active.
 static void drawDialField(LovyanGFX* g, int ox, int oy, int w, int h,
                           int value, uint16_t valColor, bool active) {
-    uint16_t bg  = active ? PROBE_SEL_BG   : PROBE_BG_SCREEN;
+    uint16_t bg  = active ? PROBE_SEL_BG   : UI_FIELD_BG;
     uint16_t bdr = active ? PROBE_C_YELLOW : PROBE_C_TAPBDR;
     g->fillRect(ox, oy, w, h, COLOR_BACKGROUND);   // clear corners to screen bg
     g->fillRoundRect(ox, oy, w, h, 2, bg);
     g->drawRoundRect(ox, oy, w, h, 2, bdr);
 
-    g->setTextSize(1);
+    uiText(g, 1);
     g->setTextColor(active ? COLOR_WHITE : PROBE_C_LBLUE);
     g->setCursor(ox + 3, oy + 2);
     g->print("DIAL");
 
     char vbuf[8];
     snprintf(vbuf, sizeof(vbuf), "%d", value);
-    g->setTextSize(2);
-    g->setTextColor(active ? PROBE_C_YELLOW : valColor);
-    g->setCursor(ox + 3, oy + 11);
-    g->print(vbuf);
-
-    g->setTextSize(1);
-    g->setTextColor(PROBE_C_DIMBLUE);
-    int16_t vw = g->textWidth(vbuf) * 2;
-    g->setCursor(ox + 3 + vw + 1, oy + 14);
-    g->print("%");
+    // Font2 "100 %" on one line under the caption, as the probe fields.
+    uiFieldValue(g, ox + 3, w - 6, oy + 10 + (h - 10) / 2.0f, vbuf, "%",
+                 active ? PROBE_C_YELLOW : valColor, false);
 }
 
 void enterFeedsSpeeds() {
@@ -50,7 +43,7 @@ void drawFeedsSpeedsScreen() {
     updateFeedsSpeedsTopDisplay();
 
     display.setTextColor(COLOR_GRAY_TEXT);
-    display.setTextSize(1);
+    uiText(&display, 1);
     display.setCursor(5, 83);
     display.print("FEED OVERRIDE");
 
@@ -69,7 +62,7 @@ void drawFeedsSpeedsScreen() {
     updateFeedOverrideDisplay();
 
     display.setTextColor(COLOR_GRAY_TEXT);
-    display.setTextSize(1);
+    uiText(&display, 1);
     display.setCursor(5, 182);
     display.print("SPINDLE OVERRIDE");
 
@@ -101,24 +94,24 @@ void updateFeedsSpeedsTopDisplay() {
     g->fillRect(ox, oy, 230, 35, COLOR_BACKGROUND);
 
     // Feed box
-    g->fillRoundRect(ox + 0, oy + 0, 112, 35, 5, COLOR_DARKER_BG);
+    uiPanel(g, ox + 0, oy + 0, 112, 35);
     g->setTextColor(COLOR_GRAY_TEXT);
-    g->setTextSize(1);
+    uiText(g, 1);
     g->setCursor(ox + 5, oy + 3);
     g->print("FEED");
     g->setTextColor(COLOR_ORANGE);
-    g->setTextSize(2);
+    uiText(g, 2);
     g->setCursor(ox + 5, oy + 13);
     g->print(feedRate);
 
     // Spindle box
-    g->fillRoundRect(ox + 118, oy + 0, 112, 35, 5, COLOR_DARKER_BG);
+    uiPanel(g, ox + 118, oy + 0, 112, 35);
     g->setTextColor(COLOR_GRAY_TEXT);
-    g->setTextSize(1);
+    uiText(g, 1);
     g->setCursor(ox + 123, oy + 3);
     g->print("SPINDLE");
     g->setTextColor(COLOR_GREEN);
-    g->setTextSize(2);
+    uiText(g, 2);
     g->setCursor(ox + 123, oy + 13);
     g->print(spindleRPM);
 

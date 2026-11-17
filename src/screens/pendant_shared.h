@@ -191,7 +191,7 @@ struct MachineState {
     bool   rotationDirty    = false;
 
     // Battery state — written by Core 0 (pendant_hw_task) every 5 s under stateMutex;
-    // read by Core 1 (drawBatteryIcon) without mutex (int/bool are atomic on Xtensa LX6).
+    // read by Core 1 (uiDrawTitleStatus) without mutex (int/bool are atomic on Xtensa LX6).
     // batteryPercent = -1 means hardware not present or not yet sampled.
     int    batteryPercent   = -1;   // 0–100, or -1 if unavailable
     int    batteryMv        = 0;    // smoothed millivolts (used by FluidNC info screen)
@@ -523,8 +523,10 @@ void drawListCrumb(LovyanGFX* g, int ox, int oy, const char* text);
 // ===== Helper Functions (defined in CNC_Pendant_UI.cpp) =====
 bool   isTouchInBounds(int tx, int ty, int x, int y, int w, int h);
 void   drawRoundRect(int x, int y, int w, int h, int r, uint16_t color);
-void   drawButton(int x, int y, int w, int h, String text, uint16_t bgColor, uint16_t textColor, int textSize = 2);
-void   drawMultiLineButton(int x, int y, int w, int h, String line1, String line2, uint16_t bgColor, uint16_t textColor, int textSize = 1);
+void   drawButton(int x, int y, int w, int h, String text, uint16_t bgColor, uint16_t textColor, int textSize = 2,
+                  const uint16_t* icon = nullptr);
+void   drawMultiLineButton(int x, int y, int w, int h, String line1, String line2, uint16_t bgColor, uint16_t textColor, int textSize = 1,
+                            const uint16_t* icon = nullptr);
 void   drawTitle(String title);
 void   drawInfoBox(int x, int y, int w, int h, String label, String value, uint16_t valueColor = COLOR_ORANGE);
 void   drawCurrentPendantScreen();
@@ -565,3 +567,5 @@ inline String alarmDescription(const String& status) {
 // Each screen exposes: enterXxx(), exitXxx(), drawXxx(), handleXxxTouch(int,int)
 // Plus zero or more updateXxx() sprite-refresh functions called every 100ms.
 
+// v2.4.0 look: title bar, buttons, panels, fonts, icons.
+#include "ui_style.h"

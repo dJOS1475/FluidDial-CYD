@@ -216,12 +216,12 @@ void updateSDCardFileList() {
 
     if (pendantSdCard.loading) {
         g->setTextColor(COLOR_GRAY_TEXT);
-        g->setTextSize(2);
+        uiText(g, 2);
         g->setCursor(ox + 50, oy + 100);
         g->print("Loading...");
     } else if (pendantSdCard.loadFailed) {
         g->setTextColor(COLOR_ORANGE);
-        g->setTextSize(1);
+        uiText(g, 1);
         g->setCursor(ox + 15, oy + 90);
         g->print("Couldn't load file list.");
         g->setTextColor(COLOR_GRAY_TEXT);
@@ -229,7 +229,7 @@ void updateSDCardFileList() {
         g->print("Tap Refresh to try again.");
     } else if (pendantSdCard.fileCount == 0) {
         g->setTextColor(COLOR_GRAY_TEXT);
-        g->setTextSize(1);
+        uiText(g, 1);
         g->setCursor(ox + 15, oy + 90);
         g->print(pendantConnected ? "No GCode files found." : "Not connected.");
         g->setCursor(ox + 15, oy + 108);
@@ -251,7 +251,7 @@ void updateSDCardFileList() {
             g->fillRoundRect(ox, ry, 230, LIST_ROW_H, 8, bg);
             // Folders read as navigation, not jobs: cyan, with a trailing slash.
             g->setTextColor(pendantSdCard.isDir[displayIndex] ? COLOR_CYAN : COLOR_WHITE);
-            g->setTextSize(1);
+            uiText(g, 1);
             g->setCursor(ox + 5, ry + 11);
             g->print(sdRowLabel(displayIndex));
         }

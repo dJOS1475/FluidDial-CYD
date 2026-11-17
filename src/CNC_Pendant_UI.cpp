@@ -340,30 +340,18 @@ void drawRoundRect(int x, int y, int w, int h, int r, uint16_t color) {
     display.fillRoundRect(x, y, w, h, r, color);
 }
 
-void drawButton(int x, int y, int w, int h, String text, uint16_t bgColor, uint16_t textColor, int textSize) {
-    drawRoundRect(x, y, w, h, 8, bgColor);
-    display.setTextColor(textColor);
-    display.setTextSize(textSize);
-    int16_t tw = display.textWidth(text.c_str());
-    int16_t th = display.fontHeight();
-    display.setCursor(x + (w - tw) / 2, y + (h - th) / 2);
-    display.print(text);
+// Buttons draw in the v2.4.0 style (screens/ui_style.cpp): bevelled 3D frame,
+// FreeSansBold label (GLCD at textSize 1), optional icon left of the label.
+void drawButton(int x, int y, int w, int h, String text, uint16_t bgColor, uint16_t textColor, int textSize,
+                const uint16_t* icon) {
+    const char* lines[1] = { text.c_str() };
+    uiDrawButton(x, y, w, h, lines, 1, bgColor, textColor, textSize, icon);
 }
 
 void drawMultiLineButton(int x, int y, int w, int h, String line1, String line2,
-                         uint16_t bgColor, uint16_t textColor, int textSize) {
-    drawRoundRect(x, y, w, h, 8, bgColor);
-    display.setTextColor(textColor);
-    display.setTextSize(textSize);
-    int16_t fh     = display.fontHeight();
-    int16_t totalH = fh * 2 + 4;
-    int16_t startY = y + (h - totalH) / 2;
-    int16_t tw1    = display.textWidth(line1.c_str());
-    display.setCursor(x + (w - tw1) / 2, startY);
-    display.print(line1);
-    int16_t tw2 = display.textWidth(line2.c_str());
-    display.setCursor(x + (w - tw2) / 2, startY + fh + 4);
-    display.print(line2);
+                         uint16_t bgColor, uint16_t textColor, int textSize, const uint16_t* icon) {
+    const char* lines[2] = { line1.c_str(), line2.c_str() };
+    uiDrawButton(x, y, w, h, lines, 2, bgColor, textColor, textSize, icon);
 }
 
 // ── Shared list paging (SD Card / Macros) ────────────────────────────────────
@@ -399,7 +387,7 @@ static void crumbText(const char* path, char* out, size_t outSz, int maxChars) {
 void drawListCrumb(LovyanGFX* g, int ox, int oy, const char* text) {
     char buf[64];
     crumbText(text, buf, sizeof(buf), 36);
-    g->setTextSize(1);
+    uiText(g, 1);
     g->setTextColor(COLOR_GRAY_TEXT);
     g->setCursor(ox + 5, oy + 4);
     g->print(buf);
@@ -434,130 +422,21 @@ bool listFooterPageTap(int tx, int ty, int footerY) {
     return isTouchInBounds(tx, ty, x0, footerY, x1 - x0, 36);
 }
 
-// ── Battery icon ─────────────────────────────────────────────────────────────
-// Draws a small battery body + nub at the top-right of the title bar.
-// Called from drawTitle() on every full screen redraw, and from
-// updateCurrentScreenSprites() every 100 ms for live updates between redraws.
-// Reads pendantMachine.batteryPercent without the mutex — safe on Xtensa LX6
-// (32-bit int write/read is atomic) and consistent with all other live fields.
-// Battery icon — rendered into a persistent 25×13 sprite and pushed atomically.
-// Sprite screen position: (215, 11).  Layout inside the sprite (offsets from top-left):
-//   Body outline : (1,1) 20×11  Nub fill : (21,4) 3×5
-//   Charge fill  : (3,3) up-to-16 × 7
-// The sprite is allocated once on first call and kept alive for the session (~650 B).
-//
-// Visibility rule: the gauge is shown ONLY when the comms layer is running in
-// WiFi mode.  WiFi mode implies a mobile / battery-powered pendant (per
-// product policy — wired pendants always use UART).  This is a more robust
-// gate than I2C-probing the IP5306, which can fail on some hardware variants
-// even when a battery and resistor-divider are present.
-// Lightning-bolt charging glyph, drawn into the battery sprite at top-left
-// (x,y).  ~6w × 9h — spans the full height of the battery body — yellow with a
-// 1px black outline so it reads on any charge-level bar colour behind it.
-static void drawChargeBolt(LGFX_Sprite& spr, int x, int y) {
-    static const uint8_t runs[9][3] = {   // {row, x-offset, width}
-        {0, 4, 2}, {1, 3, 2}, {2, 2, 2}, {3, 1, 5},
-        {4, 3, 2}, {5, 2, 2}, {6, 1, 2}, {7, 0, 2}, {8, 0, 1},
-    };
-    static const int ox[4] = { -1, 1, 0, 0 };
-    static const int oy[4] = {  0, 0, -1, 1 };
-    for (int d = 0; d < 4; ++d)            // black 1px outline (4-way offset)
-        for (int i = 0; i < 9; ++i)
-            spr.drawFastHLine(x + runs[i][1] + ox[d], y + runs[i][0] + oy[d], runs[i][2], COLOR_BACKGROUND);
-    for (int i = 0; i < 9; ++i)            // yellow fill
-        spr.drawFastHLine(x + runs[i][1], y + runs[i][0], runs[i][2], COLOR_YELLOW);
-}
-
-static void drawBatteryIcon() {
-    // Battery only exists on the wireless (mobile) pendant; a wired unit is
-    // powered from the UART cable and has no cell to report.
-    if (comms_active_mode() == COMMS_MODE_UART) return;
-    int  pct      = pendantMachine.batteryPercent;
-    bool charging = pendantMachine.batteryCharging;
-    if (pct < 0) return;  // ADC not yet sampled or out of valid range — skip
-
-    static LGFX_Sprite spr(&display);
-    if (!spr.getBuffer()) {
-        spr.createSprite(25, 13);
-        if (!spr.getBuffer()) return;  // allocation failed — silent no-op
-    }
-
-    uint16_t outline = COLOR_GRAY_TEXT;   // outline no longer signals charging
-    uint16_t fg      = (pct > 50) ? COLOR_GREEN : (pct > 20) ? COLOR_ORANGE : COLOR_RED;
-
-    spr.fillSprite(COLOR_DARKER_BG);          // background
-    spr.drawRoundRect(1, 1, 20, 11, 2, outline);  // body
-    spr.fillRect(21, 4, 3, 5, outline);           // nub
-    int fillW = 16 * pct / 100;                   // interior width = bw-4 = 16
-    if (fillW > 0)
-        spr.fillRect(3, 3, fillW, 7, fg);         // charge level bar
-    if (charging)
-        drawChargeBolt(spr, 8, 2);                // full-height yellow lightning bolt overlay
-    // Position: x=212 to leave a ~3px right margin so the icon's right edge
-    // sits symmetrically relative to the WiFi icon's left edge at x=5.
-    spr.pushSprite(212, 11);                      // atomic blit — no visible clear step
-}
-
-// ── WiFi signal-strength icon ────────────────────────────────────────────────
-// 4 vertical bars in a 22×13 region anchored at the top-left of the title bar.
-// Heights are ascending; bars below the current signal level are dimmed gray.
-// In AP captive-portal mode we show "AP" text instead.  Hidden entirely when
-// the active comms transport is UART (the icon would be meaningless there).
-//
-// IMPORTANT: this function reads CACHED WiFi state from pendantMachine, NOT
-// the live WiFi API.  Sampling happens in pendant_hw_task on Core 0 every
-// 500 ms; Core 1's UI never calls WiFi.RSSI() / wifi_in_ap_mode() directly,
-// avoiding cross-core access to the Arduino WiFi state machine which has
-// been a suspected crash source.
-static void drawLinkIcon() {
-    // Wired pendants have no radio — nothing to show.
-    if (comms_active_mode() == COMMS_MODE_UART) return;
-
-    static LGFX_Sprite spr(&display);
-    if (!spr.getBuffer()) {
-        spr.createSprite(22, 13);
-        if (!spr.getBuffer()) return;
-    }
-    spr.fillSprite(COLOR_DARKER_BG);
-
-    int bars = pendantMachine.linkSignalBars;
-    if (bars < 0) bars = 0;
-    uint16_t live = (bars >= 3) ? COLOR_GREEN
-                  : (bars >= 2) ? COLOR_ORANGE
-                  : (bars >= 1) ? COLOR_RED
-                                : COLOR_GRAY_TEXT;
-    // 4 bars at x = 1, 6, 11, 16  (3 wide, 4 px gap between centres)
-    // Heights ascending; baseline at y = 12 so all bars are bottom-aligned.
-    static const int bar_h[4] = { 3, 6, 9, 12 };
-    for (int i = 0; i < 4; ++i) {
-        int x = 1 + i * 5;
-        int h = bar_h[i];
-        int y = 12 - h;
-        uint16_t col = (i < bars) ? live : COLOR_BUTTON_GRAY;
-        spr.fillRect(x, y, 3, h, col);
-    }
-    spr.pushSprite(5, 11);
-}
-
+// Title bar: framed bar, per-screen icon on the left, status box on the right
+// (signal + battery on a wireless pendant, a plug on a wired one) — see
+// uiDrawTitle() in screens/ui_style.cpp.
 void drawTitle(String title) {
-    display.fillRect(0, 0, 240, 35, COLOR_DARKER_BG);
-    display.setTextColor(COLOR_TITLE);
-    display.setTextSize(2);
-    int16_t tw = display.textWidth(title.c_str());
-    display.setCursor((240 - tw) / 2, 10);
-    display.print(title);
-    drawLinkIcon();     // overlay icon at top-left;  no-op on a wired pendant
-    drawBatteryIcon();  // overlay icon at top-right; no-op if battery unavailable
+    uiDrawTitle(title.c_str());
 }
 
 void drawInfoBox(int x, int y, int w, int h, String label, String value, uint16_t valueColor) {
     display.fillRoundRect(x, y, w, h, 5, COLOR_DARKER_BG);
     display.setTextColor(COLOR_GRAY_TEXT);
-    display.setTextSize(1);
+    uiText(&display, 1);
     display.setCursor(x + 5, y + 5);
     display.print(label);
     display.setTextColor(valueColor);
-    display.setTextSize(2);
+    uiText(&display, 2);
     display.setCursor(x + 5, y + 20);
     display.print(value);
 }
@@ -1135,10 +1014,9 @@ static void updateCurrentScreenSprites() {
         default:
             break;
     }
-    // Refresh title-bar icons on every periodic tick — cheap direct draw.
-    // The title bar is never occupied by sprites so these are always safe to call.
-    drawLinkIcon();
-    drawBatteryIcon();
+    // Refresh the title-bar status box (signal / battery) on every periodic
+    // tick.  It renders into its own small sprite, so this never flickers.
+    uiDrawTitleStatus();
 }
 
 // ===== Static controller config items =====
@@ -2410,10 +2288,11 @@ void loop_pendant() {
             case HwEvent::POWER_OFF:
                 rtcCore1Stage = 7;     // inside POWER_OFF handler
                 // Draw shutdown screen, dim backlight, then enter deep sleep.
-                // Green button press wakes the device (full reboot — not a resume).
+                // The red button wakes the device (GPIO4, the only RTC-capable button pin
+                // — see deep_sleep() in Hardware2432.cpp); waking is a full reboot, not a resume.
                 display.fillScreen(COLOR_BACKGROUND);
                 drawTitle("POWERING OFF");
-                display.setTextSize(2);
+                uiText(&display, 2);
                 display.setTextColor(COLOR_GRAY_TEXT);
                 {
                     const char* l1 = "Press red button";

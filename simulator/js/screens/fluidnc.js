@@ -16,7 +16,7 @@ function updateFluidNCDisplay() {
     const P = panel(230, 60, 5, 40);
     const g = P.g, ox = P.ox, oy = P.oy;
     g.fillRect(ox, oy, 230, 60, COLOR_BACKGROUND);
-    g.fillRoundRect(ox, oy, 230, 60, 5, COLOR_DARKER_BG);
+    uiPanel(g, ox, oy, 230, 60);
     g.setTextColor(COLOR_GRAY_TEXT); g.setTextSize(1);
     g.setCursor(ox + 5, oy + 5); g.print("FluidDial-CYD");
     g.setTextColor(COLOR_GREEN);
@@ -53,7 +53,7 @@ function updateFluidNCDisplay() {
     const P = panel(230, 70, 5, 186);
     const g = P.g, ox = P.ox, oy = P.oy;
     g.fillRect(ox, oy, 230, 70, COLOR_BACKGROUND);
-    g.fillRoundRect(ox, oy, 230, 70, 5, COLOR_DARKER_BG);
+    uiPanel(g, ox, oy, 230, 70);
     g.setTextColor(COLOR_GRAY_TEXT); g.setTextSize(1);
     g.setCursor(ox + 5, oy + 5); g.print("FREE HEAP");
     g.setTextColor(COLOR_ORANGE); g.setTextSize(2);
@@ -77,7 +77,7 @@ function drawFluidNCScreen() {
   display.fillScreen(COLOR_BACKGROUND);
   drawTitle("FluidNC");
 
-  display.fillRoundRect(5, 108, 230, 70, 5, COLOR_DARKER_BG);
+  uiPanel(display, 5, 108, 230, 70);
   display.drawRoundRect(5, 108, 230, 70, 5, COLOR_CYAN);
   const hint = (comms_active_mode() === "UART") ? "UART >" : "ESP-NOW >";
   display.setTextColor(COLOR_CYAN); display.setTextSize(1);

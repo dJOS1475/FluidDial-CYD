@@ -88,9 +88,17 @@ function buildControls() {
   root.appendChild(_row("Link", _select("link", [
     { v: "off", t: "Disconnected (N/C)" }, { v: "connecting", t: "Connecting" }, { v: "connected", t: "Connected" },
   ], applyLink)));
+  // Sets the transport the device is RUNNING (and its stored choice).  The
+  // Connection screen still models the real path: change it there and it
+  // restarts to apply it.  The title-bar link and battery icons appear only on
+  // a wireless pendant, so this is the switch that shows or hides them.
   root.appendChild(_row("Transport", _select("transport", [
-    { v: "uart", t: "UART (cable)" }, { v: "wifi", t: "WiFi" },
-  ], (e) => { _commsMode = e.target.value === "wifi" ? COMMS_MODE_WIFI : COMMS_MODE_UART; pendantMachine.port = _commsMode === COMMS_MODE_WIFI ? "WiFi:81" : "UART0"; repaint(); })));
+    { v: COMMS_MODE_UART, t: "UART (wired)" }, { v: COMMS_MODE_ESPNOW, t: "ESP-NOW (wireless)" },
+  ], (e) => {
+    simTransport = simActiveTransport = e.target.value;
+    if (e.target.value === COMMS_MODE_ESPNOW) pendantMachine.linkSignalBars = espnow_signal_bars();
+    repaint();
+  })));
   root.appendChild(_row("Status", _select("status", [
     "Idle", "Run", "Jog", "Hold:0", "Home", "Door:0", "Check", "Sleep", "Alarm:1", "Alarm:2", "Alarm:4", "Alarm:6", "N/C",
   ].map((s) => ({ v: s, t: s })), (e) => { pendantMachine.status = e.target.value; repaint(); })));
@@ -136,12 +144,28 @@ function buildControls() {
   })()));
   root.appendChild(_row("Progress %", _range("jobPercent", 0, 100, 1, (e) => { pendantMachine.jobPercent = +e.target.value; repaint(); })));
 
-  // -- Battery / WiFi (WiFi transport) --
-  root.appendChild(_el("h3", {}, "Battery / WiFi (WiFi mode)"));
+  // -- Wireless pendant (ESP-NOW transport only) --
+  // Drives the simulated PeerLink (screens/espnow_stub.js) and the battery.
+  // None of it shows on a wired (UART) pendant — switch Transport above.
+  root.appendChild(_el("h3", {}, "Wireless pendant (ESP-NOW)"));
+  root.appendChild(_row("Signal (dBm)", _range("rssi", -95, -40, 1, (e) => {
+    simEspNow.rssi = +e.target.value;
+    pendantMachine.linkSignalBars = espnow_signal_bars();   // don't wait for the 500 ms sample
+    _ctl["rssiVal"].textContent = `${simEspNow.rssi} dBm = ${espnow_signal_bars()}/4`;
+    repaint();
+  })));
+  root.appendChild(_row("", (() => { const e = _el("span", { id: "rssiVal", class: "ctl-note" }); _ctl["rssiVal"] = e; return e; })()));
+  root.appendChild(_row("Link up", _check("espLink", (e) => { simEspNow.connected = e.target.checked; repaint(); })));
+  root.appendChild(_row("Pairing", _select("espPair", [
+    { v: "idle", t: "Idle" }, { v: "waiting", t: "Waiting for machine" },
+    { v: "working", t: "Working / reconnecting" }, { v: "ok", t: "Paired OK" }, { v: "fail", t: "Failed" },
+  ], (e) => { simEspNow.pairing = e.target.value; repaint(); })));
+  root.appendChild(_row("Radio ready", _check("espRadio", (e) => { simEspNow.radioReady = e.target.checked; repaint(); })));
   root.appendChild(_row("Battery %", _range("battery", -1, 100, 1, (e) => { pendantMachine.batteryPercent = +e.target.value; repaint(); })));
   root.appendChild(_row("Charging", _check("charging", (e) => { pendantMachine.batteryCharging = e.target.checked; repaint(); })));
-  root.appendChild(_row("Signal bars", _range("bars", -1, 4, 1, (e) => { pendantMachine.wifiSignalBars = +e.target.value; repaint(); })));
-  root.appendChild(_row("AP mode", _check("apmode", (e) => { pendantMachine.wifiInApMode = e.target.checked; repaint(); })));
+
+  // -- Controller network (what FluidNC reports about ITS network) --
+  root.appendChild(_el("h3", {}, "Controller network"));
   // The controller's $I "Mode=" line decides this row: $network/type selects one
   // network type, so exactly one Mode= line ever arrives.
   root.appendChild(_row("Network", _select("netMode", [
@@ -249,7 +273,7 @@ function syncControlsFromState() {
   const chk = (id, v) => { if (_ctl[id]) _ctl[id].checked = v; };
   set("ctl-screen", currentPendantScreen);
   set("link", pendantConnected ? "connected" : pendantMachine.connectionStatus === "Connecting" ? "connecting" : "off");
-  set("transport", comms_active_mode() === COMMS_MODE_WIFI ? "wifi" : "uart");
+  set("transport", comms_active_mode());
   set("status", pendantMachine.status);
   set("axes", String(pendantMachine.numAxes));
   set("units", pendantMachine.inInches ? "in" : "mm");
@@ -265,8 +289,11 @@ function syncControlsFromState() {
   set("jobPercent", pendantMachine.jobPercent);
   set("battery", pendantMachine.batteryPercent);
   chk("charging", pendantMachine.batteryCharging);
-  set("bars", pendantMachine.wifiSignalBars);
-  chk("apmode", pendantMachine.wifiInApMode);
+  set("rssi", simEspNow.rssi);
+  if (_ctl["rssiVal"]) _ctl["rssiVal"].textContent = `${simEspNow.rssi} dBm = ${espnow_signal_bars()}/4`;
+  chk("espLink", simEspNow.connected);
+  set("espPair", simEspNow.pairing);
+  chk("espRadio", simEspNow.radioReady);
   set("sdFiles", String(simSdTotal));
   set("netMode", pendantMachine.netMode === "Ethernet"
                    ? ((pendantMachine.netStatus || "").startsWith("Link down") ? "eth_down"

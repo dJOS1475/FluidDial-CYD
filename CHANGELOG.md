@@ -3,6 +3,19 @@
 **ChangeLog:**
 
 
+**2026-11-17**
+
+v2.4.0
+* New: **a refreshed look across every screen.**
+  * **Title bar:** a framed, subtly shaded bar with an icon for each screen on the left and a status box on the right. A wireless pendant shows its signal bars and a battery gauge there, now without the percentage number. A wired (UART) pendant shows a power-plug icon instead.
+  * **Buttons:** bright blue with a subtle 3D bevel, and bold text in FreeSansBold. The Main Menu and Probe routine buttons have icons beside their labels.
+  * **Colours:** panels are navy with a blue outline and labels are light blue. Selected is now yellow, go/home is green and stop is red.
+* New: **redesigned Jog & Homing screen.** A panel shows every axis in both machine (MPos) and work (WPos) coordinates, with the axis being jogged highlighted. HOME, JOG AXIS and JOG INCREMENT sit underneath with large axis letters, above Main Menu | SPEED | Work Area.
+* Change: **Work Area** shows Machine Pos and Work Pos together in one framed panel.
+* Change: **Probe routines** each have their own colour and icon: Z Surface green, XYZ Corner teal, Bore sky blue, Boss violet.
+* Change: probe and override values now read as one line with their unit, e.g. `150 mm/m`, and units are near-white instead of dim grey.
+* Change: some long titles are shortened to fit beside the status box: SPINDLE, FEED/SPEED, CONFIG and PAIRING.
+
 **2026-10-18**
 
 v2.3.3

@@ -42,7 +42,7 @@ function macStr(mac, ch) {
 // top edge lands in the current target.  Anything outside the target is clipped,
 // so the same code renders either the full panel or a horizontal band of it.
 function drawLinkBody(g, ox, base) {
-  g.fillRoundRect(ox, base, 230, LK_H, 4, PROBE_BG_PANEL);
+  uiPanel(g, ox, base, 230, LK_H);
   g.setTextSize(1); g.setTextColor(PROBE_C_LBLUE);
   g.setCursor(ox + 5, base + 3); g.print("LINK");
 
@@ -148,7 +148,7 @@ function drawLinkPanel() {
 }
 
 function drawTransportPanel() {
-  display.fillRoundRect(5, TP_Y, 230, TP_H, 4, PROBE_BG_PANEL);
+  uiPanel(display, 5, TP_Y, 230, TP_H);
   display.setTextSize(1); display.setTextColor(PROBE_C_LBLUE);
   display.setCursor(10, TP_Y + 3); display.print("TRANSPORT");
   const sel = get_transport_force();

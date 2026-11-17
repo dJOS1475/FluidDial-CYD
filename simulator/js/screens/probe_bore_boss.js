@@ -94,7 +94,7 @@ function drawProbeBoreScreen() {
   display.fillScreen(PROBE_BG_SCREEN);
   drawTitle("BORE");
   probeDrawPosPanel(38);
-  display.fillRoundRect(5, 70, 230, 146, 4, PROBE_BG_PANEL);
+  uiPanel(display, 5, 70, 230, 146);
   display.setTextSize(1); display.setTextColor(PROBE_C_LBLUE);
   display.setCursor(10, 73); display.print("SEQUENCE");
   drawSeqStep(8, 87, 1, "Probe 4 points", true);
@@ -279,7 +279,7 @@ function drawProbeBossScreen() {
   display.fillScreen(PROBE_BG_SCREEN);
   drawTitle("BOSS");
   probeDrawPosPanel(38);
-  display.fillRoundRect(5, 70, 230, 146, 4, PROBE_BG_PANEL);
+  uiPanel(display, 5, 70, 230, 146);
   display.setTextSize(1); display.setTextColor(PROBE_C_LBLUE);
   display.setCursor(10, 73); display.print("SEQUENCE");
   drawSeqStep(8, 87, 1, "Touch top->Z0", true);

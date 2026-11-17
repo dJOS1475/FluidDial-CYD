@@ -6,26 +6,7 @@ function exitMainMenu() { releasePanelSprites(); }
 function drawMainMenu() {
   display.fillScreen(COLOR_BACKGROUND);
   drawTitle("MAIN MENU");
-  display.fillRoundRect(5, 40, 230, 65, 5, COLOR_DARKER_BG);
-  updateMainMenuDisplay();
-
-  const btnY = 115, btnH = 47, btnGap = 52;
-  // Colour groups the menu by what each destination is for, so you can land on the
-  // right button without reading it.  The existing row pairs are already coherent
-  // categories, so nothing moves — only the tint changes.  All navigation colours:
-  // orange (selected), green (execute), red (alarm), yellow (focus) stay reserved.
-  const MENU_MACHINE = COLOR_BLUE;    // move it, datum it, probe it, watch it
-  const MENU_PARAMS  = COLOR_TEAL;    // cutting parameters
-  const MENU_JOBS    = COLOR_INDIGO;  // jobs & files
-
-  drawButton(5, btnY, 112, btnH, "Jog", MENU_MACHINE, COLOR_WHITE, 2);
-  drawButton(123, btnY, 112, btnH, "Work Area", MENU_MACHINE, COLOR_WHITE, 2);
-  drawMultiLineButton(5, btnY + btnGap, 112, btnH, "Feeds &", "Speeds", MENU_PARAMS, COLOR_WHITE, 2);
-  drawMultiLineButton(123, btnY + btnGap, 112, btnH, "Spindle", "Control", MENU_PARAMS, COLOR_WHITE, 2);
-  drawButton(5, btnY + btnGap * 2, 112, btnH, "Macros", MENU_JOBS, COLOR_WHITE, 2);
-  drawButton(123, btnY + btnGap * 2, 112, btnH, "SD Card", MENU_JOBS, COLOR_WHITE, 2);
-  drawButton(5, btnY + btnGap * 3, 112, btnH, "Probe", MENU_MACHINE, COLOR_WHITE, 2);
-  drawButton(123, btnY + btnGap * 3, 112, btnH, "Status", MENU_MACHINE, COLOR_WHITE, 2);
+  drawMainMenuNew();
 }
 
 // Returns the link-fault to show in the STATUS panel, or null when the radio is
@@ -48,52 +29,65 @@ function espNowLinkFault() {
   return null;
 }
 
+// Same layout and touch rectangles as before; icons on every button, framed
+// status panel.
+function drawMainMenuNew() {
+  uiDrawPanel(5, 40, 230, 65);
+  updateMainMenuDisplay();
+  const btnY = 115, btnH = 47, btnGap = 52, W = COLOR_WHITE, B = COLOR_BLUE;
+  drawButton(5, btnY, 112, btnH, "Jog", B, W, 2, "jog");
+  drawMultiLineButton(123, btnY, 112, btnH, "Work", "Area", B, W, 2, "work");
+  drawMultiLineButton(5, btnY + btnGap, 112, btnH, "Feeds &", "Speeds", B, W, 2, "gauge");
+  drawMultiLineButton(123, btnY + btnGap, 112, btnH, "Spindle", "Control", B, W, 2, "spindle");
+  drawButton(5, btnY + btnGap * 2, 112, btnH, "Macros", B, W, 2, "macro");
+  drawButton(123, btnY + btnGap * 2, 112, btnH, "SD Card", B, W, 2, "sd");
+  drawButton(5, btnY + btnGap * 3, 112, btnH, "Probe", B, W, 2, "probe");
+  drawButton(123, btnY + btnGap * 3, 112, btnH, "Status", B, W, 2, "status");
+}
+
+// New-style status panel: small light-blue caption, big FreeSansBold value,
+// optional small sub-line.
+function mainMenuPanelNew(caption, big, bigCol, sub) {
+  const g = display, ox = 5, oy = 40, cx = 120, GAP = 7;
+  g.fillRect(ox + 2, oy + 2, 226, 61, UI_PANEL_BG);
+  // caption (GLCD section-label style, as on every screen) + big value (+ sub
+  // line) centred as one block, caps to caps
+  g.setFont(null); g.setTextSize(1);
+  const [ca, cb] = uiCapBox(g);
+  g.setFont(GFX_FONTS.FreeSansBold18pt7b);
+  if (g.textWidth(big) > 220) g.setFont(GFX_FONTS.FreeSansBold12pt7b);
+  const bigFont = g._font;
+  const [ba, bb] = uiCapBox(g);
+  const subH = sub ? 7 + 5 : 0;
+  const blockH = (cb - ca) + GAP + (bb - ba) + subH;
+  let top = Math.round(oy + 65 / 2 - blockH / 2);
+  g.setFont(null); g.setTextColor(COLOR_GRAY_TEXT);
+  g.setCursor(cx - (g.textWidth(caption) / 2 | 0), top - ca); g.print(caption);
+  top += (cb - ca) + GAP;
+  g.setFont(bigFont); g.setTextColor(bigCol);
+  g.setCursor(cx - (g.textWidth(big) / 2 | 0), top - ba); g.print(big);
+  top += (bb - ba) + 5;
+  g.setFont(null);
+  if (sub) {
+    g.setTextColor(COLOR_GRAY_TEXT);
+    g.setCursor(cx - (g.textWidth(sub) / 2 | 0), top); g.print(sub);
+  }
+}
+
+function updateMainMenuDisplayNew() {
+  const statusStr = pendantMachine.status;
+  const linkFault = espNowLinkFault();
+  if (linkFault) mainMenuPanelNew("ESP-NOW", linkFault.big, linkFault.col, linkFault.sub);
+  else if (!pendantSynced || statusStr === "N/C" || statusStr.length === 0)
+    mainMenuPanelNew("STATUS", pendantConnected ? "Syncing" : "Connecting", COLOR_ORANGE, null);
+  else if (statusStr.startsWith("Alarm"))
+    mainMenuPanelNew(alarmDescription(statusStr), "ALARM", TFT_RED, null);
+  else mainMenuPanelNew("STATUS", statusStr, COLOR_CYAN, null);
+}
+
 function updateMainMenuDisplay() {
   if (currentPendantScreen !== PSCREEN_MAIN_MENU) return;
-  const statusStr = pendantMachine.status;
-  const P = panel(230, 65, 5, 40);
-  const g = P.g, ox = P.ox, oy = P.oy;
-  g.fillRect(ox, oy, 230, 65, COLOR_DARKER_BG);
-
-  // Wireless link problems are reported HERE rather than as an overlay from the
-  // Connection screen.  The caption switches STATUS -> ESP-NOW so it is obvious
-  // which layer is broken: a dead radio link and a machine sitting in Alarm are
-  // very different problems and must not look alike.
-  const linkFault = espNowLinkFault();
-  if (linkFault) {
-    g.setTextColor(COLOR_GRAY_TEXT); g.setTextSize(1);
-    let lw = g.textWidth("ESP-NOW");
-    g.setCursor(ox + 115 - (lw / 2 | 0), oy + 5); g.print("ESP-NOW");
-    g.setTextColor(linkFault.col); g.setTextSize(3);
-    let bw = g.textWidth(linkFault.big);
-    g.setCursor(ox + 115 - (bw / 2 | 0), oy + 20); g.print(linkFault.big);
-    g.setTextColor(COLOR_GRAY_TEXT); g.setTextSize(1);
-    let sw = g.textWidth(linkFault.sub);
-    g.setCursor(ox + 115 - (sw / 2 | 0), oy + 50); g.print(linkFault.sub);
-  } else if (!pendantSynced || statusStr === "N/C" || statusStr.length === 0) {
-    const phase = pendantConnected ? "Syncing" : "Connecting";
-    g.setTextColor(COLOR_GRAY_TEXT); g.setTextSize(1);
-    let lw = g.textWidth("STATUS");
-    g.setCursor(ox + 115 - (lw / 2 | 0), oy + 8); g.print("STATUS");
-    g.setTextColor(COLOR_ORANGE); g.setTextSize(3);
-    let cw = g.textWidth(phase);
-    g.setCursor(ox + 115 - (cw / 2 | 0), oy + 30); g.print(phase);
-  } else if (statusStr.startsWith("Alarm")) {
-    const desc = alarmDescription(statusStr);
-    g.setTextColor(TFT_RED); g.setTextSize(1);
-    let dw = g.textWidth(desc);
-    g.setCursor(ox + 115 - (dw / 2 | 0), oy + 8); g.print(desc);
-    g.setTextSize(4);
-    let sw = g.textWidth("ALARM");
-    g.setCursor(ox + 115 - (sw / 2 | 0), oy + 26); g.print("ALARM");
-  } else {
-    g.setTextColor(COLOR_GRAY_TEXT); g.setTextSize(1);
-    let lw = g.textWidth("STATUS");
-    g.setCursor(ox + 115 - (lw / 2 | 0), oy + 8); g.print("STATUS");
-    g.setTextColor(COLOR_CYAN); g.setTextSize(4);
-    let sw = g.textWidth(statusStr);
-    g.setCursor(ox + 115 - (sw / 2 | 0), oy + 26); g.print(statusStr);
-  }
+  updateMainMenuDisplayNew();
 }
 
 function handleMainMenuTouch(x, y) {

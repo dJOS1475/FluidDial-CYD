@@ -46,7 +46,7 @@ void updateStatusMachineStatus() {
 
     int ox, oy;
     LovyanGFX* g = beginPanelSprite(230, 50, ox, oy, 5, 40);
-    g->fillRect(ox, oy, 230, 50, COLOR_DARKER_BG);
+    uiPanel(g, ox, oy, 230, 50);
 
     if (!pendantSynced || statusStr == "N/C" || statusStr.length() == 0) {
         // Two-phase power-up / reconnect indicator (matches the main menu):
@@ -54,12 +54,12 @@ void updateStatusMachineStatus() {
         //   "Syncing"    — link up; fetching config + waiting for live state
         const char* phase = pendantConnected ? "Syncing" : "Connecting";
         g->setTextColor(COLOR_GRAY_TEXT);
-        g->setTextSize(1);
+        uiText(g, 1);
         int16_t lw = g->textWidth("MACHINE STATUS");
         g->setCursor(ox + 115 - lw / 2, oy + 5);
         g->print("MACHINE STATUS");
         g->setTextColor(COLOR_ORANGE);
-        g->setTextSize(3);
+        uiText(g, 3);
         int16_t cw = g->textWidth(phase);
         g->setCursor(ox + 115 - cw / 2, oy + 22);
         g->print(phase);
@@ -67,11 +67,11 @@ void updateStatusMachineStatus() {
     } else if (statusStr.startsWith("Alarm")) {
         String desc = alarmDescription(statusStr);
         g->setTextColor(TFT_RED);
-        g->setTextSize(1);
+        uiText(g, 1);
         int16_t dw = g->textWidth(desc.c_str());
         g->setCursor(ox + 115 - dw / 2, oy + 5);
         g->print(desc);
-        g->setTextSize(3);
+        uiText(g, 3);
         int16_t sw = g->textWidth("ALARM");
         g->setCursor(ox + 115 - sw / 2, oy + 22);
         g->print("ALARM");
@@ -79,11 +79,11 @@ void updateStatusMachineStatus() {
     } else if (jobRunning) {
         // Two-column layout
         g->setTextColor(COLOR_GRAY_TEXT);
-        g->setTextSize(1);
+        uiText(g, 1);
         g->setCursor(ox + 5, oy + 5);
         g->print("MACHINE STATUS");
         g->setTextColor(COLOR_CYAN);
-        g->setTextSize(3);
+        uiText(g, 3);
         int16_t sw = g->textWidth(statusStr.c_str());
         int16_t cx = 56 - sw / 2;
         if (cx < 0) cx = 0;
@@ -94,24 +94,24 @@ void updateStatusMachineStatus() {
 
         String pctStr = String(pct) + "%";
         g->setTextColor(COLOR_GRAY_TEXT);
-        g->setTextSize(1);
+        uiText(g, 1);
         int16_t lw = g->textWidth("PROGRESS");
         g->setCursor(ox + 174 - lw / 2, oy + 5);
         g->print("PROGRESS");
         g->setTextColor(COLOR_GREEN);
-        g->setTextSize(3);
+        uiText(g, 3);
         int16_t pw = g->textWidth(pctStr.c_str());
         g->setCursor(ox + 174 - pw / 2, oy + 22);
         g->print(pctStr);
 
     } else {
         g->setTextColor(COLOR_GRAY_TEXT);
-        g->setTextSize(1);
+        uiText(g, 1);
         int16_t lw = g->textWidth("MACHINE STATUS");
         g->setCursor(ox + 115 - lw / 2, oy + 5);
         g->print("MACHINE STATUS");
         g->setTextColor(COLOR_CYAN);
-        g->setTextSize(3);
+        uiText(g, 3);
         int16_t sw = g->textWidth(statusStr.c_str());
         g->setCursor(ox + 115 - sw / 2, oy + 22);
         g->print(statusStr);
@@ -130,13 +130,13 @@ void updateStatusCurrentFile() {
 
     int ox, oy;
     LovyanGFX* g = beginPanelSprite(230, 40, ox, oy, 5, 95);
-    g->fillRoundRect(ox, oy, 230, 40, 5, COLOR_DARKER_BG);
+    uiPanel(g, ox, oy, 230, 40);
 
     if (pendantSdCard.loadedFile.length() > 0 && fileStr.length() == 0) {
         g->setTextColor(COLOR_GREEN);
-        g->setTextSize(1);
+        uiText(g, 1);
         g->setCursor(ox + 5, oy + 5);
-        g->print("READY — press green to run");
+        g->print("READY - press green to run");   // ASCII only: the GLCD font has no em dash
         g->setCursor(ox + 5, oy + 20);
         // loadedFile is a full path now that files can live in subfolders, and
         // the panel only fits ~37 chars at this size.  Trim from the LEFT so the
@@ -149,7 +149,7 @@ void updateStatusCurrentFile() {
         }
     } else {
         g->setTextColor(COLOR_GRAY_TEXT);
-        g->setTextSize(1);
+        uiText(g, 1);
         g->setCursor(ox + 5, oy + 5);
         g->print("CURRENT FILE");
         g->setTextColor(COLOR_CYAN);
@@ -176,10 +176,10 @@ void updateStatusAxisPositions() {
     int ox, oy;
     LovyanGFX* g = beginPanelSprite(230, 65, ox, oy, 5, 140);
 
-    g->fillRoundRect(ox, oy, 230, 65, 5, COLOR_DARKER_BG);
+    uiPanel(g, ox, oy, 230, 65);
 
     g->setTextColor(COLOR_GRAY_TEXT);
-    g->setTextSize(1);
+    uiText(g, 1);
     g->setCursor(ox + 5, oy + 5);
     g->print("MACHINE POSITION");
 
@@ -208,7 +208,7 @@ void updateStatusAxisPositions() {
     // AXIS_NAMES / pendantMachine.mpos are sized PENDANT_MAX_AXES; numAxes is
     // already clamped to that in onDROChange, so this loop cannot run off the end.
     g->setTextColor(COLOR_ORANGE);
-    g->setTextSize(2);
+    uiText(g, 2);
     for (int i = 0; i < numAxes; i++) {
         int dec = prefDec;
         snprintf(posBuf, sizeof(posBuf), "%s:%.*f", AXIS_NAMES[i], dec, positions[i]);
@@ -243,36 +243,36 @@ void updateStatusFeedSpindle() {
     g->fillRect(ox, oy, 230, 65, COLOR_BACKGROUND);
 
     // Feed Rate box
-    g->fillRoundRect(ox + 0, oy, 112, 65, 5, COLOR_DARKER_BG);
+    uiPanel(g, ox + 0, oy, 112, 65);
     g->setTextColor(COLOR_GRAY_TEXT);
-    g->setTextSize(1);
+    uiText(g, 1);
     g->setCursor(ox + 5, oy + 3);
     g->print("FEED");
     g->setTextColor(COLOR_ORANGE);
-    g->setTextSize(2);
+    uiText(g, 2);
     g->setCursor(ox + 5, oy + 25);
     g->print(feedRate);
     g->setTextColor(COLOR_GRAY_TEXT);
-    g->setTextSize(1);
+    uiText(g, 1);
     int16_t mmW = g->textWidth("mm/min");
     g->setCursor(ox + 112 - 5 - mmW, oy + 50);
     g->print("mm/min");
 
     // Spindle box
-    g->fillRoundRect(ox + 118, oy, 112, 65, 5, COLOR_DARKER_BG);
+    uiPanel(g, ox + 118, oy, 112, 65);
     g->setTextColor(COLOR_GRAY_TEXT);
-    g->setTextSize(1);
+    uiText(g, 1);
     g->setCursor(ox + 123, oy + 3);
     g->print("SPINDLE");
     int16_t dirW = g->textWidth(spindleDir.c_str());
     g->setCursor(ox + 230 - 5 - dirW, oy + 3);
     g->print(spindleDir);
     g->setTextColor(COLOR_GREEN);
-    g->setTextSize(2);
+    uiText(g, 2);
     g->setCursor(ox + 123, oy + 25);
     g->print(spindleRPM);
     g->setTextColor(COLOR_GRAY_TEXT);
-    g->setTextSize(1);
+    uiText(g, 1);
     int16_t rpmW = g->textWidth("RPM");
     g->setCursor(ox + 230 - 5 - rpmW, oy + 50);
     g->print("RPM");

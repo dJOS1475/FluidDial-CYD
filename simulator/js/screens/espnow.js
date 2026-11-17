@@ -33,7 +33,7 @@ function pairView() {
 }
 
 function drawSteps(v) {
-  display.fillRoundRect(5, STEP_Y, 230, STEP_H, 4, PROBE_BG_PANEL);
+  uiPanel(display, 5, STEP_Y, 230, STEP_H);
   display.setTextSize(1); display.setTextColor(PROBE_C_LBLUE);
   display.setCursor(10, STEP_Y + 3); display.print("ON THE CONTROLLER");
   const steps = [
@@ -54,7 +54,7 @@ function drawSteps(v) {
 }
 
 function drawPairStatus(v) {
-  display.fillRoundRect(5, STAT_Y, 230, STAT_H, 4, PROBE_BG_PANEL);
+  uiPanel(display, 5, STAT_Y, 230, STAT_H);
   display.setTextSize(1); display.setTextColor(PROBE_C_LBLUE);
   display.setCursor(10, STAT_Y + 3); display.print("STATUS");
   const M = {
@@ -70,7 +70,7 @@ function drawPairStatus(v) {
   if (v === "ok") {
     const info = {}; const idx = espnow_active_profile_index();
     if (idx >= 0 && espnow_get_profile(idx, info)) {
-      display.setCursor(14, STAT_Y + 54); display.print(info.hostname);
+      display.setCursor(14, STAT_Y + 54); display.print(info.hostname || "(unnamed)");
       display.setCursor(14, STAT_Y + 68); display.print(macStr(info.mac, info.channel));
     }
   } else if (M[2]) {
@@ -146,7 +146,7 @@ function drawMachineRow(i) {
   display.fillRoundRect(5, y, 230, MROW_H, 4, active ? PROBE_SEL_BG : PROBE_BG_PANEL);
   display.drawRoundRect(5, y, 230, MROW_H, 4, active ? PROBE_C_YELLOW : (picked ? COLOR_ORANGE : PROBE_C_TAPBDR));
   display.setTextSize(2); display.setTextColor(active ? PROBE_C_YELLOW : COLOR_WHITE);
-  display.setCursor(12, y + 7); display.print(info.hostname);
+  display.setCursor(12, y + 7); display.print(info.hostname || "(unnamed)");
   display.setTextSize(1); display.setTextColor(COLOR_GRAY_TEXT);
   display.setCursor(12, y + 28); display.print(macStr(info.mac));
   display.setCursor(12, y + 39); display.print("ch" + info.channel);
@@ -171,7 +171,7 @@ function drawEspNowMachinesScreen() {
   const n = espnow_profile_count();
   for (let i = 0; i < n; i++) drawMachineRow(i);
   if (n === 0) {
-    display.fillRoundRect(5, ROW0_Y, 230, MROW_H, 4, PROBE_BG_PANEL);
+    uiPanel(display, 5, ROW0_Y, 230, MROW_H);
     display.setTextSize(1); display.setTextColor(COLOR_GRAY_TEXT);
     display.setCursor(14, ROW0_Y + 22); display.print("No machines paired yet");
   }

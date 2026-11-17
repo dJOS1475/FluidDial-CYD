@@ -67,10 +67,9 @@ void updateFluidNCDisplay() {
     {
         int ox, oy;
         LovyanGFX* g = beginPanelSprite(230, 60, ox, oy, 5, 40);
-        g->fillRect(ox, oy, 230, 60, COLOR_BACKGROUND);        // black corners
-        g->fillRoundRect(ox, oy, 230, 60, 5, COLOR_DARKER_BG); // rounded panel
+        uiPanel(g, ox, oy, 230, 60);                           // framed panel, black corners
 
-        g->setTextColor(COLOR_GRAY_TEXT); g->setTextSize(1);
+        g->setTextColor(COLOR_GRAY_TEXT); uiText(g, 1);
         g->setCursor(ox + 5, oy + 5);  g->print("FluidDial-CYD");
         g->setTextColor(COLOR_GREEN);
         g->setCursor(ox + 5, oy + 17); g->print(fluidDialVer);
@@ -112,17 +111,16 @@ void updateFluidNCDisplay() {
     {
         int ox, oy;
         LovyanGFX* g = beginPanelSprite(230, 70, ox, oy, 5, 186);
-        g->fillRect(ox, oy, 230, 70, COLOR_BACKGROUND);        // black corners
-        g->fillRoundRect(ox, oy, 230, 70, 5, COLOR_DARKER_BG); // rounded panel
+        uiPanel(g, ox, oy, 230, 70);                           // framed panel, black corners
 
-        g->setTextColor(COLOR_GRAY_TEXT); g->setTextSize(1);
+        g->setTextColor(COLOR_GRAY_TEXT); uiText(g, 1);
         g->setCursor(ox + 5, oy + 5); g->print("FREE HEAP");
-        g->setTextColor(COLOR_ORANGE); g->setTextSize(2);
+        g->setTextColor(COLOR_ORANGE); uiText(g, 2);
         g->setCursor(ox + 5, oy + 20);
         g->print(ESP.getFreeHeap() / 1024);
         g->print(" KB");
 
-        g->setTextColor(COLOR_GRAY_TEXT); g->setTextSize(1);
+        g->setTextColor(COLOR_GRAY_TEXT); uiText(g, 1);
         g->setCursor(ox + 115, oy + 5); g->print("STATUS");
         g->setTextColor(connected ? COLOR_GREEN : COLOR_RED);
         g->setCursor(ox + 115, oy + 20); g->print(connStatus);
@@ -148,26 +146,26 @@ void drawFluidNCScreen() {
     // Connection panel — static content, drawn once directly.
     // The entire panel is a touch target → PSCREEN_CONNECTION, where the
     // transport is chosen and (on ESP-NOW) machines are paired and selected.
-    display.fillRoundRect(5, 108, 230, 70, 5, COLOR_DARKER_BG);
+    uiPanel(&display, 5, 108, 230, 70);
     display.drawRoundRect(5, 108, 230, 70, 5, COLOR_CYAN);  // tappable hint
 
     // Affordance text in the top-right names the live transport, so the tap
     // target reads as "go to the thing that is currently connecting me".
     const char* hint = (comms_active_mode() == COMMS_MODE_UART) ? "UART >" : "ESP-NOW >";
-    display.setTextColor(COLOR_CYAN); display.setTextSize(1);
+    display.setTextColor(COLOR_CYAN); uiText(&display, 1);
     display.setCursor(240 - 5 - display.textWidth(hint), 113);
     display.print(hint);
 
-    display.setTextColor(COLOR_GRAY_TEXT); display.setTextSize(1);
+    display.setTextColor(COLOR_GRAY_TEXT); uiText(&display, 1);
     display.setCursor(10, 113); display.print("CONNECTION");
 
-    display.setTextColor(COLOR_GRAY_TEXT); display.setTextSize(1);
+    display.setTextColor(COLOR_GRAY_TEXT); uiText(&display, 1);
     display.setCursor(10, 130); display.print("Baud:");
-    display.setTextColor(COLOR_ORANGE); display.setTextSize(2);
+    display.setTextColor(COLOR_ORANGE); uiText(&display, 2);
     display.setCursor(100, 127); display.print(pendantMachine.baudRate);
-    display.setTextColor(COLOR_GRAY_TEXT); display.setTextSize(1);
+    display.setTextColor(COLOR_GRAY_TEXT); uiText(&display, 1);
     display.setCursor(10, 148); display.print("Port:");
-    display.setTextColor(COLOR_CYAN); display.setTextSize(1);
+    display.setTextColor(COLOR_CYAN); uiText(&display, 1);
     display.setCursor(10, 160); display.print(pendantMachine.port);
 
     drawButton(5,   272, 112, 40, "Main Menu", COLOR_BLUE,        COLOR_WHITE, 2);

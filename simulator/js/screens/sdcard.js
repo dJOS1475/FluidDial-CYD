@@ -85,7 +85,7 @@ function drawSDFooter(force) {
 const SD_LABEL_MAX = 35;
 function sdRowLabel(i) {
   const name = pendantSdCard.files[i];
-  if (pendantSdCard.isDir[i] && name === "..") return ".. (up a folder)";
+  if (pendantSdCard.isDir[i] && name === "..") return "..  (up a folder)";
   const label = name + (pendantSdCard.isDir[i] ? "/" : "");
   return label.length > SD_LABEL_MAX ? label.substring(0, SD_LABEL_MAX - 3) + "..." : label;
 }

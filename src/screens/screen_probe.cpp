@@ -112,7 +112,7 @@ void probeDrawPosPanel(int y, int h) {
     // fallback at (5, y) if it can't allocate — never blank).
     int ox, oy;
     LovyanGFX* g = beginPanelSprite(230, h, ox, oy, 5, y);
-    g->fillRoundRect(ox, oy, 230, h, 4, PROBE_BG_PANEL);
+    uiPanel(g, ox, oy, 230, h);
 
     if (h >= 38) {
         // ── Large layout: textSize=2, two rows ───────────────────────────
@@ -123,19 +123,19 @@ void probeDrawPosPanel(int y, int h) {
         const char* fmt = inInch ? "%.3f" : "%.1f";
 
         // Row 1 — axis labels (green) + unit hint (dim, top-right)
-        g->setTextSize(2);
+        uiText(g, 2);
         for (int i = 0; i < 3; i++) {
             g->setTextColor(PROBE_C_GREEN);
             g->setCursor(ox + cols[i], oy + 3);
             g->print(axLabels[i]);
         }
-        g->setTextSize(1);
-        g->setTextColor(PROBE_C_DIMBLUE);
+        uiText(g, 1);
+        g->setTextColor(UI_UNIT);
         g->setCursor(ox + 212, oy + 3);
         g->print(uu);
 
         // Row 2 — position values (yellow)
-        g->setTextSize(2);
+        uiText(g, 2);
         g->setTextColor(PROBE_C_YELLOW);
         for (int i = 0; i < 3; i++) {
             snprintf(buf, sizeof(buf), fmt, vals[i]);
@@ -144,7 +144,7 @@ void probeDrawPosPanel(int y, int h) {
         }
     } else {
         // ── Compact layout: textSize=1, single row ────────────────────────
-        g->setTextSize(1);
+        uiText(g, 1);
         g->setTextColor(PROBE_C_LBLUE);
         g->setCursor(ox + 5, oy + 3);
         g->print("CURRENT POSITION");
@@ -175,7 +175,7 @@ void probeDrawPosPanel(int y, int h) {
         g->setCursor(ox + 169, oy + 14);
         g->print(buf);
 
-        g->setTextColor(PROBE_C_DIMBLUE);
+        g->setTextColor(UI_UNIT);
         g->setCursor(ox + 215, oy + 18);
         g->print(uu);
     }
@@ -194,7 +194,7 @@ void probeDrawSettingsLink(int y) {
 void probeDrawSelBar(int y, const char* fieldName, float value, const char* unit, int decimals) {
     display.fillRoundRect(5, y, 230, 20, 3, PROBE_SEL_BG);
     display.drawRoundRect(5, y, 230, 20, 3, PROBE_C_YELLOW);
-    display.setTextSize(1);
+    uiText(&display, 1);
     display.setTextColor(PROBE_C_LBLUE);
     display.setCursor(10, y + 6);
     display.print(fieldName);
@@ -205,13 +205,13 @@ void probeDrawSelBar(int y, const char* fieldName, float value, const char* unit
     else if (decimals == 2) snprintf(vbuf, sizeof(vbuf), "%.2f", value);
     else                    snprintf(vbuf, sizeof(vbuf), "%.3f", value);
 
-    display.setTextSize(2);
+    uiText(&display, 2);
     display.setTextColor(PROBE_C_YELLOW);
     int16_t vw = display.textWidth(vbuf);
     display.setCursor(215 - vw - display.textWidth(unit), y + 3);
     display.print(vbuf);
-    display.setTextSize(1);
-    display.setTextColor(PROBE_C_DIMBLUE);
+    uiText(&display, 1);
+    display.setTextColor(UI_UNIT);
     display.setCursor(218 - display.textWidth(unit), y + 8);
     display.print(unit);
 }
@@ -219,11 +219,11 @@ void probeDrawSelBar(int y, const char* fieldName, float value, const char* unit
 void probeDrawSelBarInt(int y, const char* fieldName, int value) {
     display.fillRoundRect(5, y, 230, 20, 3, PROBE_SEL_BG);
     display.drawRoundRect(5, y, 230, 20, 3, PROBE_C_YELLOW);
-    display.setTextSize(1);
+    uiText(&display, 1);
     display.setTextColor(PROBE_C_LBLUE);
     display.setCursor(10, y + 6);
     display.print(fieldName);
-    display.setTextSize(2);
+    uiText(&display, 2);
     display.setTextColor(PROBE_C_YELLOW);
     char vbuf[8];
     snprintf(vbuf, sizeof(vbuf), "%d", value);
@@ -237,11 +237,11 @@ void probeDrawSelBarInt(int y, const char* fieldName, int value) {
 void probeDrawKVTouch(int x, int y, int w, int h,
                       const char* label, float value, const char* unit,
                       uint16_t valColor, bool focused, int decimals) {
-    uint16_t bg  = focused ? PROBE_SEL_BG : PROBE_BG_SCREEN;
+    uint16_t bg  = focused ? PROBE_SEL_BG : UI_FIELD_BG;
     uint16_t bdr = focused ? PROBE_C_YELLOW : PROBE_C_TAPBDR;
     display.fillRoundRect(x, y, w, h, 2, bg);
     display.drawRoundRect(x, y, w, h, 2, bdr);
-    display.setTextSize(1);
+    uiText(&display, 1);
     display.setTextColor(focused ? COLOR_WHITE : PROBE_C_LBLUE);
     display.setCursor(x + 3, y + 2);
     display.print(label);
@@ -252,29 +252,24 @@ void probeDrawKVTouch(int x, int y, int w, int h,
     else if (decimals == 2) snprintf(vbuf, sizeof(vbuf), "%.2f", value);
     else                    snprintf(vbuf, sizeof(vbuf), "%.3f", value);
 
-    display.setTextSize(2);
-    display.setTextColor(focused ? PROBE_C_YELLOW : valColor);
-    display.setCursor(x + 3, y + 11);
-    display.print(vbuf);
-    display.setTextSize(1);
-    display.setTextColor(PROBE_C_DIMBLUE);
-    int16_t vw = display.textWidth(vbuf) * 2;
-    display.setCursor(x + 3 + vw + 1, y + 14);
-    display.print(unit);
+    // Value and unit on one line in Font2 ("150 mm/m"), centred in the space
+    // under the caption; unit near-white so it reads on the navy field.
+    uiFieldValue(&display, x + 3, w - 6, y + 10 + (h - 10) / 2.0f, vbuf, unit,
+                 focused ? PROBE_C_YELLOW : valColor, false);
 }
 
 void probeDrawKVTouchInt(int x, int y, int w, int h,
                          const char* label, int value,
                          uint16_t valColor, bool focused) {
-    uint16_t bg  = focused ? PROBE_SEL_BG : PROBE_BG_SCREEN;
+    uint16_t bg  = focused ? PROBE_SEL_BG : UI_FIELD_BG;
     uint16_t bdr = focused ? PROBE_C_YELLOW : PROBE_C_TAPBDR;
     display.fillRoundRect(x, y, w, h, 2, bg);
     display.drawRoundRect(x, y, w, h, 2, bdr);
-    display.setTextSize(1);
+    uiText(&display, 1);
     display.setTextColor(focused ? COLOR_WHITE : PROBE_C_LBLUE);
     display.setCursor(x + 3, y + 2);
     display.print(label);
-    display.setTextSize(2);
+    uiText(&display, 2);
     display.setTextColor(focused ? PROBE_C_YELLOW : valColor);
     char vbuf[8];
     snprintf(vbuf, sizeof(vbuf), "%d", value);
@@ -288,7 +283,7 @@ void probeDrawWarn(int y, const char* msg, bool isRed, int h) {
     uint16_t fg  = isRed ? PROBE_C_RED     : PROBE_AMBER;
     display.fillRoundRect(5, y, 230, h, 3, bg);
     display.drawRoundRect(5, y, 230, h, 3, bdr);
-    display.setTextSize(1);
+    uiText(&display, 1);
     display.setTextColor(fg);
     display.setCursor(10, y + (h - 8) / 2);
     display.print(msg);
@@ -299,25 +294,18 @@ void probeDrawConfirmOverlay(const char* routineName) {
     // Semi-transparent dark panel
     display.fillRoundRect(20, 100, 200, 120, 8, PROBE_BG_PANEL);
     display.drawRoundRect(20, 100, 200, 120, 8, PROBE_C_YELLOW);
-    display.setTextSize(1);
+    uiText(&display, 1);
     display.setTextColor(PROBE_C_YELLOW);
     display.setCursor(30, 110);
     display.print("CONFIRM PROBE?");
-    display.setTextSize(1);
+    uiText(&display, 1);
     display.setTextColor(PROBE_C_LBLUE);
     int16_t tw = display.textWidth(routineName);
     display.setCursor(120 - tw / 2, 126);
     display.print(routineName);
     // Buttons
-    display.fillRoundRect(28,  175, 78, 32, 5, COLOR_BUTTON_GRAY);  // CANCEL
-    display.fillRoundRect(114, 175, 98, 32, 5, PROBE_BTN_GREEN);  // CONFIRM
-    display.setTextSize(2);
-    display.setTextColor(COLOR_WHITE);
-    display.setCursor(36, 183);
-    display.print("CANCEL");
-    int16_t cw = display.textWidth("CONFIRM");
-    display.setCursor(114 + (98 - cw) / 2, 183);
-    display.print("CONFIRM");
+    drawButton(28,  175, 78, 32, "CANCEL",  COLOR_BUTTON_GRAY, COLOR_WHITE, 2);
+    drawButton(114, 175, 98, 32, "CONFIRM", PROBE_BTN_GREEN,   COLOR_WHITE, 2);
 }
 
 // Dial acceleration — returns effective step multiplier.
@@ -364,15 +352,15 @@ void probeReturnToTrigger(const char* axis) {
 // rect, small label over the WCS).  Shared by every routine screen so the WCS
 // the probe zeroes can be cycled from each one.
 void probeDrawWorkAreaButton(int x, int y, int w, int h) {
-    display.fillRoundRect(x, y, w, h, 8, PROBE_BG_SCREEN);
+    display.fillRoundRect(x, y, w, h, 8, UI_FIELD_BG);
     display.drawRoundRect(x, y, w, h, 8, PROBE_C_TAPBDR);
-    display.setTextSize(1);
+    uiText(&display, 1);
     display.setTextColor(PROBE_C_LBLUE);
     const char* lbl = "WORK AREA";
     int16_t lw = display.textWidth(lbl);
     display.setCursor(x + (w - lw) / 2, y + 5);
     display.print(lbl);
-    display.setTextSize(2);
+    uiText(&display, 2);
     display.setTextColor(PROBE_C_BLUE);
     const char* v = pendantProbing.selectedCoordSystem.c_str();
     int16_t vw = display.textWidth(v);
@@ -402,7 +390,7 @@ void drawSeqStep(int x, int y, int num, const char* txt, bool active) {
     uint16_t fg = active ? COLOR_WHITE    : PROBE_C_DIMBLUE;
     uint16_t tc = active ? PROBE_C_YELLOW : PROBE_C_DIMBLUE;
     display.fillCircle(x + 6, y + 6, 6, bg);
-    display.setTextSize(1);
+    uiText(&display, 1);
     display.setTextColor(fg);
     int16_t nw = display.textWidth(String(num).c_str());
     display.setCursor(x + 6 - nw / 2, y + 2);
@@ -447,8 +435,9 @@ static void drawProbeTypeRow() {
     // selected type is highlighted; the others are gray.
     for (int i = 0; i < PROBE_TYPE_COUNT; i++) {
         bool sel = (pendantProbeV2.probeTypeIdx == i);
-        drawButton(kProbeTypeX[i], 38, kProbeTypeW[i], 40, kProbeTypeLabels[i],
-                   sel ? PROBE_C_YELLOW : (uint16_t)COLOR_BUTTON_GRAY, COLOR_WHITE, 1);
+        // Too narrow for FreeSansBold: bold Font2 label.
+        uiDrawNarrowButton(kProbeTypeX[i], 38, kProbeTypeW[i], 40, kProbeTypeLabels[i],
+                           sel ? PROBE_C_YELLOW : (uint16_t)COLOR_BUTTON_GRAY, COLOR_WHITE);
     }
 }
 
@@ -468,8 +457,8 @@ void updateProbeSharedFields() {
 }
 
 static void drawSharedKVPanel() {
-    display.fillRoundRect(5, 82, 230, 84, 4, PROBE_BG_PANEL);
-    display.setTextSize(1);
+    uiPanel(&display, 5, 82, 230, 84);
+    uiText(&display, 1);
     display.setTextColor(PROBE_C_LBLUE);
     display.setCursor(10, 84);
     display.print("SHARED SETTINGS");
@@ -477,8 +466,8 @@ static void drawSharedKVPanel() {
 }
 
 static void drawRoutineButtons() {
-    display.fillRoundRect(5, 170, 230, 104, 4, PROBE_BG_PANEL);
-    display.setTextSize(1);
+    uiPanel(&display, 5, 170, 230, 104);
+    uiText(&display, 1);
     display.setTextColor(PROBE_C_LBLUE);
     display.setCursor(10, 172);
     display.print("PROBE ROUTINES");
@@ -487,18 +476,19 @@ static void drawRoutineButtons() {
     //   Z-Height Plate → Z Surface only
     //   XYZ Plate      → Z Surface, XYZ Corner
     //   3D Probe       → all four
+    // One identity colour per routine (UI_RT_*), each with its icon.
     int n = probeRoutineCount();
     if (n == 1) {
-        drawButton(7, 186, 226, 40, "Z Surface", PROBE_BTN_GREEN, COLOR_WHITE, 2);
+        drawButton(7, 186, 226, 40, "Z Surface", PROBE_BTN_GREEN, COLOR_WHITE, 2, UI_ICON_ZSURF);
     } else if (n == 2) {
         // XYZ Plate — two full-width buttons, one per row.
-        drawButton(7, 186, 226, 40, "Z Surface",  PROBE_BTN_GREEN,  COLOR_WHITE, 2);
-        drawButton(7, 230, 226, 40, "XYZ Corner", PROBE_BTN_INDIGO, COLOR_WHITE, 2);
+        drawButton(7, 186, 226, 40, "Z Surface",  PROBE_BTN_GREEN, COLOR_WHITE, 2, UI_ICON_ZSURF);
+        drawButton(7, 230, 226, 40, "XYZ Corner", UI_RT_CORNER,    COLOR_WHITE, 2, UI_ICON_CORNER);
     } else {  // n == 4 (3D probe) — 2×2 grid
-        drawButton(  7, 186, 112, 40, "Z Surf",  PROBE_BTN_GREEN,  COLOR_WHITE, 2);
-        drawButton(121, 186, 112, 40, "XYZ Cnr", PROBE_BTN_INDIGO, COLOR_WHITE, 2);
-        drawButton(  7, 230, 112, 40, "Bore", PROBE_BTN_BLUE,   COLOR_WHITE, 2);
-        drawButton(121, 230, 112, 40, "Boss", PROBE_BTN_PURPLE, COLOR_WHITE, 2);
+        drawButton(  7, 186, 112, 40, "Z Surf",  PROBE_BTN_GREEN, COLOR_WHITE, 2, UI_ICON_ZSURF);
+        drawButton(121, 186, 112, 40, "XYZ Cnr", UI_RT_CORNER,    COLOR_WHITE, 2, UI_ICON_CORNER);
+        drawButton(  7, 230, 112, 40, "Bore",    UI_RT_BORE,      COLOR_WHITE, 2, UI_ICON_BORE);
+        drawButton(121, 230, 112, 40, "Boss",    UI_RT_BOSS,      COLOR_WHITE, 2, UI_ICON_BOSS);
     }
 }
 

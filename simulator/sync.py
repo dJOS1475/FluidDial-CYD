@@ -60,6 +60,8 @@ PORT_MAP = {
     # shared logic
     "CNC_Pendant_UI.cpp": "js/helpers.js + js/sim.js",
     "screens/pendant_shared.h": "js/state.js",
+    "screens/ui_style.cpp": "js/uistyle.js",
+    "screens/ui_style.h": "js/uistyle.js",
     # colour sources (regenerated automatically, tracked so a report still notes them)
     "cnc_pendant_config.h": "js/colors.js (auto)",
     "screens/screen_probe.h": "js/colors.js (auto)",

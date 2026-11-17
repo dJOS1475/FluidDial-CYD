@@ -57,8 +57,8 @@ static PairView pairView() {
 }
 
 static void drawSteps(PairView v) {
-    display.fillRoundRect(5, STEP_Y, 230, STEP_H, 4, PROBE_BG_PANEL);
-    display.setTextSize(1);
+    uiPanel(&display, 5, STEP_Y, 230, STEP_H);
+    uiText(&display, 1);
     display.setTextColor(PROBE_C_LBLUE);
     display.setCursor(10, STEP_Y + 3);
     display.print("ON THE CONTROLLER");
@@ -72,7 +72,7 @@ static void drawSteps(PairView v) {
         const int y = STEP_Y + 18 + i * 18;
         display.fillCircle(18, y + 4, 7,
                            steps[i].done ? PROBE_C_GREEN : COLOR_BUTTON_GRAY);
-        display.setTextSize(1);
+        uiText(&display, 1);
         display.setTextColor(COLOR_WHITE);
         display.setCursor(15, y + 1);
         display.print(steps[i].done ? "*" : String(i + 1));
@@ -86,8 +86,8 @@ static void drawSteps(PairView v) {
 }
 
 static void drawPairStatus(PairView v) {
-    display.fillRoundRect(5, STAT_Y, 230, STAT_H, 4, PROBE_BG_PANEL);
-    display.setTextSize(1);
+    uiPanel(&display, 5, STAT_Y, 230, STAT_H);
+    uiText(&display, 1);
     display.setTextColor(PROBE_C_LBLUE);
     display.setCursor(10, STAT_Y + 3);
     display.print("STATUS");
@@ -102,12 +102,12 @@ static void drawPairStatus(PairView v) {
         case PV_NORADIO: head = "Radio down"; col = PROBE_C_RED;    sub = "ESP-NOW failed to start"; break;
         default:         head = "Waiting...";  col = PROBE_C_YELLOW; sub = "Listening for controller"; break;
     }
-    display.setTextSize(3);
+    uiText(&display, 3);
     display.setTextColor(col);
     display.setCursor(14, STAT_Y + 20);
     display.print(head);
 
-    display.setTextSize(1);
+    uiText(&display, 1);
     display.setTextColor(COLOR_GRAY_TEXT);
     if (v == PV_OK) {
         ESPNowProfileInfo info;
@@ -243,7 +243,7 @@ static void drawMachineRow(int i) {
                           active ? PROBE_C_YELLOW
                                  : (picked ? COLOR_ORANGE : PROBE_C_TAPBDR));
 
-    display.setTextSize(2);
+    uiText(&display, 2);
     display.setTextColor(active ? PROBE_C_YELLOW : COLOR_WHITE);
     display.setCursor(12, y + 7);
     display.print(info.hostname[0] ? info.hostname : "(unnamed)");
@@ -252,7 +252,7 @@ static void drawMachineRow(int i) {
     snprintf(buf, sizeof(buf), "%02X:%02X:%02X:%02X:%02X:%02X",
              info.mac[0], info.mac[1], info.mac[2],
              info.mac[3], info.mac[4], info.mac[5]);
-    display.setTextSize(1);
+    uiText(&display, 1);
     display.setTextColor(COLOR_GRAY_TEXT);
     display.setCursor(12, y + 28);
     display.print(buf);
@@ -276,7 +276,7 @@ static void drawMachineRow(int i) {
         display.fillRoundRect(bx, by, 6, h, 1,
                               b < bars ? PROBE_C_GREEN : PROBE_BG_SCREEN);
     }
-    display.setTextSize(1);
+    uiText(&display, 1);
     display.setTextColor(live ? COLOR_GRAY_TEXT : PROBE_C_DIMBLUE);
     display.setCursor(196, y + 30);
     display.print(live ? "ok" : "--");
@@ -290,14 +290,14 @@ void drawEspNowMachinesScreen() {
     for (size_t i = 0; i < n; i++) drawMachineRow((int)i);
 
     if (n == 0) {
-        display.fillRoundRect(5, ROW0_Y, 230, MROW_H, 4, PROBE_BG_PANEL);
-        display.setTextSize(1);
+        uiPanel(&display, 5, ROW0_Y, 230, MROW_H);
+        uiText(&display, 1);
         display.setTextColor(COLOR_GRAY_TEXT);
         display.setCursor(14, ROW0_Y + 22);
         display.print("No machines paired yet");
     }
 
-    display.setTextSize(1);
+    uiText(&display, 1);
     display.setTextColor(PROBE_C_DIMBLUE);
     display.setCursor(8, 216);
     display.printf("Tap a machine to use it  -  %u/5 paired", (unsigned)n);
