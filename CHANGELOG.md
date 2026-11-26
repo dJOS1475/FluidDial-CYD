@@ -2,24 +2,12 @@
 
 **ChangeLog:**
 
-## Unreleased
+**2026-11-26**
 
-* Add experimental `pibot_v42` target with FT6336U touch, PiBot backlight,
-  encoder and button mapping, plus the existing ESP-NOW/UART UI.
-* Keep the standard CYD target and its battery/touch detection unchanged.
-  PiBot battery telemetry is deferred.
-* PiBot: default screen rotation is now 0 (the generic default showed the screen
-  upside down on the pendant). Saved rotation preferences are unchanged.
-* PiBot: the 3-position selector (GPIO34/35/39) selects the jog axis and the
-  potentiometer (GPIO26) sets the jog speed cap on the Jog screen. Logic lives in the
-  host-tested `src/PiBotControls.h`. Untested on hardware; pot reads share ADC2 with
-  the ESP-NOW radio (see docs/PIBOT.md).
-* Isolate PiBot installer artifacts in `docs/pibot_v42/`; add host regression
-  checks and CI builds for both new-UI hardware targets.
-* Expand the existing GrblParser dependency pin to its full commit SHA so
-  PlatformIO's shallow Git fetch can resolve it (same library revision).
-* Hardware validation is pending; see [PiBot commissioning notes](docs/PIBOT.md).
-
+v2.4.1
+* New: **experimental PiBot Pendant V4.2 build target** (`pio run -e pibot_v42`), contributed by @matteohoeren. It adds the PiBot's FT6336U touch panel, backlight, encoder and buttons, a 3-position selector that picks the jog axis, and a potentiometer that sets the jog speed. Hardware validation is still pending, so PiBot binaries are not on the web installer or the Releases page; see [PiBot notes](docs/PIBOT.md).
+* No change for CYD pendants: the standard firmware behaves exactly as v2.4.0.
+* Build: the GrblParser dependency is pinned by its full commit hash (same library version), and a CI workflow builds both targets and runs host tests on pull requests.
 
 **2026-11-17**
 

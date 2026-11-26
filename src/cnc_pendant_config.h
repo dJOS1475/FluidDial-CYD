@@ -24,9 +24,9 @@
 // of the git-tag-derived `git_info` string (which only changes when a tag is
 // actually cut, and is kept for the full build identifier in the About screen).
 #ifdef PIBOT_PENDANT
-#define FIRMWARE_VERSION "v2.4.0-pibot-dev"
+#define FIRMWARE_VERSION "v2.4.1-pibot-dev"
 #else
-#define FIRMWARE_VERSION "v2.4.0"
+#define FIRMWARE_VERSION "v2.4.1"
 #endif
 
 // ===== Display Configuration =====
