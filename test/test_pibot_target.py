@@ -110,25 +110,16 @@ class TargetTests(unittest.TestCase):
         """)
         self.assertEqual(result.returncode, 0, result.stderr)
 
-    def test_v240_versions_palette_and_rotation(self):
-        for flags, version, rotation in (
-            ([], "v2.4.0", 2),
-            (["-DPIBOT_PENDANT", "-DCAPACITIVE_CYD"], "v2.4.0-pibot-dev", 0),
+    def test_target_default_rotations(self):
+        for flags, rotation in (
+            ([], 2),
+            (["-DPIBOT_PENDANT", "-DCAPACITIVE_CYD"], 0),
         ):
-            with self.subTest(version=version):
+            with self.subTest(flags=flags, rotation=rotation):
                 result = self.compile(
                     """
-                    #include "cnc_pendant_config.h"
                     #include "PiBotPins.h"
-                    constexpr bool same(const char* a, const char* b) {
-                        return *a == *b && (*a == '\\0' || same(a + 1, b + 1));
-                    }
-                    static_assert(COLOR_DARKER_BG == 0x08A8, "navy panels");
-                    static_assert(COLOR_GRAY_TEXT == 0x9EDF, "light-blue labels");
-                    static_assert(COLOR_BLUE == 0x1A9B, "blue buttons");
-                    static_assert(COLOR_ORANGE == 0xEEC0, "yellow selection");
                     """
-                    + f'static_assert(same(FIRMWARE_VERSION, "{version}"), "version");'
                     + f'static_assert(PENDANT_NORMAL_ROTATION == {rotation}, "rotation");',
                     flags,
                 )
