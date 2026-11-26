@@ -25,7 +25,12 @@
 // CYD that is supposed to control battery charging, cutting the
 // traces that connect it to the battery circuit and running a wire
 // over to the photoresistor.
+#ifdef PIBOT_PENDANT
+// GPIO34 is part of the selector, not a photoresistor / UI lock input.
+int lockout_pin = -1;
+#else
 int lockout_pin = GPIO_NUM_34;
+#endif
 
 m5::Touch_Class  xtouch;
 m5::Touch_Class& touch = xtouch;
@@ -124,6 +129,9 @@ static void init_panel_st7789() {
     cfg.pin_cs          = GPIO_NUM_15;
     cfg.offset_rotation = base_rotation;
     cfg.bus_shared      = false;
+#ifdef PIBOT_PENDANT
+    cfg.invert          = true;
+#endif
     p.config(cfg);
 
     p.light(&light);
@@ -141,6 +149,9 @@ static void init_panel_ili9341() {
     cfg.pin_cs          = GPIO_NUM_15;
     cfg.offset_rotation = base_rotation;
     cfg.bus_shared      = false;
+#ifdef PIBOT_PENDANT
+    cfg.invert          = true;
+#endif
     p.config(cfg);
 
     p.light(&light);
@@ -159,10 +170,32 @@ int green_button_pin = -1;
 int enc_a, enc_b;
 
 #ifdef CAPACITIVE_CYD
+#    ifdef PIBOT_PENDANT
+lgfx::Touch_FT5x06 _touch_ft5x06;
+#    else
 lgfx::Touch_CST816S _touch_cst816s;
+#    endif
 
 void init_capacitive_cyd() {
     {
+#    ifdef PIBOT_PENDANT
+        // FT6336U uses the FT5x06 driver. Poll instead of relying on IRQ.
+        auto cfg            = _touch_ft5x06.config();
+        cfg.i2c_port        = I2C_NUM_1;
+        cfg.pin_sda         = pibot::touch_sda;
+        cfg.pin_scl         = pibot::touch_scl;
+        cfg.pin_rst         = -1;
+        cfg.pin_int         = -1;
+        cfg.offset_rotation = base_rotation;
+        cfg.freq            = 400000;
+        cfg.x_min           = 0;
+        cfg.x_max           = 239;
+        cfg.y_min           = 0;
+        cfg.y_max           = 319;
+        cfg.bus_shared      = false;
+        _touch_ft5x06.config(cfg);
+        display.getPanel()->setTouch(&_touch_ft5x06);
+#    else
         auto cfg            = _touch_cst816s.config();
         cfg.i2c_port        = I2C_NUM_0;
         cfg.pin_sda         = GPIO_NUM_33;
@@ -175,13 +208,29 @@ void init_capacitive_cyd() {
         cfg.y_max           = 320;
         _touch_cst816s.config(cfg);
         display.getPanel()->setTouch(&_touch_cst816s);
+#    endif
         display.getPanel()->initTouch();
     }
+#    ifdef PIBOT_PENDANT
+    setBacklightPin(pibot::backlight);
+#    else
     setBacklightPin(GPIO_NUM_27);
 
     pinMode(lockout_pin, INPUT);
+#    endif
 
-#    ifdef CYD_BUTTONS
+#    ifdef PIBOT_PENDANT
+    enc_a = pibot::encoder_a;
+    enc_b = pibot::encoder_b;
+    red_button_pin   = pibot::button_cancel;
+    dial_button_pin  = pibot::button_pause;
+    green_button_pin = pibot::button_start;
+    // Return the red-button pad from RTC control after deep-sleep wakeup.
+    rtc_gpio_deinit(static_cast<gpio_num_t>(pibot::button_cancel));
+    pinMode(red_button_pin, INPUT_PULLUP);
+    pinMode(dial_button_pin, INPUT_PULLUP);
+    pinMode(green_button_pin, INPUT_PULLUP);
+#    elif defined(CYD_BUTTONS)
     enc_a = GPIO_NUM_22;
     enc_b = GPIO_NUM_21;
     // rotary_button_pin = GPIO_NUM_35;
@@ -452,6 +501,10 @@ void init_hardware() {
 
     init_light();
     init_bus();
+#ifdef PIBOT_PENDANT
+    // Fixed hardware: do not infer another panel from an unreliable ID read.
+    init_panel_ili9341();
+#else
     // or ... 0x04, 1, 3) == 0x0
     if (read_panel_reg(&bus, GPIO_NUM_15, 0xda, 0, 1) == 0x0) {
         dbg_printf("ILI9341 panel\n");
@@ -460,6 +513,7 @@ void init_hardware() {
         dbg_printf("ST7789 panel\n");
         init_panel_st7789();
     }
+#endif
     display.init();
 
     choose_board();
@@ -468,14 +522,14 @@ void init_hardware() {
 
     set_layout(layout_num);
 
-    touch.begin(&display);  // installs ESP-IDF I2C driver for I2C_NUM_0
+    touch.begin(&display);  // touch driver owns its board-specific I2C port
 
     init_encoder(enc_a, enc_b);
     init_fnc_uart(FNC_UART_NUM, PND_TX_FNC_RX_PIN, PND_RX_FNC_TX_PIN);
 
     touch.setFlickThresh(10);
 
-    battery_init();  // after touch.begin(): display_num set + I2C_NUM_0 driver installed
+    battery_init();  // CYD only; PiBot has no verified battery telemetry yet
 
 #ifdef LED_DEBUG
     // RGB LED pins
@@ -576,6 +630,9 @@ bool    touch_debounce = false;
 int32_t touch_timeout  = 0;
 
 bool ui_locked() {
+    if (lockout_pin < 0) {
+        return false;
+    }
     bool locked = digitalRead(lockout_pin);
     if ((int)locked != last_locked) {
         last_locked = locked;
