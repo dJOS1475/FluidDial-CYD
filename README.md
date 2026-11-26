@@ -1,5 +1,5 @@
 # FluidDial-CYD: 
-FluidDial-CYD is a custom firmware for CYD-equipped FluidDial CNC pendants. The UI has been rebuilt from the ground up for devices with 3 physical buttons and a jog dial. Supports both **resistive (XPT2046)** and **capacitive (CST816S)** CYD screen variants. 
+FluidDial-CYD is a custom firmware for CYD-equipped FluidDial CNC pendants. The UI has been rebuilt from the ground up for devices with 3 physical buttons and a jog dial. Supports both **resistive (XPT2046)** and **capacitive (CST816S)** CYD screen variants, plus experimental support for the **PiBot Pendant V4.2** (build from source; see the [PiBot notes](docs/PIBOT.md)). 
 
 Runs **wired over UART** or **wireless over ESP-NOW** (requires FluidNC v4.0.4+), with **Li-Ion battery** support for a fully untethered pendant.
 
